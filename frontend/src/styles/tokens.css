@@ -1,0 +1,124 @@
+/* VOLTA design tokens. Every screen uses these; nothing is styled with raw values.
+ *
+ * Source: Sylva by MengTo (https://mengto.github.io/sylva/). Its palette, Lexend
+ * weights, 1600-unit layout scale, radii, card shadow and easing are copied as
+ * values. Marked NEW: the electric accents, which come from the developer's
+ * direction (electric-green liquid metal and pulses, red on overload).
+ */
+
+@import "@fontsource-variable/lexend";
+
+:root {
+  /* ── layout scale: 1 unit = 1px of Sylva's 1600-wide artboard ─────────── */
+  --u: calc(100vw / 1600);
+
+  /* ── surfaces (Sylva) ─────────────────────────────────────────────────── */
+  --bg: #383b34;                 /* page background */
+  --bg-hero: #4a4d44;            /* the near-flat hero field */
+  --bg-deep: #23261f;            /* terrain shadow, dark ink */
+  --bg-night: #1b1e18;           /* deepest shade */
+  --haze: #2d3225;               /* scene haze (Sylva hazeCol 0.176, 0.195, 0.145) */
+  --pool: rgba(232, 238, 222, 0.085); /* the soft light pool behind the scene */
+
+  /* ── ink on dark (Sylva) ──────────────────────────────────────────────── */
+  --ink: #ffffff;
+  --ink-soft: rgba(255, 255, 255, 0.62);
+  --ink-faint: rgba(255, 255, 255, 0.44);
+  --ink-mark: rgba(255, 255, 255, 0.34);   /* stat icons */
+  --rule: rgba(255, 255, 255, 0.055);      /* guides, ghost word */
+
+  /* ── floating paper cards (Sylva's white cards) ──────────────────────────
+     Named "paper" so shadcn's --card can mean the glass card below. */
+  --paper: #f2f3ef;
+  --paper-ink: #23261f;
+  --paper-label: #7c8177;
+  --paper-shadow: 0 calc(30 * var(--u)) calc(70 * var(--u)) rgba(16, 21, 13, 0.30);
+
+  /* ── glass card: moss-green translucent panel (charts, dashboard) ────────
+     Sylva's haze (#2d3225) at 62%, with the dock's soft edge. */
+  --glass-card: rgba(45, 50, 37, 0.62);
+  --glass-card-ink: var(--ink);
+  --glass-card-edge: rgba(238, 243, 231, 0.085);
+
+  /* ── glass: dock, buttons (Sylva) ─────────────────────────────────────── */
+  --glass: rgba(255, 255, 255, 0.04);
+  --glass-hover: rgba(255, 255, 255, 0.075);
+  --glass-edge: rgba(255, 255, 255, 0.11);
+  --glass-rim: rgba(255, 255, 255, 0.19);
+  --glass-active: #f2f3ef;                /* the active dock item turns paper-white */
+  --glass-shadow: 0 calc(12 * var(--u)) calc(34 * var(--u)) rgba(10, 14, 8, 0.30);
+
+  /* ── electric accents (NEW, from the developer's direction) ───────────── */
+  --volt: #c4f26a;                         /* electric green: pulses, liquid-metal tint */
+  --volt-soft: rgba(196, 242, 106, 0.35);
+  --volt-glow: rgba(196, 242, 106, 0.16);
+  --volt-pale: #e5f4d1;                    /* Sylva's pale green highlight (229, 244, 209) */
+  --overload: #ff5b4a;                     /* Critical Overload: lines pulse red */
+  --overload-soft: rgba(255, 91, 74, 0.35);
+
+  /* ── energy flows: shared by the 3D scene and every chart ────────────── */
+  --flow-grid: var(--volt);                /* main-grid current: electric lime */
+  --flow-battery: var(--volt-pale);        /* battery: Sylva's pale green */
+  --flow-solar: #f0e7bd;                   /* solar: Sylva's warm light colour (scene code) */
+  --flow-overload: var(--overload);        /* overload only */
+  --chart-grid-line: rgba(255, 255, 255, 0.045); /* very faint chart grid */
+  --chart-ref-line: rgba(255, 255, 255, 0.18);   /* the 160 and 200 kW reference lines */
+
+  /* ── controller modes, for any mode UI ───────────────────────────────── */
+  --mode-grid: var(--ink-soft);            /* Main Grid Mode */
+  --mode-storage: var(--volt);             /* Renewable Storage Mode */
+  --mode-overload: var(--overload);
+
+  /* ── type (Sylva: Lexend, light by default) ──────────────────────────── */
+  --font: "Lexend Variable", "Lexend", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --w-light: 300;
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semibold: 600;
+  --t-ghost: calc(310 * var(--u));         /* giant background wordmark */
+  --t-display: calc(63 * var(--u));        /* headline */
+  --t-display-lh: calc(65 * var(--u));
+  --t-card-title: calc(26.2 * var(--u));
+  --t-card-title-lh: calc(27 * var(--u));
+  --t-lede: calc(16.5 * var(--u));
+  --t-lede-lh: calc(22 * var(--u));
+  --t-card-label: calc(15.5 * var(--u));
+  --t-stat: calc(13.5 * var(--u));
+  --t-dock: calc(11 * var(--u));
+  --track-display: calc(-0.4 * var(--u));
+  --track-card: calc(-0.5 * var(--u));
+  --track-dock: calc(1.5 * var(--u));      /* dock labels are spaced caps */
+  --track-ghost: calc(30 * var(--u));
+
+  /* ── radii (Sylva) ────────────────────────────────────────────────────── */
+  --r-card: calc(46 * var(--u));
+  --r-portal: calc(34 * var(--u));
+  --r-pill: calc(40 * var(--u));
+  --r-dock: calc(14 * var(--u));
+  --r-dock-item: calc(10 * var(--u));
+  --r-round: 50%;
+
+  /* ── motion (Sylva) ───────────────────────────────────────────────────── */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 0.25s;
+  --dur: 0.8s;
+  --dur-reveal: 1.3s;
+
+  /* ── layering ─────────────────────────────────────────────────────────── */
+  --z-ghost: 1;
+  --z-card-back: 2;   /* card 1 sits behind the scene, so the landscape overlaps it */
+  --z-scene: 3;
+  --z-ui: 4;
+  --z-dock: 10;
+}
+
+/* Sylva caps the scale on very wide screens */
+@media (min-width: 1900px) {
+  :root { --u: calc(1900px / 1600); }
+}
+
+/* Phones: a single column on a 390-wide scale */
+@media (max-width: 720px) {
+  :root { --u: calc(100vw / 390); }
+}

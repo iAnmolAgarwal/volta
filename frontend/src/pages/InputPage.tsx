@@ -5,7 +5,7 @@ import { GlassCard } from "@/components/app/GlassCard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Pill } from "@/components/app/Pill";
 import { ErrorState } from "@/components/app/States";
-import { ApiError, forecastCsv, forecastRows, forecastSample, MAX_ROWS, setLastRunId, type Run } from "@/lib/api";
+import { ApiError, forecastCsv, forecastRows, getSample, MAX_ROWS, SAMPLE_FILENAME, setLastRunId, type Run } from "@/lib/api";
 import { WORDMARK } from "@/lib/brand";
 import { DayForm } from "./input/DayForm";
 import { describeError, subjectOf, type What } from "./input/errors";
@@ -13,6 +13,7 @@ import { HeroStats } from "./input/HeroStats";
 import { BusyCard, CleaningReport, RunSummary } from "./input/Report";
 import { RowsTable } from "./input/RowsTable";
 import { loadDraft, loadLast, saveDraft, saveLast, type Last } from "./input/session";
+import { stepsFor } from "./input/steps";
 import { stashUnsaved, storageOf } from "./input/unsaved";
 import { cellId, csvRowCount, generate, toTelemetry, type Col, type GenSpec, type Row } from "./input/profile";
 import "@/styles/pages/input.css";
@@ -27,7 +28,7 @@ import "@/styles/pages/input.css";
 /** The post in flight, or how the last one failed. The last good result is kept apart (`last`). */
 type Op =
   | { state: "idle" }
-  | { state: "busy"; what: What; title: string; startedAt: number; cancel: () => void }
+  | { state: "busy"; what: What; title: string; startedAt: number; steps: string[]; at: number; token: number; cancel: () => void }
   | { state: "error"; title: string; error: unknown; retry?: () => void };
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -48,6 +49,7 @@ export default function InputPage() {
   const resultRef = useRef<HTMLDivElement>(null);
   const reportHead = useRef<HTMLSpanElement>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
+  const tokens = useRef(0);
 
   useEffect(() => {
     document.title = `Forecast input · ${WORDMARK}`;
@@ -68,39 +70,45 @@ export default function InputPage() {
 
   const busy = op.state === "busy";
 
-  const send = useCallback((what: What, subject: string, title: string, go: (signal: AbortSignal) => Promise<Run>, posted?: number[]) => {
-    const ctrl = new AbortController();
-    const retry = () => send(what, subject, title, go, posted);
-    setOp({ state: "busy", what, title, startedAt: Date.now(), cancel: () => ctrl.abort() });
-    go(ctrl.signal)
-      .then((run) => {
-        // a saved run is remembered by id; one that wasn't saved travels in sessionStorage
-        const st = storageOf(run);
-        if (st.saved && st.id) setLastRunId(st.id);
-        const stashed = st.saved ? true : stashUnsaved(run);
-        const next: Last = { what, run, posted, stashed };
-        saveLast(next);
-        setLast(next);
-        if (st.saved) setSavedHere((n) => n + 1);
-        setOp({ state: "idle" });
-        setArrived((n) => n + 1);
-      })
-      .catch((error) => {
-        if (ctrl.signal.aborted) {
-          setOp({ state: "idle" }); // cancelled: the last report, if any, stays as it was
-          return;
-        }
-        const copy = describeError(subject, error);
-        setOp({ state: "error", title: copy.title, error: copy.error, retry: copy.retryable ? retry : undefined });
-      });
-  }, []);
+  /** Post through `go`. It calls `advance` each time the browser sees a step really finish. */
+  const send = useCallback(
+    (what: What, subject: string, title: string, route: { steps: string[]; at: number }, go: (signal: AbortSignal, advance: () => void) => Promise<Run>, posted?: number[]) => {
+      const ctrl = new AbortController();
+      const token = ++tokens.current;
+      const retry = () => send(what, subject, title, route, go, posted);
+      const advance = () => setOp((o) => (o.state === "busy" && o.token === token ? { ...o, at: Math.min(o.at + 1, o.steps.length - 1) } : o));
+      setOp({ state: "busy", what, title, startedAt: Date.now(), ...route, token, cancel: () => ctrl.abort() });
+      go(ctrl.signal, advance)
+        .then((run) => {
+          // a saved run is remembered by id; one that wasn't saved travels in sessionStorage
+          const st = storageOf(run);
+          if (st.saved && st.id) setLastRunId(st.id);
+          const stashed = st.saved ? true : stashUnsaved(run);
+          const next: Last = { what, run, posted, stashed };
+          saveLast(next);
+          setLast(next);
+          if (st.saved) setSavedHere((n) => n + 1);
+          setOp({ state: "idle" });
+          setArrived((n) => n + 1);
+        })
+        .catch((error) => {
+          if (ctrl.signal.aborted) {
+            setOp({ state: "idle" }); // cancelled: the last report, if any, stays as it was
+            return;
+          }
+          const copy = describeError(subject, error);
+          setOp({ state: "error", title: copy.title, error: copy.error, retry: copy.retryable ? retry : undefined });
+        });
+    },
+    [],
+  );
 
   const sendRows = () => {
     const n = rows.length;
     if (n === 0) return;
     const body = toTelemetry(rows);
     const subject = subjectOf("manual", `Your ${n} ${n === 1 ? "hour" : "hours"}`);
-    send("manual", subject, `Forecasting ${n} manual ${n === 1 ? "hour" : "hours"}`, (signal) => forecastRows(body, { signal }), rows.map((r) => r.id));
+    send("manual", subject, `Forecasting ${n} manual ${n === 1 ? "hour" : "hours"}`, stepsFor("manual", { rows: n }), (signal) => forecastRows(body, { signal }), rows.map((r) => r.id));
   };
 
   const fail = (subject: string, error: unknown) => {
@@ -108,24 +116,32 @@ export default function InputPage() {
     setOp({ state: "error", title: copy.title, error: copy.error });
   };
 
-  const sendFile = async (file: File) => {
+  const sendFile = (file: File) => {
     setFileName(file.name);
-    let n: number;
-    try {
-      n = csvRowCount(await file.text());
-    } catch {
-      fail(file.name, new Error(`${file.name} couldn't be read from this device. Try saving it again, then drop it here.`));
-      return;
-    }
-    if (n > MAX_ROWS) {
-      // the API would answer 413; say so before uploading
-      fail(file.name, new ApiError("too_large", `${file.name} has ${n.toLocaleString()} rows and the limit is ${MAX_ROWS.toLocaleString()}. Nothing was sent; trim it and drop it again.`));
-      return;
-    }
-    send("csv", file.name, `Forecasting ${file.name} · ${n.toLocaleString()} ${n === 1 ? "row" : "rows"}`, (signal) => forecastCsv(file, { signal }));
+    // the file is read and its size checked inside the post, so the busy card's first step is that read
+    send("csv", file.name, `Forecasting ${file.name}`, stepsFor("csv", { fileName: file.name }), async (signal, advance) => {
+      let n: number;
+      try {
+        n = csvRowCount(await file.text());
+      } catch {
+        throw new Error(`${file.name} couldn't be read from this device. Try saving it again, then drop it here.`);
+      }
+      if (n > MAX_ROWS) {
+        // the API would answer 413; say so before uploading
+        throw new ApiError("too_large", `${file.name} has ${n.toLocaleString()} rows and the limit is ${MAX_ROWS.toLocaleString()}. Nothing was sent; trim it and drop it again.`);
+      }
+      if (signal.aborted) throw new DOMException("cancelled", "AbortError");
+      advance();
+      return forecastCsv(file, { signal });
+    });
   };
 
-  const sendSample = () => send("sample", "The sample", "Forecasting the 1,000-hour sample", (signal) => forecastSample({ signal }));
+  const sendSample = () =>
+    send("sample", "The sample", "Forecasting the 1,000-hour sample", stepsFor("sample"), async (signal, advance) => {
+      const csv = await getSample({ signal });
+      advance();
+      return forecastCsv(csv, { signal, source: "sample", filename: SAMPLE_FILENAME });
+    });
 
   const onGenerate = () => {
     setRows(generate(spec));
@@ -166,7 +182,7 @@ export default function InputPage() {
         <div className="vi-result" ref={resultRef}>
           {op.state !== "idle" && (
             <div className="vi-result-grid">
-              {op.state === "busy" && <BusyCard title={op.title} startedAt={op.startedAt} onCancel={op.cancel} />}
+              {op.state === "busy" && <BusyCard title={op.title} startedAt={op.startedAt} steps={op.steps} at={op.at} onCancel={op.cancel} />}
               {op.state === "error" && (
                 <ErrorState
                   title={op.title}
@@ -203,7 +219,7 @@ export default function InputPage() {
                 busyText="Cleaning and forecasting"
                 disabled={busy}
                 hint={`or click to browse · up to ${MAX_ROWS.toLocaleString()} rows`}
-                onFile={(file) => void sendFile(file)}
+                onFile={sendFile}
                 onReject={(file, why) => fail(file.name, new Error(`${why}. Choose a .csv file.`))}
               />
               <p className="vi-note vi-cols">

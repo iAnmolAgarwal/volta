@@ -41,6 +41,12 @@ FEATURE_GROUPS = {
 }
 FEATURE_COLUMNS = [c for cols in FEATURE_GROUPS.values() for c in cols]
 
+# Columns for the QuickML training CSV and endpoint: the one-SE set from
+# model/baselines.py (hour blocks + cool_24). blk_night is left out as the
+# reference level so a linear model with an intercept gets a full-rank design.
+QUICKML_REFERENCE = "blk_night"
+QUICKML_FEATURES = ["blk_dawn", "blk_morning", "blk_day", "blk_evening", "blk_late", "cool_24"]
+
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
     """Map raw telemetry rows to model features, one output row per input row.

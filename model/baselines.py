@@ -21,7 +21,15 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from model.data import DOCS_DIR, TARGET, load_test, load_train
-from model.features import COOL_THRESHOLDS, FEATURE_COLUMNS, FEATURE_GROUPS, HOUR_BLOCKS, build_features
+from model.features import (
+    COOL_THRESHOLDS,
+    FEATURE_COLUMNS,
+    FEATURE_GROUPS,
+    HOUR_BLOCKS,
+    QUICKML_FEATURES,
+    QUICKML_REFERENCE,
+    build_features,
+)
 from model.report import Report
 from model.split import describe_split, time_split
 
@@ -320,6 +328,9 @@ def main() -> None:
         fit_rmse, val_rmse, _ = exp.score(make(), best_cols)
         family.append((name, fit_rmse, val_rmse))
         record(name, "best set (one-SE rule)", len(best_cols), fit_rmse, val_rmse)
+    record("OLS with intercept", f"QuickML columns ({QUICKML_REFERENCE} as reference)",
+           len(QUICKML_FEATURES), *exp.score(LinearRegression(), QUICKML_FEATURES)[:2])
+    quickml_matches = [c for c in best_cols if c != QUICKML_REFERENCE] == QUICKML_FEATURES
 
     t_best, coef, tests, noise, formula_val = formula_search(train, exp)
 
@@ -365,6 +376,9 @@ def main() -> None:
     rep.add(
         f"Best threshold: {t_star:.2f} °C (VAL RMSE {cool_grid['VAL RMSE'].min():.4f}).",
         f"**Best feature set ({len(best_cols)} columns):** `{', '.join(best_cols)}`",
+        f"QUICKML_FEATURES in model/features.py is this set with `{QUICKML_REFERENCE}` left out as "
+        "the reference level (same predictions under a linear model with an intercept): "
+        + ("**matches**." if quickml_matches else "**DOES NOT MATCH; update QUICKML_FEATURES.**"),
     )
 
     rep.add("## Best feature set by model family (fit on FIT, scored on VAL)")

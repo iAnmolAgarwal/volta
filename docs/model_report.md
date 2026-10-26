@@ -26,6 +26,7 @@ Forward in time, never random: fit on the first 80% of `train_telemetry.csv` by 
 | RandomForest | best set (one-SE rule) | 7 | 8.285 | 14.205 |
 | GradientBoosting | best set (one-SE rule) | 7 | 8.249 | 11.469 |
 | LightGBM | best set (one-SE rule) | 7 | 8.339 | 14.407 |
+| OLS with intercept | QuickML columns (blk_night as reference) | 6 | 8.575 | 8.279 |
 
 A VAL RMSE near 8.30 kW over 800 rows has a standard error of about 0.21 kW (RMSE / sqrt(2n)), so gaps under ~0.2 kW are within noise.
 
@@ -82,6 +83,8 @@ One-SE groups without `cooling`, plus one hinge max(0, T - t). The full four-hin
 Best threshold: 24.00 °C (VAL RMSE 8.2788).
 
 **Best feature set (7 columns):** `blk_night, blk_dawn, blk_morning, blk_day, blk_evening, blk_late, cool_24`
+
+QUICKML_FEATURES in model/features.py is this set with `blk_night` left out as the reference level (same predictions under a linear model with an intercept): **matches**.
 
 ## Best feature set by model family (fit on FIT, scored on VAL)
 

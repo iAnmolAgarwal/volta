@@ -2,6 +2,7 @@ import { Suspense, useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
 import { Dock, type DockId } from "@/components/landing/Dock";
 import { WORDMARK } from "@/lib/brand";
+import { getLastRunId } from "@/lib/api";
 import { Shimmer } from "./States";
 import "@/styles/landing.css"; // the dock's own rules (already in the entry bundle; listed so the dependency is explicit)
 import "@/styles/app.css";
@@ -17,8 +18,15 @@ const ACTIVE: Record<string, DockId> = {
   "/history": "history",
 };
 
+// Controller opens the run in context: the dashboard's own ?run= / ?unsaved=1, else the viewer's last run
+function controllerHref(pathname: string, search: string): string {
+  if (pathname === "/dashboard" && /[?&](run|unsaved)=/.test(search)) return `/dashboard${search}`;
+  const last = getLastRunId();
+  return last ? `/dashboard?run=${encodeURIComponent(last)}` : "/dashboard";
+}
+
 export default function AppLayout() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const active = ACTIVE[pathname] ?? null;
 
   // a new route starts at the top
@@ -35,7 +43,7 @@ export default function AppLayout() {
         <div className="va-ghost">{WORDMARK}</div>
       </div>
       <a className="va-skip" href="#va-main">Skip to content</a>
-      <Dock active={active} />
+      <Dock active={active} controllerHref={controllerHref(pathname, search)} />
       <main className="va-main" id="va-main" tabIndex={-1}>
         <Suspense fallback={<div className="va-page"><Shimmer variant="text" lines={2} className="va-boot-title" /><Shimmer variant="chart" /></div>}>
           <Outlet />

@@ -14,7 +14,8 @@ import { BURST_MS, useRouteLink } from "@/lib/useRouteLink";
  * The landing page and the app routes share it. The items are routes, followed
  * client side: on the landing page the paper moves to the clicked item and the
  * scene's click burst plays before the route changes (`burst`); on the app
- * routes `active` follows the route. */
+ * routes `active` follows the route, "Launch dashboard" is dropped (Controller
+ * is the dashboard there), and Controller opens the run in context (`controllerHref`). */
 
 export type DockId = "forecast" | "controller" | "history" | "dashboard";
 
@@ -42,13 +43,16 @@ interface Spec { el: HTMLElement; ang: number; tAng: number; br: number; tBr: nu
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const smooth = (x: number) => x * x * (3 - 2 * x);
 
-export function Dock({ active: routeActive, burst = false }: { active?: DockId | null; burst?: boolean } = {}) {
+export function Dock({ active: routeActive, burst = false, controllerHref }: { active?: DockId | null; burst?: boolean; controllerHref?: string } = {}) {
   const navRef = useRef<HTMLElement>(null);
   const [picked, setPicked] = useState<DockId>("forecast");
   // the app routes pass the route's item; the landing page keeps its own (Forecast first, as built)
   const active = routeActive !== undefined ? routeActive : picked;
   const link = useRouteLink();
   const wait = burst ? BURST_MS : 0;
+  const items = controllerHref
+    ? ITEMS.filter((it) => it.id !== "dashboard").map((it) => (it.id === "controller" ? { ...it, href: controllerHref } : it))
+    : ITEMS;
 
   useEffect(() => {
     const root = navRef.current;
@@ -249,7 +253,7 @@ export function Dock({ active: routeActive, burst = false }: { active?: DockId |
         <a className="vl-dock-item vl-dock-mark" href="/" data-dock="mark" data-spec aria-label={MARK_LABEL} style={{ "--d": `${DELAYS[0]}ms` } as CSSProperties} onClick={link("/", wait)}>
           <Zap aria-hidden strokeWidth={1.25} />
         </a>
-        {ITEMS.map((it, i) => (
+        {items.map((it, i) => (
           <a
             key={it.id}
             href={it.href}

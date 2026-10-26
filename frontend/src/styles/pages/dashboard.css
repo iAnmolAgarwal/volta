@@ -7,6 +7,49 @@
  * down Sylva's diagonal (x 1250 → 1346 → 1432, +110 a step). Every value is a
  * token from tokens.css or a unit of --u; no Sylva code is copied. */
 
+/* ── the supply tones: three distinct flows, all from the flow tokens ─────
+   grid stays the lime; the battery is its pale green taken down into the
+   portal's moss (a mid sage); the sun's warm light is taken to an amber. */
+.vd {
+  --vd-grid: var(--flow-grid);
+  --vd-battery: color-mix(in oklab, var(--flow-battery) 58%, var(--portal-bg));
+  --vd-solar: color-mix(in oklab, var(--flow-solar) 72%, var(--overload) 28%);
+  --vd-grid-glow: var(--flow-grid-glow);
+  --vd-battery-glow: color-mix(in oklab, var(--vd-battery) 40%, transparent);
+  --vd-solar-glow: color-mix(in oklab, var(--vd-solar) 40%, transparent);
+  /* where the fixed dock ends: Sylva's 38 top + its 46 height */
+  --vd-dock-end: calc((38 + 46) * var(--u));
+}
+@supports (color: oklch(from red l c h)) {
+  .vd { --vd-solar: oklch(from var(--flow-solar) calc(l - 0.09) calc(c + 0.08) calc(h - 20)); }
+}
+.vd-area--grid { --area-glow: var(--vd-grid-glow); }
+.vd-area--battery { --area-glow: var(--vd-battery-glow); }
+.vd-area--pv { --area-glow: var(--vd-solar-glow); }
+
+/* ── the dock's shelf: once the page scrolls, a frosted band of the field
+   rises behind the fixed dock, so data fades out before it reaches it ──── */
+.vd::before {
+  content: "";
+  position: fixed;
+  z-index: calc(var(--z-dock) - 1);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--vd-dock-end) + 30 * var(--u));
+  pointer-events: none;
+  background: linear-gradient(180deg, var(--bg-hero) 0%, var(--bg-hero) 58%, transparent 100%);
+  backdrop-filter: blur(calc(10 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(10 * var(--u)));
+  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
+  mask-image: linear-gradient(180deg, #000 62%, transparent);
+  opacity: 0;
+  transition: opacity 0.35s var(--ease);
+}
+.vd[data-scrolled]::before { opacity: 1; }
+/* keyboard focus and in-page jumps stop below the dock */
+:root:has(.vd) { scroll-padding-top: calc(var(--vd-dock-end) + 24 * var(--u)); }
+
 /* ── the hero band ───────────────────────────────────────────────────────── */
 .vd-hero {
   position: relative;
@@ -19,7 +62,9 @@
 .vd-hero > .va-head { grid-column: 1 / -1; margin-bottom: calc(22 * var(--u)); }
 .vd-hero > .va-head .va-lede { max-width: calc(250 * var(--u)); }
 .vd-state { grid-column: 1; min-width: 0; padding-right: calc(40 * var(--u)); }
-.vd-state .va-mode-reason { max-width: calc(360 * var(--u)); }
+.vd-state .va-mode-reason { max-width: calc(360 * var(--u)); min-height: calc(2 * 1.5em); }
+/* a steady pill: "Main Grid" and "Renewable Storage · Overload" hold one width while scrubbing */
+.vd-state .va-mode-pill { min-width: calc(330 * var(--u)); }
 
 /* "Saved" or "Not saved: <reason>": a quiet chip beside the eyebrow */
 .vd-hero .va-eyebrow { white-space: nowrap; }
@@ -180,8 +225,42 @@
   gap: var(--a-gap);
   align-items: stretch;
 }
-.vd-chart-wrap { min-width: 0; display: grid; scroll-margin-top: calc(130 * var(--u)); }
-.vd-chart { --chart-h: calc(372 * var(--u)); }
+.vd-chart-wrap { min-width: 0; display: grid; scroll-margin-top: calc(var(--vd-dock-end) + 16 * var(--u)); }
+
+/* the chart card: the landing's paper card, its moss plate inset 14 at the top,
+   then the label, title and range under it (the "Next-24h peak" card) */
+.vd-chart { --chart-h: calc(372 * var(--u)); display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
+.vd-chart .va-chart-plate { margin: 0; flex: none; }
+.vd-chart:has(.recharts-surface:focus-visible) .va-chart-plate,
+.vd-chart:has(.recharts-wrapper:focus-visible) .va-chart-plate { outline: 2px solid var(--focus-ring-dark); outline-offset: calc(3 * var(--u)); }
+.vd-chart .recharts-wrapper:focus-visible { outline: none; }
+.vd-chart .va-axis-unit { top: calc(6 * var(--u)); }
+.vd-chart-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: calc(14 * var(--u)) calc(20 * var(--u));
+  padding: calc(22 * var(--u)) calc(24 * var(--u)) 0;
+}
+.vd-chart-heading .va-card-label { color: var(--paper-label); }
+.vd-chart-heading .va-card-title { color: var(--paper-ink); }
+.vd-chart .va-chart-desc { margin: calc(8 * var(--u)) 0 0; color: var(--paper-label); }
+.vd-chart-range { padding-top: calc(4 * var(--u)); }
+.vd-chart .va-legend { grid-column: 1 / -1; margin: 0; color: var(--paper-label); }
+/* on paper, each swatch is ringed in the paper's ink so the pale tones still read */
+.vd-chart .va-legend-swatch { box-shadow: 0 0 0 1px var(--paper-label), 0 0 calc(6 * var(--u)) var(--sw); }
+.vd-chart .va-legend-line { background: var(--paper-ink); }
+.vd-chart .va-legend-dash { border-top-color: var(--paper-label); }
+.vd-chart .va-legend-dash--overload { border-top-color: var(--overload); }
+.vd-chart .va-legend-band { background: var(--volt-soft); box-shadow: inset 0 0 0 1px var(--paper-label); }
+.vd-legend-band { width: calc(16 * var(--u)); height: calc(10 * var(--u)); border-radius: calc(3 * var(--u)); background: var(--volt-soft); box-shadow: inset 0 0 0 1px var(--paper-label); }
+.vd-legend-dot { width: calc(9 * var(--u)); height: calc(9 * var(--u)); border-radius: var(--r-round); background: var(--overload); }
+
+/* the tooltip: values never wrap; on a phone it is the compact head only, pinned over the plot's top */
+.vd-tip .va-tip-row b,
+.vd-tip .va-tip-kw { white-space: nowrap; }
+.vd-tip .va-tip-row span { min-width: 0; }
+.vd-tip-line { width: calc(12 * var(--u)) !important; height: 1.5px !important; border-radius: 0 !important; background: var(--ink); box-shadow: none !important; }
 .vd-ref-label {
   fill: var(--ink-faint);
   font-size: max(var(--t-min), var(--a-caps));
@@ -194,9 +273,8 @@
   width: calc(16 * var(--u));
   height: calc(9 * var(--u));
   border-radius: 0 0 calc(4 * var(--u)) calc(4 * var(--u));
-  border: 1px dashed var(--flow-battery);
+  border: 1.5px dashed var(--vd-battery);
   border-top: 0;
-  opacity: 0.8;
 }
 
 .vd-focus { display: flex; flex-direction: column; gap: calc(16 * var(--u)); }
@@ -239,6 +317,7 @@
   min-height: calc(3 * 1.5em + 14 * var(--u)); /* three lines held, so the card never jumps on hover */
 }
 .vd-inputs { display: flex; flex-wrap: wrap; gap: calc(14 * var(--u)) calc(28 * var(--u)); margin: 0; margin-top: auto; }
+.vd-inputs dl { margin: 0; }
 
 /* ── the system log: Field Notes under a heading on the card's own rail ──── */
 .vd-log {
@@ -310,7 +389,16 @@
   .vd-alert-chips { flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; }
 
   .vd-main { grid-template-columns: minmax(0, 1fr); }
-  .vd-chart { --chart-h: max(260px, calc(600 * var(--u))); }
+  .vd { --vd-dock-end: calc(30 * var(--u) + max(56px, 58 * var(--u))); }
+  .vd::before { height: calc(var(--vd-dock-end) + 22px); }
+  .vd-state .va-mode-pill { min-width: 0; }
+  .vd-chart { --chart-h: max(260px, calc(600 * var(--u))); padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(30 * var(--u)); }
+  .vd-chart .va-chart-plate { margin: 0; }
+  .vd-chart-foot { grid-template-columns: minmax(0, 1fr); padding: calc(26 * var(--u)) calc(16 * var(--u)) 0; gap: calc(20 * var(--u)); }
+  .vd-chart-range .va-range { width: 100%; }
+  .vd-tip.is-compact { width: auto; min-width: calc(330 * var(--u)); gap: max(4px, calc(8 * var(--u))); }
+  .vd-legend-band { width: max(12px, calc(22 * var(--u))); height: max(10px, calc(16 * var(--u))); }
+  .vd-legend-dot { width: max(8px, calc(14 * var(--u))); height: max(8px, calc(14 * var(--u))); }
   .vd-legend-charging { width: max(14px, calc(24 * var(--u))); height: max(8px, calc(13 * var(--u))); }
   .vd-source { height: max(24px, calc(40 * var(--u))); padding: 0 max(10px, calc(16 * var(--u))); font-size: var(--a-caps); }
   .vd-focus { gap: calc(26 * var(--u)); }

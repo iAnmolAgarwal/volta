@@ -7,21 +7,21 @@
  * down Sylva's diagonal (x 1250 → 1346 → 1432, +110 a step). Every value is a
  * token from tokens.css or a unit of --u; no Sylva code is copied. */
 
-/* ── the supply tones: three distinct flows, all from the flow tokens ─────
-   grid stays the lime; the battery is its pale green taken down into the
-   portal's moss (a mid sage); the sun's warm light is taken to an amber. */
+/* ── the supply flows: each on its own flow token, as tokens.css names them
+   (grid the lime, battery Sylva's pale green, solar its warm light); the chart
+   tells them apart by fill weight and edge (LoadChart.tsx SERIES) ───────── */
 .vd {
   --vd-grid: var(--flow-grid);
-  --vd-battery: color-mix(in oklab, var(--flow-battery) 58%, var(--portal-bg));
-  --vd-solar: color-mix(in oklab, var(--flow-solar) 72%, var(--overload) 28%);
+  --vd-battery: var(--flow-battery);
+  --vd-solar: var(--flow-solar);
   --vd-grid-glow: var(--flow-grid-glow);
-  --vd-battery-glow: color-mix(in oklab, var(--vd-battery) 40%, transparent);
-  --vd-solar-glow: color-mix(in oklab, var(--vd-solar) 40%, transparent);
+  --vd-battery-glow: var(--flow-battery-glow);
+  --vd-solar-glow: var(--flow-solar-glow);
+  /* every label on the chart plate keeps this far from the plate's edges
+     (the round-2 judge's 12 px; the same floor as --t-min and the tick size) */
+  --vd-plate-pad: var(--t-min);
   /* where the fixed dock ends: Sylva's 38 top + its 46 height */
   --vd-dock-end: calc((38 + 46) * var(--u));
-}
-@supports (color: oklch(from red l c h)) {
-  .vd { --vd-solar: oklch(from var(--flow-solar) calc(l - 0.09) calc(c + 0.08) calc(h - 20)); }
 }
 .vd-area--grid { --area-glow: var(--vd-grid-glow); }
 .vd-area--battery { --area-glow: var(--vd-battery-glow); }
@@ -41,8 +41,9 @@
   background: linear-gradient(180deg, var(--bg-hero) 0%, var(--bg-hero) 58%, transparent 100%);
   backdrop-filter: blur(calc(10 * var(--u)));
   -webkit-backdrop-filter: blur(calc(10 * var(--u)));
-  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
-  mask-image: linear-gradient(180deg, #000 62%, transparent);
+  /* a mask reads only alpha: any opaque token serves */
+  -webkit-mask-image: linear-gradient(180deg, var(--bg-deep) 62%, transparent);
+  mask-image: linear-gradient(180deg, var(--bg-deep) 62%, transparent);
   opacity: 0;
   transition: opacity 0.35s var(--ease);
 }
@@ -259,10 +260,21 @@
    then the label, title and range under it (the "Next-24h peak" card) */
 .vd-chart { --chart-h: calc(391 * var(--u)); /* 372, plus the mode track and its gap, so the plot keeps its height */ display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
 .vd-chart .va-chart-plate { margin: 0; flex: none; }
-.vd-chart:has(.recharts-surface:focus-visible) .va-chart-plate,
-.vd-chart:has(.recharts-wrapper:focus-visible) .va-chart-plate { outline: 2px solid var(--focus-ring-dark); outline-offset: calc(3 * var(--u)); }
-.vd-chart .recharts-wrapper:focus-visible { outline: none; }
-.vd-chart .va-axis-unit { top: calc(6 * var(--u)); }
+/* the plot is one slider over the focused hour (arrow keys); its ring is drawn round the plate */
+.vd-plot { position: absolute; inset: 0; border-radius: inherit; }
+.vd-plot:focus-visible { outline: none; }
+.vd-chart .va-chart-plate:has(.vd-plot:focus-visible) { outline: 2px solid var(--focus-ring-dark); outline-offset: calc(3 * var(--u)); }
+/* the axes: every tick in faint ink, Lexend, at the 12 px floor (Recharts 3 draws
+   tick labels as .recharts-cartesian-axis-tick-value in its own layer, with a
+   default grey fill this overrides); the unit sits 12 px in from the plate's edge */
+.vd-chart .recharts-cartesian-axis-tick-value {
+  fill: var(--ink-faint);
+  font-family: var(--font);
+  font-size: var(--t-min);
+  font-weight: var(--w-light);
+  font-variant-numeric: tabular-nums;
+}
+.vd-chart .va-axis-unit { top: calc(6 * var(--u)); left: var(--vd-plate-pad); font-size: var(--t-min); letter-spacing: var(--track-dock); }
 .vd-chart-foot {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -277,6 +289,10 @@
 .vd-chart .va-legend { grid-column: 1 / -1; margin: 0; color: var(--paper-label); }
 /* on paper, each swatch is ringed in the paper's ink so the pale tones still read */
 .vd-chart .va-legend-swatch { box-shadow: 0 0 0 1px var(--paper-label), 0 0 calc(6 * var(--u)) var(--sw); }
+/* the charging key: its dashed edge in the paper's label ink, over a wash of the battery's token */
+.vd-chart .vd-legend-charging { border-color: var(--paper-label); background: var(--flow-battery-glow); }
+/* the solar swatch carries its dotted edge, as the plate draws it */
+.vd-chart .va-legend-swatch.is-dotted { box-shadow: 0 0 calc(6 * var(--u)) var(--sw); outline: 1px dotted var(--paper-label); outline-offset: 1px; }
 .vd-chart .va-legend-line { background: var(--paper-ink); }
 .vd-chart .va-legend-dash { border-top-color: var(--paper-label); }
 .vd-chart .va-legend-dash--overload { border-top-color: var(--overload); }

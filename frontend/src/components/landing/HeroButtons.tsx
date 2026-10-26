@@ -4,6 +4,7 @@ import { LiquidMetal } from "./LiquidMetal";
 import { NARROW, REDUCED_MOTION, useMedia } from "./useMedia";
 import { useAfterPaint } from "./useAfterPaint";
 import { cssVars } from "./cssVars";
+import { BURST_MS, useRouteLink } from "@/lib/useRouteLink";
 
 /* The two hero controls. "Launch dashboard" is the most prominent button: a
  * dark glass pill with a liquid-metal rim (our WebGL2 shader, tinted --volt)
@@ -23,10 +24,11 @@ function useMetal() {
 
 export function LaunchPill() {
   const { metal, onUnavailable } = useMetal();
+  const link = useRouteLink();
   return (
     <div className="vl-pill-wrap">
       <div className="vl-pill-reveal mask par" style={cssVars({ "--d": "600ms", "--pd": 15, "--pr": 1.4 })}>
-        <a className={`vl-pill${metal ? " is-metal" : ""}`} href="#dashboard">
+        <a className={`vl-pill${metal ? " is-metal" : ""}`} href="/dashboard" onClick={link("/dashboard", BURST_MS)}>
           <span className="vl-plate-glass" aria-hidden="true" />
           {metal && <LiquidMetal onUnavailable={onUnavailable} />}
           <LayoutDashboard className="vl-pill-icon" aria-hidden strokeWidth={1.6} />

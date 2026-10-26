@@ -199,7 +199,7 @@ export function Landing() {
       {/* the scene fills the hero at z 3, aria-hidden and click-through; its sparks listen on window */}
       {sceneOn && <GridScene className="vl-scene" onReady={onSceneReady} />}
 
-      <Dock />
+      <Dock burst />
 
       <div className="vl-stage">
         <div className="vl-guides fade" style={cssVars({ "--d": "900ms" })} aria-hidden="true">

@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType } from "react";
 import { Activity, ToggleRight } from "lucide-react";
 import { STORAGE_MODE, type Forecast, type Hour } from "@/lib/forecast";
 import { cssVars } from "./cssVars";
+import { BURST_MS, useRouteLink } from "@/lib/useRouteLink";
 
 /* The two floating paper cards (Sylva's). Card 1 reads label, title, then
  * plate on top; it sits behind the 3D canvas, so its knob lives outside it
@@ -61,8 +62,9 @@ export function PeakCard({ forecast, index, loading, played, flash }: CardProps)
 
 /** A card knob: Sylva's white disc, inside a hit area floored at 44px on phones. */
 function Knob({ href, label, Icon }: { href: string; label: string; Icon: ComponentType<{ strokeWidth?: number; "aria-hidden"?: boolean }> }) {
+  const link = useRouteLink();
   return (
-    <a className="vl-knob" href={href} aria-label={label}>
+    <a className="vl-knob" href={href} aria-label={label} onClick={link(href, BURST_MS)}>
       <span className="vl-knob-disc" aria-hidden="true">
         <Icon aria-hidden strokeWidth={1.4} />
       </span>
@@ -75,7 +77,7 @@ export function PeakKnob() {
   return (
     <span className="vl-knob-float par" style={cssVars({ "--pd": 10, "--pr": 2.2 })}>
       <span className="vl-knob-reveal mask-circle" style={cssVars({ "--d": "1100ms" })}>
-        <Knob href="#forecast" label="Open the forecast" Icon={Activity} />
+        <Knob href="/input" label="Open the forecast" Icon={Activity} />
       </span>
     </span>
   );
@@ -111,7 +113,7 @@ export function ModeCard({ forecast, hour, index, loading, played, flash }: Card
         {played && !loading && <span className="vl-chip vl-chip--hour">{hh(hour.hour)}</span>}
         {loading && <span className="vl-shimmer" aria-hidden="true" />}
       </figure>
-      <Knob href="#controller" label="Open the controller" Icon={ToggleRight} />
+      <Knob href="/dashboard" label="Open the controller" Icon={ToggleRight} />
     </article>
   );
 }

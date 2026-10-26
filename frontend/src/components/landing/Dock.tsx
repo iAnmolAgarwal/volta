@@ -2,16 +2,24 @@ import { useEffect, useRef, useState, type ComponentType, type CSSProperties } f
 import { Activity, History, LogIn, ToggleRight, Zap } from "lucide-react";
 import { FINE_HOVER, NARROW, REDUCED_MOTION } from "./useMedia";
 import { MARK_LABEL } from "@/lib/brand";
+import { BURST_MS, useRouteLink } from "@/lib/useRouteLink";
 
 /* The floating dock, after Sylva's: pills that magnify on a spring as the
  * pointer nears them (anchored at the top, so they grow downward), a specular
  * rim that turns to face the pointer, and an active item that wears the
  * cards' paper. Keyboard focus gets the same magnification. Coarse pointers
  * and reduced motion get a still dock. All layout reads happen in the frame,
- * never in the pointer handler. */
+ * never in the pointer handler.
+ *
+ * The landing page and the app routes share it. The items are routes, followed
+ * client side: on the landing page the paper moves to the clicked item and the
+ * scene's click burst plays before the route changes (`burst`); on the app
+ * routes `active` follows the route. */
+
+export type DockId = "forecast" | "controller" | "history" | "dashboard";
 
 interface Item {
-  id: string;
+  id: DockId;
   href: string;
   label: string;
   Icon: ComponentType<{ strokeWidth?: number; "aria-hidden"?: boolean }>;
@@ -19,10 +27,10 @@ interface Item {
 }
 
 const ITEMS: Item[] = [
-  { id: "forecast", href: "#forecast", label: "Forecast", Icon: Activity },
-  { id: "controller", href: "#controller", label: "Controller", Icon: ToggleRight },
-  { id: "history", href: "#history", label: "History", Icon: History },
-  { id: "dashboard", href: "#dashboard", label: "Launch dashboard", Icon: LogIn, enter: true },
+  { id: "forecast", href: "/input", label: "Forecast", Icon: Activity },
+  { id: "controller", href: "/dashboard", label: "Controller", Icon: ToggleRight },
+  { id: "history", href: "/history", label: "History", Icon: History },
+  { id: "dashboard", href: "/dashboard", label: "Launch dashboard", Icon: LogIn, enter: true },
 ];
 
 // entrance stagger per tile (Sylva: 120ms for the mark, then ~50ms apart)
@@ -34,9 +42,13 @@ interface Spec { el: HTMLElement; ang: number; tAng: number; br: number; tBr: nu
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const smooth = (x: number) => x * x * (3 - 2 * x);
 
-export function Dock() {
+export function Dock({ active: routeActive, burst = false }: { active?: DockId | null; burst?: boolean } = {}) {
   const navRef = useRef<HTMLElement>(null);
-  const [active, setActive] = useState("forecast");
+  const [picked, setPicked] = useState<DockId>("forecast");
+  // the app routes pass the route's item; the landing page keeps its own (Forecast first, as built)
+  const active = routeActive !== undefined ? routeActive : picked;
+  const link = useRouteLink();
+  const wait = burst ? BURST_MS : 0;
 
   useEffect(() => {
     const root = navRef.current;
@@ -234,7 +246,7 @@ export function Dock() {
   return (
     <div className="vl-dock-wrap">
       <nav ref={navRef} className="vl-dock par" style={{ "--pd": 5 } as CSSProperties} data-spec aria-label="Primary">
-        <a className="vl-dock-item vl-dock-mark" href="#top" data-dock="mark" data-spec aria-label={MARK_LABEL} style={{ "--d": `${DELAYS[0]}ms` } as CSSProperties}>
+        <a className="vl-dock-item vl-dock-mark" href="/" data-dock="mark" data-spec aria-label={MARK_LABEL} style={{ "--d": `${DELAYS[0]}ms` } as CSSProperties} onClick={link("/", wait)}>
           <Zap aria-hidden strokeWidth={1.25} />
         </a>
         {ITEMS.map((it, i) => (
@@ -247,7 +259,10 @@ export function Dock() {
             aria-current={active === it.id ? "page" : undefined}
             className={`vl-dock-item${active === it.id ? " is-active" : ""}${it.enter ? " vl-dock-item--enter" : ""}`}
             style={{ "--d": `${DELAYS[i + 1]}ms` } as CSSProperties}
-            onClick={() => setActive(it.id)}
+            onClick={(e) => {
+              setPicked(it.id);
+              link(it.href, wait)(e);
+            }}
           >
             <span className="vl-glyph" aria-hidden="true"><it.Icon strokeWidth={1.25} /></span>
             <span className="vl-dock-label">{it.label}</span>

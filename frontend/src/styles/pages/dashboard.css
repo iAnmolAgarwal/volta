@@ -101,6 +101,19 @@
 .vd-stat--a { left: calc(1204 * var(--u)); top: calc(2 * var(--u)); }
 .vd-stat--b { left: calc(1300 * var(--u)); top: calc(112 * var(--u)); }
 .vd-stat--c { left: calc(1386 * var(--u)); top: calc(214 * var(--u)); }
+/* the diagonal's scope, in the eyebrow's spaced caps, over stat A */
+.vd-stats-cap {
+  position: absolute;
+  left: calc(1204 * var(--u));
+  top: calc(-30 * var(--u));
+  margin: 0;
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
 .vd-mark { width: calc(32 * var(--u)); height: calc(32 * var(--u)); flex: none; margin-top: calc(2 * var(--u)); color: var(--ink-mark); }
 .vd-mark svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 calc(2 * var(--u)) calc(10 * var(--u)) var(--stat-shadow)); }
 .vd-stat dl { margin: 0; }
@@ -334,6 +347,23 @@
 .vd-inputs { display: flex; flex-wrap: wrap; gap: calc(14 * var(--u)) calc(28 * var(--u)); margin: 0; margin-top: auto; }
 .vd-inputs dl { margin: 0; }
 
+/* ── the whole run: the side stats, on the system log's two rails ────────── */
+.vd-run {
+  display: grid;
+  grid-template-columns: calc(330 * var(--u)) minmax(0, 1fr);
+  gap: calc(48 * var(--u));
+  align-items: center;
+}
+.vd-run-head .va-card-title { margin: 0; }
+.vd-run-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, max-content));
+  justify-content: space-between;
+  gap: calc(20 * var(--u)) calc(28 * var(--u));
+  padding-right: calc(12 * var(--u));
+}
+.vd-run .vd-stat { position: static; }
+
 /* ── the system log: Field Notes under a heading on the card's own rail ──── */
 .vd-log {
   display: grid;
@@ -420,6 +450,10 @@
   .vd-focus { gap: calc(26 * var(--u)); }
   .vd-why { padding-top: calc(22 * var(--u)); min-height: calc(2 * 1.5em + 22 * var(--u)); }
 
+  .vd-stats-cap { position: static; grid-column: 1 / -1; margin-bottom: calc(-4 * var(--u)); }
+  .vd-run { grid-template-columns: minmax(0, 1fr); gap: calc(26 * var(--u)); align-items: start; }
+  .vd-run-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; gap: calc(26 * var(--u)) calc(14 * var(--u)); padding-right: 0; }
+  .vd-run .vd-stat dt { white-space: normal; }
   .vd-log { grid-template-columns: minmax(0, 1fr); gap: calc(26 * var(--u)); }
   .vd-log-head { position: static; }
   .vd-log-list { gap: calc(12 * var(--u)); }

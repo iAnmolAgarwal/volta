@@ -10,6 +10,7 @@ import { FocusCard } from "./FocusCard";
 import { LoadChart } from "./LoadChart";
 import { activeEntry, logEntries, overloadRuns, WINDOW, windowFor, windowStats } from "./model";
 import { OverloadBanner } from "./OverloadBanner";
+import { RunStats } from "./RunStats";
 import { SideStats } from "./SideStats";
 import { SystemLog } from "./SystemLog";
 import { isUnsaved, storageChip } from "./unsaved";
@@ -19,7 +20,8 @@ import { WindowStepper } from "./WindowStepper";
  * the headline on the left rail with the grid-state badge under it, the lede
  * at x 520 with the window stepper under it (where Sylva's pill sits), and the
  * window's side stats down Sylva's diagonal. Then the overload banner, the load
- * chart with the hour in focus beside it, and the system log.
+ * chart with the hour in focus beside it, the whole run's stats, and the
+ * system log.
  *
  * One focused hour drives the badge, the ring, the active log entry and the
  * banner's pressed chip: the hour under the chart's tooltip, or, when nothing
@@ -181,7 +183,9 @@ export function Dashboard({ run }: { run: Run }) {
         <FocusCard hour={focus} hovering={hovered != null} delay={740} />
       </div>
 
-      <SystemLog entries={entries} activeKey={activeKey} overloadHours={stats.overloadHours} switches={stats.switches} onSelect={jump} delay={840} />
+      <RunStats summary={run.summary} delay={840} />
+
+      <SystemLog entries={entries} activeKey={activeKey} overloadHours={stats.overloadHours} switches={stats.switches} onSelect={jump} delay={920} />
     </div>
   );
 }

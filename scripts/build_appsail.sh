@@ -13,6 +13,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT/backend" "$OUT/model"
 cp "$ROOT"/backend/*.py "$OUT/backend/"
 cp "$ROOT"/model/{__init__,data,features,quickml_client}.py "$OUT/model/"
+cp "$ROOT/sample_test_input.csv" "$OUT/"  # served by GET /api/sample
 git -C "$ROOT" describe --always --dirty > "$OUT/version.txt"
 cat > "$OUT/main.py" <<'PY'
 from backend.app import main

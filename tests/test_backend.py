@@ -285,7 +285,8 @@ def sdk(monkeypatch):
     return fake_qm
 
 
-def test_sdk_transport_sends_a_whole_batch_in_one_call(sdk):
+def test_sdk_transport_sends_a_whole_batch_in_one_call(sdk, monkeypatch):
+    monkeypatch.delenv("ZOHO_ORG_ID", raising=False)
     from backend.quickml_sdk import SdkTransport
     from model.quickml_client import QuickMLClient
 
@@ -296,14 +297,19 @@ def test_sdk_transport_sends_a_whole_batch_in_one_call(sdk):
     assert kind == "request" and kwargs["path"] == "/endpoints/predict"
     assert kwargs["json"] == {"data": [{"blk_day": 1, "cool_24": 1.0}, {"blk_day": 0, "cool_24": 2.0},
                                        {"blk_day": 0, "cool_24": 3.0}]}
-    assert kwargs["headers"] == {"X-QUICKML-ENDPOINT-KEY": "endpoint-key-SECRET"}
+    assert kwargs["headers"] == {"X-QUICKML-ENDPOINT-KEY": "endpoint-key-SECRET", "CATALYST-ORG": "60093344122",
+                                 "Environment": "Development"}
 
 
-def test_sdk_transport_uses_public_predict_for_one_dict(sdk):
+def test_sdk_transport_headers_follow_env_and_gateway(sdk, monkeypatch):
     from backend.quickml_sdk import SdkTransport
 
-    assert SdkTransport("k", IN_CATALYST)({"data": {"cool_24": 1.0}}) == {"result": [42.0]}
-    assert sdk.calls == [("predict", "k", {"cool_24": 1.0})]
+    monkeypatch.setenv("ZOHO_ORG_ID", "123")
+    req = FakeRequest({"X-ZC-ProjectId": "1", "X-ZC-Environment": "Production"})
+    SdkTransport("k", req)({"data": {"cool_24": 1.0}})  # a single dict goes the same way
+    (kind, kwargs), = sdk.calls
+    assert kwargs["json"] == {"data": {"cool_24": 1.0}}
+    assert (kwargs["headers"]["CATALYST-ORG"], kwargs["headers"]["Environment"]) == ("123", "Production")
 
 
 def test_sdk_errors_become_prediction_errors_without_the_key(sdk):

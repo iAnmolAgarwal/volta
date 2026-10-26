@@ -4,14 +4,20 @@ The SDK authenticates as the project admin from headers the Catalyst gateway
 adds to every incoming request (X-ZC-*), so it needs only the endpoint key: no
 Zoho OAuth client and no published deployment URL.
 
-SDK 1.4.0's QuickML.predict() posts {"data": <dict>} and rejects a list, while
-the endpoint accepts a list of rows. Batches therefore go through the SDK's own
-authorized requester to the same path, so 1,000 rows cost one QuickML call.
+SDK 1.4.0's QuickML.predict() posts {"data": <dict>} and rejects a list, and it
+sends CATALYST-ORG only when X_ZOHO_CATALYST_ORG_ID is set (AppSail does not set
+it), which QuickML rejects with ORGID_HEADER_UNAVAILABLE. So every call goes
+through the SDK's own authorized requester to the same path, with the org and
+environment headers added; 1,000 rows cost one QuickML call.
 """
+
+import os
 
 from model.quickml_client import PredictionError
 
 PROJECT_HEADER = "X-ZC-ProjectId"  # present only on requests routed by Catalyst
+ENVIRONMENT_HEADER = "X-ZC-Environment"
+DEFAULT_ORG_ID = "60093344122"  # our Catalyst org (not a secret); ZOHO_ORG_ID overrides
 
 
 def in_catalyst(request) -> bool:
@@ -28,22 +34,24 @@ class SdkTransport:
 
         self.key = endpoint_key
         self.quick_ml = zcatalyst_sdk.initialize(req=request).quick_ml()
+        self.headers = {
+            "X-QUICKML-ENDPOINT-KEY": endpoint_key,
+            "CATALYST-ORG": (os.environ.get("ZOHO_ORG_ID") or "").strip() or DEFAULT_ORG_ID,
+            "Environment": request.headers.get(ENVIRONMENT_HEADER) or "Development",
+        }
 
     def __call__(self, payload: dict) -> dict:
         from zcatalyst_sdk._constants import CatalystService, CredentialUser, RequestMethod
         from zcatalyst_sdk.exceptions import CatalystError
 
-        data = payload["data"]
         try:
-            if isinstance(data, dict):
-                return self.quick_ml.predict(self.key, data)
             resp = self.quick_ml._requester.request(
                 method=RequestMethod.POST,
                 path="/endpoints/predict",
-                json={"data": data},
+                json={"data": payload["data"]},
                 user=CredentialUser.ADMIN,
                 catalyst_service=CatalystService.QUICK_ML,
-                headers={"X-QUICKML-ENDPOINT-KEY": self.key},
+                headers=dict(self.headers),  # the requester adds its own headers to this dict
             )
             return resp.response_json
         except CatalystError as e:

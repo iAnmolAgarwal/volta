@@ -246,6 +246,57 @@
 .vh-plate .vh-sub { font-size: var(--a-small); font-weight: var(--w-light); color: var(--ink-soft); line-height: calc(19 * var(--u)); letter-spacing: 0; }
 .vh-dt-note { color: var(--ink-faint); }
 
+/* the run's shape: the landing Field Note's curve (CardCharts PeakChart), edge
+   to edge across the plate's top as the landing's chart fills its plate */
+.vh-curve-wrap { margin: calc(-22 * var(--u)) calc(-24 * var(--u)) 0; }
+.vh-curve { position: relative; height: calc(90 * var(--u)); }
+.vh-curve-svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; }
+.vh-curve-env { fill: var(--flow-grid); opacity: 0.08; }
+.vh-curve-max { fill: none; stroke: var(--flow-grid); stroke-opacity: 0.3; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.vh-curve-mean { fill: none; stroke: var(--flow-grid); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+/* the line's soft glow, in screen space (the landing's 4-unit drop-shadow) */
+.vh-curve-glow { filter: drop-shadow(0 0 calc(4 * var(--u)) var(--flow-grid-glow)); }
+/* the 200 kW reference: the landing's faint 2/4 dash */
+.vh-curve-ref {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--y);
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--chart-ref-line) 0 calc(2 * var(--u)), transparent calc(2 * var(--u)) calc(6 * var(--u)));
+}
+/* the highest bucket: the landing's playhead dot, red when it is an overload */
+.vh-curve-peak {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: calc(7 * var(--u));
+  height: calc(7 * var(--u));
+  border-radius: var(--r-round);
+  background: var(--flow-grid);
+  box-shadow: 0 0 0 calc(1.5 * var(--u)) var(--bg-deep), 0 0 calc(8 * var(--u)) var(--flow-grid-glow);
+  transform: translate(-50%, -50%);
+}
+.vh-curve-peak.is-over { background: var(--flow-overload); box-shadow: 0 0 0 calc(1.5 * var(--u)) var(--bg-deep), 0 0 calc(8 * var(--u)) var(--overload-soft); }
+/* the curve's two ends on the data's clock, in the dock's spaced caps */
+.vh-curve-axis {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+  margin: calc(8 * var(--u)) calc(24 * var(--u)) 0;
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-soft);
+}
+.vh-curve-step { color: var(--ink-faint); }
+.vh-plate.has-curve .vh-plate-body { gap: calc(14 * var(--u)); }
+.vh-plate.has-curve .vh-readings { padding-top: calc(14 * var(--u)); }
+
 /* the knob: a picture of the card's link, on the plate's corner */
 .vh-knob { z-index: 2; pointer-events: none; }
 .vh-run:hover .va-knob-disc,
@@ -333,6 +384,10 @@
   .vh-plate dt { font-size: var(--a-small); line-height: 1.35; white-space: normal; }
   .vh-plate dd { font-size: var(--a-body); line-height: 1.35; white-space: normal; }
   .vh-plate .vh-sub { line-height: 1.35; }
+  .vh-curve-wrap { margin: calc(-26 * var(--u)) calc(-26 * var(--u)) 0; }
+  .vh-curve { height: calc(176 * var(--u)); }
+  .vh-curve-axis { margin: calc(14 * var(--u)) calc(26 * var(--u)) 0; letter-spacing: 0.07em; }
+  .vh-plate.has-curve .vh-plate-body { gap: calc(22 * var(--u)); }
 
   .vh-empty { padding-top: calc(90 * var(--u)); padding-bottom: calc(90 * var(--u)); }
   .vh-skel-resume { width: 100%; }

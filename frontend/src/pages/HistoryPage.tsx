@@ -10,7 +10,7 @@ import { getLastRunId, listRuns } from "@/lib/api";
 import { WORDMARK } from "@/lib/brand";
 import { FilterDock } from "./history/FilterDock";
 import { HistoryStats } from "./history/HistoryStats";
-import { countBySource, createdShort, FILTER_LABEL, hoursText, isFilter, listStats, newestFirst, runHref, runTitle, type SavedRun, type SourceFilter } from "./history/model";
+import { countBySource, createdShort, curveScale, FILTER_LABEL, hoursText, isFilter, listStats, newestFirst, runHref, runTitle, type SavedRun, type SourceFilter } from "./history/model";
 import { RunCard } from "./history/RunCard";
 import "@/styles/pages/history.css";
 
@@ -78,6 +78,7 @@ export default function HistoryPage() {
   const shown = useMemo(() => (filter === "all" ? runs : runs.filter((r) => r.source === filter)), [runs, filter]);
   const counts = useMemo(() => countBySource(runs), [runs]);
   const stats = useMemo(() => listStats(shown, runs.length), [shown, runs.length]);
+  const scale = useMemo(() => curveScale(runs), [runs]); // one kW scale for every card's curve
   const lastRun = runs.find((r) => r.id === last) ?? null;
   const resume = lastRun ?? runs[0] ?? null;
   const ready = load.state === "ready" && runs.length > 0;
@@ -170,7 +171,7 @@ export default function HistoryPage() {
         <ol className="vh-grid" key={filter} aria-label={filter === "all" ? "Saved runs, newest first" : `${FILTER_LABEL[filter]} runs, newest first`}>
           {shown.map((r, k) => (
             <li key={r.id}>
-              <RunCard run={r} last={r.id === last} delay={quick ? k * STEP_QUICK : CARD_DELAY + Math.min(k, 8) * STEP} />
+              <RunCard run={r} last={r.id === last} scale={scale} delay={quick ? k * STEP_QUICK : CARD_DELAY + Math.min(k, 8) * STEP} />
             </li>
           ))}
         </ol>

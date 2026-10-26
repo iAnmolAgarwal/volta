@@ -7,6 +7,7 @@
  * live in Stratus, all-digit ids are the older Data Store runs. */
 
 import { dayMonth, hhmm, type RunListItem, type RunSource } from "@/lib/api";
+import { OVERLOAD_AT_KW } from "@/lib/forecast";
 
 export interface RunStorage {
   stratus?: boolean;
@@ -14,7 +15,43 @@ export interface RunStorage {
   reason?: string | null;
 }
 
-export type SavedRun = RunListItem & { storage?: RunStorage };
+/** A Stratus run's demand in at most 48 equal buckets (docs/api.md, GET /api/runs). */
+export interface RunSeries {
+  step_hours: number;
+  mean_kw: number[];
+  max_kw: number[];
+}
+
+export type SavedRun = RunListItem & { storage?: RunStorage; series?: RunSeries | null };
+
+const finite = (a: unknown): a is number[] => Array.isArray(a) && a.every((v) => typeof v === "number" && Number.isFinite(v));
+
+/** The run's series when it is whole enough to draw (two or more matching points), else null: the older Data Store runs have none. */
+export function seriesOf(r: SavedRun): RunSeries | null {
+  const s = r.series;
+  if (!s || !finite(s.mean_kw) || !finite(s.max_kw)) return null;
+  if (s.mean_kw.length < 2 || s.mean_kw.length !== s.max_kw.length) return null;
+  return { step_hours: Number.isFinite(s.step_hours) && s.step_hours > 0 ? s.step_hours : 1, mean_kw: s.mean_kw, max_kw: s.max_kw };
+}
+
+/** Every card's curve shares one kW scale, so the 200 kW line sits at one height on all of them. */
+export interface CurveScale {
+  /** The floor: the lowest mean listed, less 40%, so each curve stands on a quiet floor (the landing flow chart's idea) and keeps its shape. */
+  lo: number;
+  /** The top: the highest peak listed, or 200 kW, with the landing chart's 12% headroom. */
+  hi: number;
+}
+
+export function curveScale(runs: SavedRun[]): CurveScale {
+  let hi = OVERLOAD_AT_KW;
+  let lo = Infinity;
+  for (const r of runs) {
+    if (Number.isFinite(r.peak_kw) && r.peak_kw > hi) hi = r.peak_kw;
+    const s = seriesOf(r);
+    if (s) for (const v of s.mean_kw) if (v < lo) lo = v;
+  }
+  return { lo: Number.isFinite(lo) ? Math.max(0, lo * 0.6) : 0, hi: hi * 1.12 };
+}
 
 export type SourceFilter = "all" | RunSource;
 export const FILTERS: SourceFilter[] = ["all", "csv", "manual", "sample"];
@@ -73,6 +110,27 @@ export function spanText(r: SavedRun): string {
 export const atText = (ts: string) => `${dayMonth(ts)} · ${hhmm(ts)}`;
 
 export const hoursText = (n: number) => `${n.toLocaleString("en-GB")} h`;
+
+/** The share of the run's hours at or above 200 kW. */
+export const overloadShare = (r: SavedRun) => (r.n_rows > 0 ? Math.max(0, Math.min(1, r.overload_count / r.n_rows)) : 0);
+
+/** "58% of hours", "<1% of hours", "no hours". */
+export function shareText(share: number): string {
+  if (share <= 0) return "no hours";
+  if (share < 0.01) return "<1% of hours";
+  return `${Math.round(share * 100)}% of hours`;
+}
+
+/** The run's length, said once on the card: "1,000 h", or "22 of 25 rows kept" when the cleaner dropped some. */
+export function lengthText(r: SavedRun): string {
+  if (r.rows_in > r.n_rows) return `${r.n_rows.toLocaleString("en-GB")} of ${r.rows_in.toLocaleString("en-GB")} rows kept`;
+  return hoursText(r.n_rows);
+}
+
+/** The curve's two ends on the data's clock: ["16 Jun · 15:00", "28 Jul · 06:00"], the end as a bare time within one day. */
+export function spanEnds(r: SavedRun): [string, string] {
+  return [atText(r.start), r.start.slice(0, 10) === r.end.slice(0, 10) ? hhmm(r.end) : atText(r.end)];
+}
 
 /** "1,000 rows, all kept" or "22 of 25 rows kept". */
 export function rowsText(r: SavedRun): string {

@@ -41,6 +41,7 @@ class SdkTransport:
         }
 
     def __call__(self, payload: dict) -> dict:
+        import requests
         from zcatalyst_sdk._constants import CatalystService, CredentialUser, RequestMethod
         from zcatalyst_sdk.exceptions import CatalystError
 
@@ -56,3 +57,5 @@ class SdkTransport:
             return resp.response_json
         except CatalystError as e:
             raise PredictionError(f"QuickML SDK call failed: {str(e).replace(self.key, '***')[:500]}") from None
+        except requests.RequestException as e:  # the SDK lets network errors (e.g. its 30 s read timeout) through
+            raise PredictionError(f"QuickML did not answer: {type(e).__name__}: {str(e).replace(self.key, '***')[:300]}") from None

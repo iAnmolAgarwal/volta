@@ -321,3 +321,14 @@ def test_sdk_errors_become_prediction_errors_without_the_key(sdk):
     with pytest.raises(PredictionError, match="NOT_PUBLISHED") as exc:
         SdkTransport("endpoint-key-SECRET", IN_CATALYST)({"data": [{"cool_24": 1.0}]})
     assert "endpoint-key-SECRET" not in str(exc.value)
+
+
+def test_sdk_network_errors_become_prediction_errors(sdk):
+    import requests
+
+    from backend.quickml_sdk import SdkTransport
+
+    # seen live: the SDK's request to api.catalyst.zoho.in timed out and escaped as a bare 500
+    sdk.fail = requests.ReadTimeout("HTTPSConnectionPool(host='api.catalyst.zoho.in', port=443): Read timed out.")
+    with pytest.raises(PredictionError, match="QuickML did not answer: ReadTimeout"):
+        SdkTransport("endpoint-key-SECRET", IN_CATALYST)({"data": [{"cool_24": 1.0}]})

@@ -1,6 +1,7 @@
 // Materials for the solids. All of them light with the shared key/fill/ambient
-// model, sink into the air with distance and write premultiplied alpha, so the
-// whole world dissolves into the page the same way.
+// model and write premultiplied alpha, so the whole world dissolves into the page
+// the same way. The places the current serves (city, battery bank, solar field)
+// take no air and no mist: they stay crisp.
 import { NoBlending, ShaderMaterial } from "three";
 import { INSTANCE_VERT, LIGHT_GLSL, OUT_PREMUL, shared } from "./glsl";
 import type { Palette } from "./palette";
@@ -17,7 +18,30 @@ export const activity = {
 const solid = (vertexShader: string, fragmentShader: string, uniforms: Record<string, { value: unknown }>) =>
   new ShaderMaterial({ uniforms: { ...shared, ...activity, ...uniforms }, vertexShader, fragmentShader, blending: NoBlending });
 
-/** Galvanised steel: pylons, poles, gantries, switchgear. */
+const BOX_VERT = /* glsl */ `
+  attribute float aSeed;
+  varying vec3 vW, vN, vL, vLN, vScale;
+  varying float vSeed;
+  void main() {
+    ${INSTANCE_VERT}
+    vW = wp.xyz; vN = wn; vL = position; vLN = normal; vSeed = aSeed;
+    vScale = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }`;
+
+/** One-pixel antialiased band: 1 inside [a, b], 0 outside, measured on x. */
+const BAND_GLSL = /* glsl */ `
+  float band(float x, float a, float b) {
+    float w = fwidth(x) * 0.75;
+    return smoothstep(a - w, a + w, x) * (1.0 - smoothstep(b - w, b + w, x));
+  }
+`;
+
+/**
+ * Galvanised steel: pylons, poles, gantries, switchgear. Dark, so the hero line
+ * reads as a silhouette against the mist and across the paper card, with a thin
+ * lit edge where a member turns to the light. Far towers sink into the air.
+ */
 export function steelMaterial(pal: Palette) {
   return solid(
     /* glsl */ `
@@ -30,40 +54,36 @@ export function steelMaterial(pal: Palette) {
       }`,
     /* glsl */ `
       ${LIGHT_GLSL}
-      uniform vec3 uAlbedo;
+      uniform vec3 uAlbedo, uEdge;
       varying vec3 vW, vN;
       varying float vY;
       void main() {
         vec3 N = normalize(vN);
         if (!gl_FrontFacing) N = -N;
         float dist = distance(vW, cameraPosition);
-        float ao = mix(0.55, 1.0, smoothstep(0.0, 40.0, vY));
+        float ao = mix(0.6, 1.0, smoothstep(0.0, 60.0, vY));
         vec3 col = shade(N, uAlbedo, ao);
-        // a thin bright edge where the member turns to the light
-        col += uKeyCol * pow(max(dot(N, uKeyDir), 0.0), 6.0) * 0.12;
-        col = air(col, dist * 1.04);
+        float k = max(dot(N, uKeyDir), 0.0);
+        col += uEdge * pow(k, 5.0) * 0.16 + uEdge * max(N.y, 0.0) * 0.03;
+        col = air(col, dist * 0.92);
         float alpha = landAlpha(dist);
+        float mist = mistAlpha(vW);
         ${OUT_PREMUL}
       }`,
-    { uAlbedo: { value: pal.paper.clone().multiplyScalar(0.46) } },
+    {
+      uAlbedo: { value: pal.paper.clone().multiplyScalar(0.085) },
+      uEdge: { value: pal.flowSolar.clone() },
+    },
   );
 }
 
-/** Pale architectural-model blocks with lit windows. */
+/** Pale architectural-model blocks with lit windows: bright, crisp, never hazed. */
 export function buildingMaterial(pal: Palette) {
   return solid(
-    /* glsl */ `
-      attribute float aSeed;
-      varying vec3 vW, vN, vL, vLN, vScale;
-      varying float vSeed;
-      void main() {
-        ${INSTANCE_VERT}
-        vW = wp.xyz; vN = wn; vL = position; vLN = normal; vSeed = aSeed;
-        vScale = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
-        gl_Position = projectionMatrix * viewMatrix * wp;
-      }`,
+    BOX_VERT,
     /* glsl */ `
       ${LIGHT_GLSL}
+      ${BAND_GLSL}
       uniform vec3 uPaper, uLabel, uWarm, uPale, uGlass, uOver;
       uniform float uCity, uAlarm;
       varying vec3 vW, vN, vL, vLN, vScale;
@@ -72,27 +92,39 @@ export function buildingMaterial(pal: Palette) {
         vec3 N = normalize(vN);
         float dist = distance(vW, cameraPosition);
         float up = (vL.y + 0.5) * vScale.y;
-        vec3 albedo = mix(uPaper, uLabel, 0.18 + 0.3 * vSeed) * mix(0.5, 0.68, fract(vSeed * 7.3));
-        float ao = mix(0.5, 1.0, smoothstep(0.0, 22.0, up));
+        vec3 albedo = mix(uPaper, uLabel, 0.06 + 0.22 * vSeed) * mix(0.74, 0.9, fract(vSeed * 7.3));
+        float ao = mix(0.62, 1.0, smoothstep(0.0, 18.0, up));
         vec3 col = shade(N, albedo, ao);
         if (abs(vLN.y) < 0.5) {
+          float half_ = (abs(vLN.x) > 0.5 ? vScale.z : vScale.x) * 0.5;
           float across = abs(vLN.x) > 0.5 ? vL.z * vScale.z : vL.x * vScale.x;
-          vec2 cell = vec2(across / 7.0, up / 9.5);
+          // windows on a grid that starts and ends a margin in from the corners
+          float cw = 8.5, ch = 11.0;
+          float n = max(1.0, floor((half_ * 2.0 - 5.0) / cw));
+          float x0 = across + n * cw * 0.5;
+          vec2 cell = vec2(x0 / cw, (up - 6.0) / ch);
           vec2 f = fract(cell), id = floor(cell);
-          vec2 aa = fwidth(cell) * 0.7;
-          float win = smoothstep(0.24 - aa.x, 0.24 + aa.x, f.x) * (1.0 - smoothstep(0.76 - aa.x, 0.76 + aa.x, f.x))
-                    * smoothstep(0.3 - aa.y, 0.3 + aa.y, f.y) * (1.0 - smoothstep(0.8 - aa.y, 0.8 + aa.y, f.y));
-          win *= step(1.0, id.y) * step(up, vScale.y - 5.0);
+          float win = band(f.x, 0.22, 0.78) * band(f.y, 0.26, 0.8);
+          win *= step(0.0, cell.x) * step(cell.x, n) * step(0.0, cell.y) * step(up, vScale.y - 6.0);
           float h = hash12(id + vec2(vSeed * 91.0, vLN.x * 13.0 + vLN.z * 29.0));
-          float lit = step(h, 0.58);
-          vec3 lamp = mix(uWarm, uPale, step(0.7, fract(h * 13.7)));
+          float lit = step(h, 0.62);
+          vec3 lamp = mix(uWarm, uPale, step(0.66, fract(h * 13.7)));
           float flick = 1.0 - uAlarm * 0.35 * step(0.6, fract(h * 5.1 + floor(uTime * 6.0) * 0.37));
-          col = mix(col, uGlass * (0.5 + 0.5 * ao), win * 0.75);
-          col += win * lit * lamp * uCity * flick * mix(1.2, 2.1, fract(h * 3.1));
+          col = mix(col, uGlass * (0.45 + 0.4 * ao), win * 0.82);
+          col += win * lit * lamp * uCity * flick * mix(1.1, 1.9, fract(h * 3.1));
           col = mix(col, col * 0.7 + uOver * 0.5 * win * lit * uCity, uAlarm * 0.18);
+          // the parapet catches the light: a crisp line where the wall meets the roof
+          col *= 1.0 + 0.16 * band(up, vScale.y - 2.2, vScale.y + 1.0);
+          // and every corner reads as a corner
+          col *= 1.0 - 0.18 * band(abs(across), half_ - 0.9, half_ + 1.0);
+        } else if (vLN.y > 0.5) {
+          // the roof: a parapet rim and a little plant on top
+          float ex = (0.5 - abs(vL.x)) * vScale.x, ez = (0.5 - abs(vL.z)) * vScale.z;
+          float rim = 1.0 - band(min(ex, ez), 1.6, 1e4);
+          col *= mix(0.86, 1.08, rim);
         }
-        col = air(col, dist);
-        float alpha = landAlpha(dist);
+        float alpha = 1.0;
+        float mist = 1.0;
         ${OUT_PREMUL}
       }`,
     {
@@ -109,43 +141,34 @@ export function buildingMaterial(pal: Palette) {
 /** Battery containers: ribbed pale boxes with a status strip that shows the flow. */
 export function batteryMaterial(pal: Palette) {
   return solid(
-    /* glsl */ `
-      attribute float aSeed;
-      varying vec3 vW, vN, vL, vLN, vScale;
-      varying float vSeed;
-      void main() {
-        ${INSTANCE_VERT}
-        vW = wp.xyz; vN = wn; vL = position; vLN = normal; vSeed = aSeed;
-        vScale = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
-        gl_Position = projectionMatrix * viewMatrix * wp;
-      }`,
+    BOX_VERT,
     /* glsl */ `
       ${LIGHT_GLSL}
+      ${BAND_GLSL}
       uniform vec3 uPaper, uChargeCol, uDisCol, uIdle, uOver;
       uniform float uCharge, uDischarge, uAlarm;
       varying vec3 vW, vN, vL, vLN, vScale;
       varying float vSeed;
       void main() {
         vec3 N = normalize(vN);
-        float dist = distance(vW, cameraPosition);
         float up = (vL.y + 0.5) * vScale.y;
         float along = (vL.x + 0.5) * vScale.x;
-        float rib = 0.9 + 0.1 * step(0.5, fract(along / 2.6));
-        vec3 albedo = uPaper * 0.62 * (abs(vLN.y) > 0.5 ? 1.0 : rib);
-        vec3 col = shade(N, albedo, mix(0.55, 1.0, smoothstep(0.0, 6.0, up)));
+        float rib = 0.88 + 0.12 * band(fract(along / 2.8), 0.0, 0.5);
+        vec3 albedo = uPaper * 0.78 * (abs(vLN.y) > 0.5 ? 1.0 : rib);
+        vec3 col = shade(N, albedo, mix(0.6, 1.0, smoothstep(0.0, 6.0, up)));
         if (abs(vLN.z) > 0.5) {
-          float strip = smoothstep(0.6, 1.1, up / vScale.y * 1.25 - 0.1) * (1.0 - smoothstep(0.86, 0.9, up / vScale.y));
+          float strip = band(up / vScale.y, 0.62, 0.84);
           float x = vL.x + 0.5;
           // charging: a level that fills and sweeps; discharging: a steady draw that pulses outward
           float sweep = smoothstep(0.0, 0.25, 1.0 - abs(fract(x - uTime * 0.45 - vSeed) - 0.5) * 2.0);
           vec3 lit = uIdle * 0.25
                    + uChargeCol * uCharge * (0.6 + 1.4 * sweep)
-                   + uDisCol * uDischarge * (1.4 + 0.8 * sweep);
-          lit = mix(lit, uOver * (0.8 + 0.6 * sin(uTime * 7.0)), uAlarm * uDischarge);
+                   + uDisCol * uDischarge * (1.6 + 0.8 * sweep);
+          lit = mix(lit, uOver * (0.9 + 0.6 * sin(uTime * 7.0)), uAlarm * uDischarge);
           col = mix(col, lit * 1.6, strip);
         }
-        col = air(col, dist);
-        float alpha = landAlpha(dist);
+        float alpha = 1.0;
+        float mist = 1.0;
         ${OUT_PREMUL}
       }`,
     {
@@ -158,51 +181,47 @@ export function batteryMaterial(pal: Palette) {
   );
 }
 
-/** Solar tables: dark glass with a cell grid, a glint, and a warm sheen when generating. */
+/** Solar tables: dark glass with a crisp cell grid, a glint, and a warm sheen when generating. */
 export function panelMaterial(pal: Palette) {
   return solid(
-    /* glsl */ `
-      varying vec3 vW, vN, vL, vLN, vScale;
-      void main() {
-        ${INSTANCE_VERT}
-        vW = wp.xyz; vN = wn; vL = position; vLN = normal;
-        vScale = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
-        gl_Position = projectionMatrix * viewMatrix * wp;
-      }`,
+    BOX_VERT,
     /* glsl */ `
       ${LIGHT_GLSL}
       uniform vec3 uGlass, uFrame, uSun;
       uniform float uSolar;
       varying vec3 vW, vN, vL, vLN, vScale;
+      varying float vSeed;
       void main() {
         vec3 N = normalize(vN);
-        float dist = distance(vW, cameraPosition);
         vec3 V = normalize(cameraPosition - vW);
         vec3 col;
         if (vLN.y > 0.5) {
-          vec2 c = vec2((vL.x + 0.5) * vScale.x / 6.2, (vL.z + 0.5) * vScale.z / 5.3);
+          vec2 c = vec2((vL.x + 0.5) * vScale.x / 6.4, (vL.z + 0.5) * vScale.z / 5.4);
           vec2 f = abs(fract(c) - 0.5);
-          vec2 aa = fwidth(c) * 1.5;
+          vec2 aa = fwidth(c) * 1.2;
           float line = max(smoothstep(0.5 - aa.x, 0.5, f.x), smoothstep(0.5 - aa.y, 0.5, f.y));
+          // the frame round each table
+          vec2 e = (0.5 - abs(vL.xz)) * vScale.xz;
+          float edge = 1.0 - smoothstep(0.6, 0.6 + fwidth(e.x) * 1.5, min(e.x, e.y));
           col = uGlass;
           float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-          col += uAirCol * 0.18 * fres;
+          col += uAirCol * 0.22 * fres;
           float spec = pow(max(dot(reflect(-uKeyDir, N), V), 0.0), 24.0);
           col += uKeyCol * spec * 0.4;
           float shimmer = 0.75 + 0.25 * sin(uTime * 1.1 + vW.x * 0.021 + vW.z * 0.013);
-          col += uSun * uSolar * 0.1 * shimmer;
+          col += uSun * uSolar * 0.12 * shimmer;
           col += uKeyCol * spec * uSolar * 0.5;
-          col = mix(col, uFrame, line * 0.3);
+          col = mix(col, uFrame, max(line * 0.35, edge * 0.9));
         } else {
           col = shade(N, uFrame, 1.0);
         }
-        col = air(col, dist);
-        float alpha = landAlpha(dist);
+        float alpha = 1.0;
+        float mist = 1.0;
         ${OUT_PREMUL}
       }`,
     {
-      uGlass: { value: pal.bgNight.clone().multiplyScalar(1.15) },
-      uFrame: { value: pal.paper.clone().multiplyScalar(0.24) },
+      uGlass: { value: pal.bgNight.clone().multiplyScalar(1.2) },
+      uFrame: { value: pal.paper.clone().multiplyScalar(0.42) },
       uSun: { value: pal.flowSolar.clone() },
     },
   );
@@ -251,9 +270,11 @@ export function treeMaterial(pal: Palette) {
         float wrap = dot(N, uKeyDir) * 0.5 + 0.5;
         float ao = mix(0.42, 1.0, smoothstep(-0.95, 0.5, p.y)) * mix(0.7, 1.0, zz);
         vec3 col = albedo * (uKeyCol * (0.04 + 0.96 * wrap * wrap) + uAmbCol * (0.32 + 0.68 * (0.5 + 0.5 * N.y))) * ao;
-        col *= mix(0.55, 1.0, smoothstep(650.0, 2100.0, dist));
+        // the foreground falls into shade: the light lives in the valley
+        col *= mix(0.4, 1.0, smoothstep(1000.0, 2100.0, dist));
         col = air(col, dist);
         float alpha = landAlpha(dist);
+        float mist = mistAlpha(vW);
         ${OUT_PREMUL}
       }`,
     {

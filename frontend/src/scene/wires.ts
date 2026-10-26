@@ -30,13 +30,14 @@ export const flow = {
   uHot: { value: new Color() }, // the white-hot head of a pulse
   uWireCol: { value: new Color() },
   uDensity: { value: 1 },
+  uPulse: { value: 1 }, // 0 draws the lines energised but with no pulses (the neutral poster)
 };
 
 export function buildWireGeometry(lines: Polyline[]): BufferGeometry {
   let verts = 0, quads = 0;
   for (const l of lines) { verts += l.points.length * 2; quads += l.points.length - 1; }
   const pos = new Float32Array(verts * 3), nxt = new Float32Array(verts * 3);
-  const side = new Float32Array(verts), sAt = new Float32Array(verts);
+  const side = new Float32Array(verts), sAt = new Float32Array(verts), glow = new Float32Array(verts);
   const meta = new Float32Array(verts * 4); // route, jit, width, powered
   const idx = new Uint32Array(quads * 6);
   let v = 0, k = 0;
@@ -53,6 +54,7 @@ export function buildWireGeometry(lines: Polyline[]): BufferGeometry {
         side[v] = last ? -sd : sd;
         sAt[v] = l.s[i];
         meta.set([l.route, l.jit, l.width, l.powered ? 1 : 0], v * 4);
+        glow[v] = l.glow;
         v++;
       }
     }
@@ -68,6 +70,7 @@ export function buildWireGeometry(lines: Polyline[]): BufferGeometry {
   g.setAttribute("aSide", new BufferAttribute(side, 1));
   g.setAttribute("aS", new BufferAttribute(sAt, 1));
   g.setAttribute("aMeta", new BufferAttribute(meta, 4));
+  g.setAttribute("aGlow", new BufferAttribute(glow, 1));
   g.setIndex(new BufferAttribute(idx, 1));
   g.computeBoundingSphere();
   return g;
@@ -78,6 +81,7 @@ const VERT = /* glsl */ `
   attribute float aSide;
   attribute float aS;
   attribute vec4 aMeta;
+  attribute float aGlow;
   uniform vec2 uRes;
   uniform float uWidthScale, uMinPx;
   uniform float uLevel[${ROUTE_COUNT}];
@@ -98,17 +102,21 @@ const VERT = /* glsl */ `
     vec2 dir = normalize((c1.xy / c1.w - c0.xy / c0.w) * uRes);
     vec2 nrm = vec2(-dir.y, dir.x);
     // world width to pixels at this depth, floored so far wires stay continuous
-    float px = aMeta.z * uWidthScale * projectionMatrix[1][1] * uRes.y * 0.5 / c0.w;
-    float w = max(px, uMinPx);
+    float ws = mix(1.0, aGlow, step(1.5, uWidthScale)); // the halo pass narrows for the streets
+    float px = aMeta.z * uWidthScale * ws * projectionMatrix[1][1] * uRes.y * 0.5 / c0.w;
+    float w = max(px, uMinPx * ws);
     vCover = clamp(px / w, 0.0, 1.0);
     c0.xy += nrm * aSide * (w / uRes) * c0.w;
     gl_Position = c0;
     vV = aSide;
     vS = aS;
     vX = (uPhase[r] - aS) / uSpacing[r] + aMeta.y;
+    // a resting line is quieter than its level: pulses fall off faster than the hum
     vLevel = uLevel[r];
     vFront = uFront[r];
-    vSpacing = uSpacing[r] / uTail[r];
+    // tails shorten toward the camera, so a pulse keeps about the same length on screen
+    float near = clamp(distance(position, cameraPosition) / 1500.0, 0.3, 1.0);
+    vSpacing = uSpacing[r] / (uTail[r] * near);
     vPowered = aMeta.w;
     vCol = mix(uFlowCol[r], uOverCol, uRed[r]) * uGain[r];
     vDist = distance(position, cameraPosition);
@@ -134,14 +142,14 @@ export function buildWireMaterials(lineGeo: BufferGeometry) {
     fragmentShader: /* glsl */ `
       ${LIGHT_GLSL}
       uniform vec3 uWireCol, uHot;
-      uniform float uDensity;
+      uniform float uDensity, uPulse;
       varying float vS, vX, vLevel, vFront, vSpacing, vCover, vDist, vPowered, vV;
       varying vec3 vCol;
       ${PULSE}
       void main() {
         float e = energised() * vPowered;
         float haze = 1.0 - 0.92 * smoothstep(uFog.x, uFog.y, vDist);
-        float p = pulseAt(vX * uDensity) * vLevel * e * haze;
+        float p = pulseAt(vX * uDensity) * pow(vLevel, 1.4) * e * haze * uPulse;
         vec3 col = air(uWireCol, vDist);
         col += vCol * (0.035 * vLevel * e * haze + 3.4 * p + 1.8 * frontSpark() * vPowered);
         col += uHot * smoothstep(0.55, 1.0, p) * 0.9;
@@ -166,21 +174,21 @@ export function buildWireMaterials(lineGeo: BufferGeometry) {
     vertexShader: VERT,
     fragmentShader: /* glsl */ `
       ${LIGHT_GLSL}
-      uniform float uDensity;
+      uniform float uDensity, uPulse;
       varying float vS, vX, vLevel, vFront, vSpacing, vCover, vDist, vPowered, vV;
       varying vec3 vCol;
       ${PULSE}
       void main() {
         if (vPowered < 0.5) discard;
         float e = energised();
-        float p = pulseAt(vX * uDensity) * vLevel * e;
+        float p = pulseAt(vX * uDensity) * pow(vLevel, 1.4) * e * uPulse;
         float across = exp(-vV * vV * 3.6);
         float far = 1.0 - 0.92 * smoothstep(uFog.x, uFog.y, vDist);
         vec3 g = vCol * across * far * landAlpha(vDist) * (0.018 * vLevel * e + 0.8 * p + 0.9 * frontSpark());
         gl_FragColor = vec4(g, 1.0);
         #include <colorspace_fragment>
-        float a = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
-        gl_FragColor.a = clamp(a, 0.0, 1.0);
+        // light only: it brightens what is behind it and never greys the paper card
+        gl_FragColor.a = uOpaqueLight * clamp(max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b)), 0.0, 1.0);
       }`,
     transparent: true,
     depthWrite: false,

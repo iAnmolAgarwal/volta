@@ -16,8 +16,14 @@ export interface Frame {
   narrow: boolean;
 }
 
-/** Below 900 px: artboard point NARROW.vx/vy lands on page units NARROW.x/y, scaled by NARROW.k. */
-export const NARROW = { k: 0.66, vx: 725, vy: 330, x: 380, y: 610, fadeFrom: 1000, fadeTo: 1080 };
+/**
+ * Below 900 px: artboard point NARROW.vx/vy lands on page units NARROW.x/y, scaled
+ * by NARROW.k. The land fades out between fadeFrom and fadeTo (page units), over
+ * the page just above card 1. The hero line's wires are not clipped: they cross
+ * card 1 (which sits under the canvas), as Sylva's root does, and run on behind
+ * card 2 (which sits above it).
+ */
+export const NARROW = { k: 0.66, vx: 725, vy: 330, x: 380, y: 610, fadeFrom: 990, fadeTo: 1042 };
 
 export function computeFrame(W: number, H: number, u: number, narrow: boolean): Frame {
   if (!narrow) {

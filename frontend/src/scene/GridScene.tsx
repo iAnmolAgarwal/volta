@@ -18,10 +18,14 @@ export interface GridSceneProps {
  * The power-grid landscape. Renders its own canvas (or, without WebGL, a poster
  * of the same composition) filling its positioned parent, at z-index --z-scene,
  * aria-hidden and click-through. The page owns the data and calls setState.
+ *
+ * Nothing here blocks first paint: three.js and the engine load as their own chunk
+ * from an effect, the WebGL check runs there too, and the engine builds the world
+ * in short steps and compiles its shaders asynchronously before the canvas fades in.
  */
 export function GridScene({ onReady, className }: GridSceneProps): JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [fallback, setFallback] = useState(() => !webglAvailable());
+  const [fallback, setFallback] = useState(false);
   const readyRef = useRef(onReady);
   useEffect(() => {
     readyRef.current = onReady;
@@ -40,21 +44,25 @@ export function GridScene({ onReady, className }: GridSceneProps): JSX.Element {
         engine = null;
       },
     };
+    const toPoster = (err?: unknown) => {
+      if (!live) return;
+      if (err) console.warn("VOLTA scene: WebGL could not start, showing the poster instead.", err);
+      setFallback(true);
+    };
     if (fallback) {
       readyRef.current?.(handle);
+    } else if (!webglAvailable()) {
+      toPoster();
     } else {
-      // three.js loads in its own chunk, after the page has painted
       import("./engine")
         .then(({ GridEngine }) => {
           if (!live) return;
-          engine = new GridEngine(root, { onFallback: () => setFallback(true) });
+          engine = new GridEngine(root, { onFallback: () => toPoster() });
+          // the page may set the hour's state at once; the engine keeps it until it is built
           readyRef.current?.(handle);
+          return engine.ready;
         })
-        .catch((err: unknown) => {
-          if (!live) return;
-          console.warn("VOLTA scene: WebGL could not start, showing the poster instead.", err);
-          setFallback(true);
-        });
+        .catch(toPoster);
     }
     return () => handle.dispose();
   }, [fallback]);

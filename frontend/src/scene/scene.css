@@ -42,15 +42,16 @@
 
 @media (max-width: 900px) {
   /* one column: the artboard is cropped into the band between the stats and
-     the cards (layout.ts NARROW), and fades out before the cards */
+     the cards (layout.ts NARROW), and fades out over the page before card 1,
+     as the live land does (NARROW.fadeFrom / fadeTo) */
   .volta-scene__poster {
     left: calc(-204.1 * var(--u));
     top: calc(524.2 * var(--u));
     width: calc(1267.2 * var(--u));
   }
   .volta-scene.is-fallback {
-    -webkit-mask-image: linear-gradient(to bottom, black calc(1000 * var(--u)), transparent calc(1080 * var(--u)));
-    mask-image: linear-gradient(to bottom, black calc(1000 * var(--u)), transparent calc(1080 * var(--u)));
+    -webkit-mask-image: linear-gradient(to bottom, black calc(990 * var(--u)), transparent calc(1042 * var(--u)));
+    mask-image: linear-gradient(to bottom, black calc(990 * var(--u)), transparent calc(1042 * var(--u)));
   }
 }
 

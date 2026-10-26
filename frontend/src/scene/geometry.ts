@@ -81,11 +81,12 @@ export interface Hardware {
 /**
  * A double-circuit lattice pylon, 300 units tall (about 50 m at the world's scale).
  * `lod` 1 is the far version: fewer panels and thicker members, so it does not
- * shimmer when it is a few pixels tall in the haze.
+ * shimmer when it is a few pixels tall in the haze. `weight` thickens every member,
+ * for the hero towers near the camera, so they hold a bold silhouette.
  */
-export function latticePylon(lod: 0 | 1): Hardware {
+export function latticePylon(lod: 0 | 1, weight = 1): Hardware {
   const b = new Beams();
-  const k = lod ? 1.9 : 1;
+  const k = (lod ? 1.9 : 1) * weight;
   const tLeg = 2.6 * k, tBrace = 1.15 * k, tArm = 1.7 * k;
   // half-width of the body at height y
   const w = (y: number) => {

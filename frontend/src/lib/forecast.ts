@@ -71,7 +71,9 @@ export async function loadForecast(timeoutMs = 8000): Promise<Forecast> {
   try {
     const resp = await fetch(`${base}/api/predict`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // text/plain keeps this a "simple" request: the Catalyst gateway answers CORS
+      // preflights without CORS headers, and the API parses the body as JSON anyway
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
       body: JSON.stringify({ rows: sample24 }),
       signal: ctrl.signal,
     });

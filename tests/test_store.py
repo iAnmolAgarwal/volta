@@ -100,7 +100,7 @@ def make_hours(n):
     return [{
         "index": i, "timestamp": f"2015-06-{16 + i // 24:02d} {i % 24:02d}:00:00", "hour": i % 24,
         "ambient_temp_c": 25.5, "humidity_pct": 50.0, "solar_irradiance_wm2": 0.0, "prediction_kw": 150.25 + i,
-        "mode": "Main Grid Mode", "overload": i % 2 == 0, "soc_pct": 80.0, "battery_kw": -100.0, "grid_kw": 250.25,
+        "mode": "Main Grid Mode", "overload": i % 2 == 0, "soc_pct": 80.0, "pv_kw": 12.5, "battery_kw": -100.0, "grid_kw": 250.25,
         "reason": "150.2 kW ≤ 160 and hour 0 is outside 18–22",
     } for i in range(n)]
 

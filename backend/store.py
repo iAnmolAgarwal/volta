@@ -32,12 +32,12 @@ RUN_FIELDS = {  # run record key -> runs column
 HOUR_FIELDS = {  # hour key -> run_hours column
     "index": "idx", "timestamp": "ts", "ambient_temp_c": "temp_c", "humidity_pct": "humidity_pct",
     "solar_irradiance_wm2": "solar_wm2", "prediction_kw": "prediction_kw", "mode": "grid_mode",
-    "overload": "is_overload", "soc_pct": "soc_pct", "battery_kw": "battery_kw", "grid_kw": "grid_kw",
+    "overload": "is_overload", "soc_pct": "soc_pct", "pv_kw": "pv_kw", "battery_kw": "battery_kw", "grid_kw": "grid_kw",
     "reason": "reason",
 }
 INT_KEYS = {"rows_in", "n_rows", "overload_count", "storage_hours", "switch_count", "index"}
 FLOAT_KEYS = {"peak_kw", "ambient_temp_c", "humidity_pct", "solar_irradiance_wm2", "prediction_kw",
-              "soc_pct", "battery_kw", "grid_kw"}
+              "soc_pct", "pv_kw", "battery_kw", "grid_kw"}
 
 
 class StoreError(RuntimeError):

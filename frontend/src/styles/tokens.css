@@ -122,3 +122,64 @@
 @media (max-width: 900px) {
   :root { --u: calc(100vw / 760); }
 }
+
+/* ── landing page values (Screen 1) ──────────────────────────────────────
+   Added by the screen builder. Each one is a Sylva value that had no token
+   yet; the comment names where in Sylva's CSS it comes from. */
+:root {
+  /* hero field: Sylva .hero background and .hero::after light floor */
+  --hero-pool: rgba(232, 238, 222, 0.085);           /* .hero radial at 27% 84% (same as --pool) */
+  --hero-shade: rgba(24, 28, 20, 0.10);              /* .hero radial at 92% 8% */
+  --floor-light: rgba(238, 243, 231, 0.50);          /* .hero::after centre */
+  --floor-light-mid: rgba(238, 243, 231, 0.21);
+  --floor-light-low: rgba(238, 243, 231, 0.04);
+  --floor-light-edge: rgba(238, 243, 231, 0.085);
+  --floor-light-none: rgba(238, 243, 231, 0);
+  --floor-light-phone: rgba(238, 243, 231, 0.40);    /* @media 900 .hero::after */
+  --floor-light-phone-mid: rgba(238, 243, 231, 0.14);
+  --floor-light-phone-edge: rgba(238, 243, 231, 0.05);
+  --rule-none: rgba(255, 255, 255, 0);               /* .guides i gradient ends */
+
+  /* dock: Sylva .dock / .dock-item */
+  --dock-bg: rgba(34, 40, 31, 0.74);
+  --dock-sheen: rgba(255, 255, 255, 0.055);
+  --dock-inset: rgba(255, 255, 255, 0.06);
+  --dock-shadow: rgba(10, 14, 8, 0.30);
+  --dock-near-bg: rgba(31, 37, 28, 0.94);            /* .dock-item[data-near] */
+  --dock-mark: #eef1e7;                              /* .dock-mark tile */
+  --dock-mark-near: #ffffff;
+  --dock-active-shadow: rgba(12, 17, 9, 0.24);       /* .dock-item.is-active */
+  --spec-hot: rgba(240, 246, 232, 0.95);             /* [data-spec]::after conic rim */
+  --spec-warm: rgba(240, 246, 232, 0.16);
+  --spec-dim: rgba(240, 246, 232, 0.08);
+  --spec-none: rgba(240, 246, 232, 0);
+
+  /* stats: Sylva .stat text-shadow and mark drop-shadow */
+  --stat-shadow: rgba(10, 14, 8, 0.6);
+
+  /* cards: Sylva .card, .card figure, .knob */
+  --paper-shadow-hover: 0 calc(38 * var(--u)) calc(84 * var(--u)) rgba(16, 21, 13, 0.36); /* .card:hover */
+  --portal-bg: #263025;                              /* .card figure background */
+  --portal-scan: rgba(229, 244, 209, 0.2);           /* .card figure::after scan */
+  --portal-scan-hot: rgba(252, 255, 246, 0.72);
+  --knob: #fbfcf8;
+  --knob-hover: #ffffff;
+  --knob-ink: #3f453a;
+  --knob-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(16, 21, 13, 0.18);
+  --focus-ring: rgba(255, 255, 255, 0.85);           /* a:focus-visible */
+  --focus-ring-dark: rgba(28, 34, 22, 0.9);          /* .knob:focus-visible */
+
+  /* play button ring: Sylva .play-ring */
+  --play-ring: rgba(255, 255, 255, 0.17);
+  --play-ring-hot: rgba(255, 255, 255, 0.32);
+
+  /* liquid-metal plate: Sylva liquid-metal-explore.html .plate */
+  --plate-sheen: rgba(255, 255, 255, 0.085);
+  --plate-sheen-low: rgba(255, 255, 255, 0.014);
+  --plate-body: rgba(10, 12, 10, 0.42);
+  --plate-body-hot: rgba(8, 10, 8, 0.50);
+  --plate-inset: rgba(255, 255, 255, 0.13);
+  --plate-shadow-1: rgba(0, 0, 0, 0.38);
+  --plate-shadow-2: rgba(0, 0, 0, 0.28);
+  --plate-shadow-3: rgba(0, 0, 0, 0.16);
+}

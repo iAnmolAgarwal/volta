@@ -1,4 +1,6 @@
-// Screen 1 (landing) is built by the design loop; see design-notes/screen-01/spec.md.
+// Screen 1: the VOLTA landing page (design-notes/screen-01/spec.md).
+import { Landing } from "@/components/landing/Landing";
+
 export default function App() {
-  return <main className="min-h-svh" />;
+  return <Landing />;
 }

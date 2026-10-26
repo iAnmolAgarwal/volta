@@ -1,0 +1,806 @@
+/* Screen 1: the VOLTA landing page.
+ *
+ * Layout, sizes and motion follow Sylva by MengTo (positions in units of its
+ * 1600-wide artboard, --u; 760 units below 900px). Every colour comes from
+ * tokens.css. Written for this page; no Sylva code is copied.
+ */
+
+/* ── hero shell ──────────────────────────────────────────────────────────── */
+.vl {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  min-height: calc(880 * var(--u));
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(64% 52% at 27% 84%, var(--hero-pool) 0%, var(--floor-light-none) 72%),
+    radial-gradient(70% 60% at 92% 8%, var(--hero-shade) 0%, transparent 68%),
+    var(--bg-hero);
+}
+/* the floor of light the landscape stands in */
+.vl::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(72% 44% at 50% 117%, var(--floor-light) 0%, var(--floor-light-mid) 42%, var(--floor-light-low) 72%, var(--floor-light-none) 88%),
+    linear-gradient(180deg, var(--floor-light-none) 54%, var(--floor-light-low) 78%, var(--floor-light-edge) 100%);
+}
+
+/* a centred 1600 × 880 stage, centred with margins (a transform would trap
+   its children in a stacking context below the scene) */
+.vl-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-left: calc(-800 * var(--u));
+  margin-top: calc(-440 * var(--u));
+  width: calc(1600 * var(--u));
+  height: calc(880 * var(--u));
+}
+
+/* ── the 3D scene (z 3: above card 1, below the rest) ────────────────────── */
+.vl-scene {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-scene);
+  pointer-events: none;
+}
+
+/* ── guides and ghost word (z 1) ─────────────────────────────────────────── */
+.vl-guides {
+  position: absolute;
+  inset: calc(-40 * var(--u)) 0;
+  z-index: var(--z-ghost);
+  pointer-events: none;
+}
+.vl-guides i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, var(--rule-none) 0%, var(--rule) 12%, var(--rule) 78%, var(--rule-none) 100%);
+}
+.vl-guides i:nth-child(1) { left: calc(405 * var(--u)); }
+.vl-guides i:nth-child(2) { left: calc(748 * var(--u)); }
+.vl-guides i:nth-child(3) { left: calc(1091 * var(--u)); }
+
+.vl-ghost {
+  position: absolute;
+  z-index: var(--z-ghost);
+  left: calc(6 * var(--u));
+  bottom: calc(-64 * var(--u));
+  font-size: var(--t-ghost);
+  line-height: 0.78;
+  font-weight: var(--w-regular);
+  letter-spacing: var(--track-ghost);
+  color: var(--rule);
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ── the dock (z 10) ─────────────────────────────────────────────────────── */
+.vl-dock-wrap {
+  position: absolute;
+  z-index: var(--z-dock);
+  top: calc(38 * var(--u));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.vl-dock {
+  position: relative;
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: calc(3 * var(--u));
+  height: calc(46 * var(--u));
+  padding: calc(5 * var(--u));
+  border-radius: var(--r-dock);
+  border: 1px solid var(--glass-edge);
+  /* no backdrop-filter over a live canvas (Sylva measured ~20 fps); a lit top edge reads the same */
+  background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg);
+  box-shadow: 0 calc(8 * var(--u)) calc(22 * var(--u)) var(--dock-shadow), inset 0 1px var(--dock-inset);
+  isolation: isolate;
+}
+.vl-dock-item {
+  position: relative;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  height: calc(36 * var(--u));
+  gap: calc(8 * var(--u));
+  padding: 0 calc(13 * var(--u));
+  transform-origin: 50% 0; /* grows downward, out of the headline's way */
+  border: 1px solid transparent;
+  border-radius: var(--r-dock-item);
+  background: var(--glass);
+  color: var(--ink-faint);
+  text-decoration: none;
+  font-size: var(--t-dock);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  white-space: nowrap;
+  will-change: width, height, transform;
+  transition: color 0.18s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.vl-dock-item:hover { color: var(--ink); }
+.vl-dock-item[data-near="true"] {
+  z-index: 7;
+  color: var(--ink);
+  border-color: var(--glass-rim);
+  background: var(--dock-near-bg);
+  box-shadow: 0 calc(7 * var(--u)) calc(16 * var(--u)) var(--dock-shadow);
+}
+.vl-glyph {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  flex: none;
+  opacity: 0.66;
+  transition: opacity 0.18s var(--ease);
+}
+.vl-glyph svg { display: block; width: 100%; height: 100%; }
+.vl-dock-item[data-near="true"] .vl-glyph { opacity: 1; }
+
+/* the mark: the one opaque tile in a bar of glass */
+.vl-dock-mark {
+  width: calc(36 * var(--u));
+  padding: 0;
+  background: var(--dock-mark);
+  border-color: var(--dock-mark);
+  color: var(--paper-ink);
+  overflow: hidden;
+}
+.vl-dock-mark svg { width: 52%; height: 52%; display: block; fill: currentColor; }
+.vl-dock-mark[data-near="true"] { background: var(--dock-mark-near); border-color: var(--dock-mark-near); color: var(--bg-night); }
+
+/* the current section wears the cards' paper */
+.vl-dock-item.is-active {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) var(--dock-active-shadow);
+}
+.vl-dock-item.is-active .vl-glyph { opacity: 0.8; }
+.vl-dock-item--enter { color: var(--ink); background: var(--glass-hover); }
+
+/* specular rim: a conic highlight masked to the border, aimed at the pointer */
+[data-spec] { --spec-angle: 2.4rad; --spec-bright: 0; }
+[data-spec]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 5;
+  padding: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--spec-bright);
+  background: conic-gradient(from var(--spec-angle) at 50% 50%,
+    var(--spec-none) 0deg, var(--spec-dim) 14deg, var(--spec-hot) 28deg, var(--spec-warm) 46deg, var(--spec-none) 68deg,
+    var(--spec-none) 180deg, var(--spec-dim) 194deg, var(--spec-hot) 208deg, var(--spec-warm) 226deg, var(--spec-none) 248deg,
+    var(--spec-none) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* ── headline, lede (z 4) ────────────────────────────────────────────────── */
+.vl-headline {
+  position: absolute;
+  z-index: var(--z-ui);
+  left: calc(46 * var(--u));
+  top: calc(202 * var(--u));
+  margin: 0;
+  font-size: var(--t-display);
+  line-height: var(--t-display-lh);
+  font-weight: var(--w-light);
+  letter-spacing: var(--track-display);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.vl-headline span { display: block; padding-bottom: 0.04em; }
+.vl-headline i { display: inline-block; font-style: normal; }
+
+.vl-lede {
+  position: absolute;
+  z-index: var(--z-ui);
+  left: calc(520 * var(--u));
+  top: calc(196 * var(--u));
+  width: calc(208 * var(--u));
+  margin: 0;
+  font-size: var(--t-lede);
+  line-height: var(--t-lede-lh);
+  font-weight: var(--w-light);
+  color: var(--ink-soft);
+}
+
+/* ── glass plate shared by the pill and the play disc (Sylva's .plate) ───── */
+.vl-plate-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--plate-sheen), var(--plate-sheen-low) 44%, transparent 64%), var(--plate-body);
+  box-shadow:
+    0 calc(5 * var(--u)) calc(11 * var(--u)) var(--plate-shadow-1),
+    0 calc(14 * var(--u)) calc(30 * var(--u)) var(--plate-shadow-2),
+    0 calc(29 * var(--u)) calc(58 * var(--u)) var(--plate-shadow-3),
+    inset 0 1px 0 var(--plate-inset);
+  transition: background 0.38s var(--ease), box-shadow 0.38s var(--ease);
+}
+/* without the metal, the rim is a plain glass edge */
+.vl-pill:not(.is-metal) .vl-plate-glass,
+.vl-play-btn:not(.is-metal) .vl-plate-glass {
+  border: 1px solid var(--glass-rim);
+}
+.vl-pill:hover .vl-plate-glass,
+.vl-play-btn:hover .vl-plate-glass,
+.vl-pill:focus-visible .vl-plate-glass,
+.vl-play-btn:focus-visible .vl-plate-glass {
+  background: linear-gradient(180deg, var(--plate-sheen), var(--plate-sheen-low) 44%, transparent 64%), var(--plate-body-hot);
+}
+.vl-pill:active .vl-plate-glass,
+.vl-play-btn:active .vl-plate-glass { transition-duration: 0.1s; box-shadow: 0 calc(3 * var(--u)) calc(8 * var(--u)) var(--plate-shadow-1), inset 0 1px 0 var(--plate-inset); }
+.lm-canvas { position: absolute; pointer-events: none; display: block; }
+
+/* ── "Launch dashboard" pill (z 4), centred on (644, 360) ────────────────── */
+.vl-pill-wrap {
+  position: absolute;
+  z-index: var(--z-ui);
+  left: calc(644 * var(--u));
+  top: calc(360 * var(--u));
+  transform: translate(-50%, -50%);
+}
+.vl-pill-reveal { --mr: calc(30 * var(--u)); }
+.vl-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(13 * var(--u));
+  height: calc(60 * var(--u));
+  padding: 0 calc(26 * var(--u)) 0 calc(21 * var(--u));
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: calc(16.3 * var(--u));
+  font-weight: var(--w-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+.vl-pill-icon { position: relative; width: calc(17 * var(--u)); height: calc(17 * var(--u)); flex: none; }
+.vl-pill-label { position: relative; transform: translateY(calc(0.5 * var(--u))); }
+
+/* ── play button (z 4): Sylva's 170-unit ring around an 88-unit disc ─────── */
+.vl-play {
+  position: absolute;
+  z-index: var(--z-ui);
+  left: calc(187 * var(--u));
+  top: calc(431 * var(--u));
+  width: calc(170 * var(--u));
+  height: calc(170 * var(--u));
+}
+.vl-play-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid var(--play-ring);
+  border-radius: var(--r-round);
+}
+.vl-play-ring::after {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--u));
+  border: 1px solid var(--play-ring-hot);
+  border-radius: var(--r-round);
+  opacity: 0;
+  transform: scale(0.86);
+  transition: opacity 0.7s var(--ease), transform 0.9s var(--ease-out);
+}
+.vl-play:hover .vl-play-ring::after,
+.vl-play:focus-within .vl-play-ring::after,
+.vl-play[data-playing] .vl-play-ring::after { opacity: 1; transform: scale(1.06); }
+.vl-play[data-playing] .vl-play-ring::after { animation: vl-ring-pulse 1.2s var(--ease) infinite; }
+@keyframes vl-ring-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.vl-play-reveal {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(88 * var(--u));
+  height: calc(88 * var(--u));
+  margin: calc(-44 * var(--u)) 0 0 calc(-44 * var(--u));
+  border-radius: var(--r-round);
+}
+.vl-play-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-round);
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.vl-play-icon {
+  position: relative;
+  width: calc(22 * var(--u));
+  height: calc(22 * var(--u));
+  margin-left: calc(3 * var(--u)); /* optical centre of the triangle */
+  fill: currentColor;
+}
+.vl-play-caption {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 18 * var(--u));
+  transform: translate(-50%, calc(-6 * var(--u)));
+  font-size: var(--t-dock);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  text-shadow: 0 calc(2 * var(--u)) calc(16 * var(--u)) var(--stat-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s var(--ease), transform 0.6s var(--ease-out);
+}
+.vl-play:hover .vl-play-caption,
+.vl-play:focus-within .vl-play-caption,
+.vl-play[data-playing] .vl-play-caption { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── side stats (z 4) ────────────────────────────────────────────────────── */
+.vl-stat {
+  position: absolute;
+  z-index: var(--z-ui);
+  display: flex;
+  align-items: flex-start;
+  gap: calc(9 * var(--u));
+  margin: 0;
+}
+.vl-stat--a { left: calc(1250 * var(--u)); top: calc(216 * var(--u)); }
+.vl-stat--b { left: calc(1346 * var(--u)); top: calc(326 * var(--u)); }
+.vl-stat--c { left: calc(1432 * var(--u)); top: calc(428 * var(--u)); } /* the +96/+110 step, eased to clear card 2 and the right edge */
+.vl-mark {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  flex: none;
+  margin-top: calc(2 * var(--u));
+  color: var(--ink-mark);
+}
+.vl-mark svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 calc(2 * var(--u)) calc(10 * var(--u)) var(--stat-shadow)); }
+.vl-stat dt,
+.vl-stat dd { margin: 0; text-shadow: 0 calc(2 * var(--u)) calc(16 * var(--u)) var(--stat-shadow); white-space: nowrap; }
+.vl-stat dt { font-size: var(--t-stat); font-weight: var(--w-light); color: var(--ink-soft); line-height: calc(19 * var(--u)); }
+.vl-stat dd { font-size: var(--t-stat); font-weight: var(--w-semibold); color: var(--ink); line-height: calc(21 * var(--u)); }
+.vl-num { font-variant-numeric: tabular-nums; }
+.vl-line { display: block; }
+
+/* ── floating paper cards ────────────────────────────────────────────────── */
+.vl-card {
+  position: absolute;
+  --mr: var(--r-card);
+  background: var(--paper);
+  border-radius: var(--r-card);
+  box-shadow: var(--paper-shadow);
+  transition: box-shadow var(--dur) var(--ease);
+}
+.vl-card:hover { box-shadow: var(--paper-shadow-hover); }
+/* card 1 sits under the scene (z 2 < 3), so the landscape crosses its shoulder;
+   its knob lives outside it, above the scene */
+.vl-card--peak {
+  z-index: var(--z-card-back);
+  left: calc(890 * var(--u));
+  top: calc(200 * var(--u));
+  width: calc(330 * var(--u));
+  height: calc(305 * var(--u));
+  transform-origin: 50% 50%;
+}
+.vl-card--mode {
+  z-index: var(--z-ui);
+  will-change: transform;
+  left: calc(1237 * var(--u));
+  top: calc(482 * var(--u));
+  width: calc(328 * var(--u));
+  height: calc(310 * var(--u));
+}
+.vl-card-label {
+  position: absolute;
+  left: calc(38 * var(--u));
+  right: calc(30 * var(--u));
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  font-size: var(--t-card-label);
+  font-weight: var(--w-light);
+  color: var(--paper-label);
+}
+.vl-card-title {
+  position: absolute;
+  left: calc(38 * var(--u));
+  margin: 0;
+  font-size: var(--t-card-title);
+  line-height: var(--t-card-title-lh);
+  font-weight: var(--w-regular);
+  letter-spacing: var(--track-card);
+  color: var(--paper-ink);
+  transition: opacity var(--dur) var(--ease);
+}
+.vl-card--peak .vl-card-label { top: calc(152 * var(--u)); }
+.vl-card--peak .vl-card-title { top: calc(177 * var(--u)); width: calc(160 * var(--u)); }
+.vl-card--mode .vl-card-label { top: calc(45 * var(--u)); }
+.vl-card--mode .vl-card-title { top: calc(70 * var(--u)); }
+.vl-card[data-loading] .vl-card-title { opacity: 0.45; }
+
+/* the overload flag beside card 2's label */
+.vl-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  height: calc(22 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  border-radius: 999px;
+  background: var(--overload-soft);
+  color: var(--paper-ink);
+  font-size: calc(11 * var(--u));
+  font-weight: var(--w-medium);
+  letter-spacing: calc(0.8 * var(--u));
+  text-transform: uppercase;
+}
+.vl-flag i { width: calc(6 * var(--u)); height: calc(6 * var(--u)); border-radius: var(--r-round); background: var(--overload); }
+
+/* the plate: a dark moss window holding the chart */
+.vl-plate {
+  position: absolute;
+  left: calc(14 * var(--u));
+  right: calc(14 * var(--u));
+  margin: 0;
+  border-radius: var(--r-portal);
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(var(--glass-card), var(--glass-card)), var(--bg-deep);
+  box-shadow: inset 0 0 0 1px var(--glass-card-edge);
+}
+.vl-card--peak .vl-plate { top: calc(14 * var(--u)); height: calc(122 * var(--u)); }
+.vl-card--mode .vl-plate { bottom: calc(14 * var(--u)); height: calc(158 * var(--u)); }
+.vl-plate-media {
+  position: absolute;
+  inset: 0;
+  transition: opacity var(--dur) var(--ease), filter var(--dur) var(--ease);
+}
+.vl-card[data-loading] .vl-plate-media { opacity: 0.4; filter: saturate(0.4); }
+/* the white scan that rides across the plate as the chart draws in (Sylva's plate scan) */
+.vl-plate::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  width: 26%;
+  left: -13%;
+  filter: blur(calc(2 * var(--u)));
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--portal-scan) 42%, var(--portal-scan-hot) 54%, transparent);
+}
+
+/* chips inside a plate: snapshot label, playback hour */
+.vl-chip {
+  position: absolute;
+  z-index: 3;
+  top: calc(12 * var(--u));
+  height: calc(22 * var(--u));
+  display: inline-flex;
+  align-items: center;
+  padding: 0 calc(10 * var(--u));
+  border-radius: 999px;
+  border: 1px solid var(--glass-edge);
+  background: var(--popover);
+  color: var(--ink-soft);
+  font-size: calc(10.5 * var(--u));
+  font-weight: var(--w-regular);
+  letter-spacing: calc(0.4 * var(--u));
+  white-space: nowrap;
+  pointer-events: none;
+}
+.vl-chip--snapshot { left: calc(14 * var(--u)); }
+.vl-chip--hour { right: calc(14 * var(--u)); color: var(--ink); font-variant-numeric: tabular-nums; }
+.vl-card--mode .vl-chip--snapshot ~ .vl-chip--hour { right: calc(14 * var(--u)); }
+
+/* loading: a slow sheen over the dimmed snapshot */
+.vl-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, var(--glass-hover) 50%, transparent 70%);
+  background-size: 250% 100%;
+  animation: vl-shimmer 1.6s var(--ease) infinite;
+}
+@keyframes vl-shimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+/* the round knobs */
+.vl-knob-float {
+  position: absolute;
+  z-index: var(--z-ui);
+  pointer-events: none;
+  left: calc(1142 * var(--u));
+  top: calc(427 * var(--u));
+  width: calc(58 * var(--u));
+  height: calc(58 * var(--u));
+  /* turns about card 1's centre, so it stays on the card's corner */
+  transform-origin: calc(-87 * var(--u)) calc(-74.5 * var(--u));
+}
+.vl-knob-float > * { pointer-events: auto; }
+.vl-knob {
+  position: absolute;
+  z-index: var(--z-ui);
+  display: grid;
+  place-items: center;
+  width: calc(58 * var(--u));
+  height: calc(58 * var(--u));
+  border-radius: var(--r-round);
+  background: var(--knob);
+  color: var(--knob-ink);
+  box-shadow: var(--knob-shadow);
+  transition: transform 0.5s var(--ease-out), background 0.4s var(--ease);
+}
+.vl-knob-float .vl-knob { left: 0; top: 0; }
+.vl-card--mode .vl-knob { width: calc(54 * var(--u)); height: calc(54 * var(--u)); right: calc(26 * var(--u)); bottom: calc(26 * var(--u)); }
+.vl-knob svg { width: calc(19 * var(--u)); height: calc(19 * var(--u)); display: block; }
+.vl-knob:hover { transform: scale(1.1) rotate(8deg); background: var(--knob-hover); }
+
+/* ── charts: our look on the shadcn structure ────────────────────────────── */
+.vl-chart { font-family: var(--font); }
+.vl-chart .recharts-area-curve { filter: drop-shadow(0 0 calc(4 * var(--u)) var(--volt-soft)); }
+.vl-chart .recharts-cartesian-grid line { stroke: var(--chart-grid-line); }
+.vl-tip.vl-tip {
+  min-width: calc(128 * var(--u));
+  gap: calc(6 * var(--u));
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(12 * var(--u));
+  border: 1px solid var(--glass-edge);
+  background: var(--popover);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: calc(11 * var(--u));
+  font-weight: var(--w-light);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(8px);
+}
+.vl-tip .font-medium { font-weight: var(--w-medium); color: var(--ink-soft); }
+.vl-tip-row { display: flex; align-items: center; gap: calc(7 * var(--u)); width: 100%; }
+.vl-tip-row i { width: calc(7 * var(--u)); height: calc(7 * var(--u)); border-radius: var(--r-round); flex: none; box-shadow: 0 0 calc(6 * var(--u)) currentColor; }
+.vl-tip-row span { color: var(--ink-soft); }
+.vl-tip-row b { margin-left: auto; font-weight: var(--w-medium); font-variant-numeric: tabular-nums; }
+
+/* ── headline review switcher (temporary) ─────────────────────────────────
+   Top-left, level with the dock: the bottom-left the spec suggests is where
+   the scene's solar field now sits. */
+.vl-review {
+  position: absolute;
+  z-index: var(--z-ui);
+  left: calc(46 * var(--u));
+  top: calc(46 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+}
+.vl-review-label {
+  margin-right: calc(6 * var(--u));
+  font-size: var(--t-dock);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.vl-review-chip {
+  width: max(28px, calc(30 * var(--u)));
+  height: max(28px, calc(30 * var(--u)));
+  padding: 0;
+  border-radius: var(--r-dock-item);
+  border: 1px solid var(--glass-edge);
+  background: var(--dock-bg);
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: max(11px, var(--t-dock));
+  font-weight: var(--w-medium);
+  cursor: pointer;
+  transition: color 0.18s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.vl-review-chip:hover { color: var(--ink); border-color: var(--glass-rim); }
+.vl-review-chip[aria-pressed="true"] { background: var(--paper); border-color: var(--paper); color: var(--paper-ink); }
+
+/* ── keyboard focus ──────────────────────────────────────────────────────── */
+.vl a:focus-visible,
+.vl button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: calc(4 * var(--u));
+}
+.vl-dock-item:focus-visible { border-radius: var(--r-dock-item); }
+.vl-knob:focus-visible { outline-color: var(--focus-ring-dark); }
+.vl-pill:focus-visible { outline-offset: calc(6 * var(--u)); border-radius: 999px; }
+.vl-play-btn:focus-visible { border-radius: var(--r-round); }
+
+/* ── entrance: everything wipes in behind a mask ─────────────────────────
+   Transform is kept for the parallax, so the reveal uses clip-path; once the
+   intro has run, .intro-done drops the clips so no stacking context lingers. */
+.vl .mask { clip-path: inset(100% 0 0 0 round var(--mr, 0px)); }
+.vl.is-ready .mask {
+  clip-path: inset(0 0 0 0 round var(--mr, 0px));
+  transition: clip-path 1.05s var(--ease-out) var(--d, 0ms);
+}
+.vl .mask-circle { clip-path: circle(0% at 50% 50%); }
+.vl.is-ready .mask-circle {
+  clip-path: circle(76% at 50% 50%);
+  transition: clip-path 1.1s var(--ease-out) var(--d, 0ms);
+}
+.vl .fade { opacity: 0; }
+.vl.is-ready .fade { opacity: 1; transition: opacity var(--dur-reveal) var(--ease) var(--d, 0ms); }
+.vl.intro-done .mask,
+.vl.intro-done .mask-circle { clip-path: none; transition: none; }
+.vl .vl-scene { opacity: 0; }
+.vl.is-ready .vl-scene { opacity: 1; transition: opacity 0.45s var(--ease); }
+
+/* the dock fades as a whole and drops in tile by tile */
+.vl .vl-dock { opacity: 0; }
+.vl.is-ready .vl-dock { opacity: 1; transition: opacity var(--dur) var(--ease) 80ms; }
+.vl .vl-dock-item { clip-path: inset(0 0 105% 0); }
+.vl.is-ready .vl-dock-item {
+  clip-path: inset(0 0 -30% 0);
+  transition: clip-path 0.9s var(--ease-out) var(--d, 0ms), color 0.18s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.vl.intro-done .vl-dock-item { clip-path: none; }
+
+/* the headline rises under a fade; keyframes, so switching options replays it */
+.vl .vl-headline i { opacity: 0; }
+.vl.is-ready .vl-headline i {
+  animation:
+    vl-fade 1.05s var(--ease) var(--d, 0ms) both,
+    vl-rise 1.25s var(--ease-out) var(--d, 0ms) both;
+}
+@keyframes vl-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vl-rise { from { transform: translateY(calc(16 * var(--u))); } to { transform: none; } }
+
+/* the charts draw in left to right with the card easing, a beat after their
+   card lands, with Sylva's white scan riding the front edge. The wipe sits on
+   the plate, not on Recharts' paths, so a chart re-render can't restart it. */
+.vl .vl-plate-media { clip-path: inset(0 100% 0 0); }
+.vl.is-ready .vl-plate-media { animation: vl-wipe 1.6s var(--ease-out) var(--draw-d, 0.95s) both; }
+.vl.is-ready .vl-plate::after { animation: vl-scan 1.6s var(--ease-out) var(--draw-d, 0.95s) both; }
+.vl.intro-done .vl-plate-media { clip-path: none; animation: none; }
+.vl-card--peak { --draw-d: 0.95s; }
+.vl-card--mode { --draw-d: 1.1s; }
+@keyframes vl-wipe {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes vl-scan {
+  0% { left: -13%; opacity: 0; }
+  10% { opacity: 0.75; }
+  85% { opacity: 0.5; }
+  100% { left: 87%; opacity: 0; }
+}
+
+/* ── pointer parallax: each layer rides --pd px and turns --pr degrees ───── */
+.vl.is-par .par {
+  transform:
+    perspective(1400px)
+    translate3d(calc(var(--px, 0) * var(--pd, 0) * -1px), calc(var(--py, 0) * var(--pd, 0) * -0.62px), 0)
+    rotateY(calc(var(--px, 0) * var(--pr, 0) * 1deg))
+    rotateX(calc(var(--py, 0) * var(--pr, 0) * -0.7deg));
+}
+/* the pill wrapper already centres with a transform, so its inner layer rides */
+.vl-pill-reveal.par { will-change: transform; }
+
+/* ── reduced motion: a still, composed page ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .vl .mask,
+  .vl .mask-circle,
+  .vl .fade,
+  .vl .vl-scene,
+  .vl .vl-dock,
+  .vl .vl-dock-item,
+  .vl .vl-headline i {
+    opacity: 1 !important;
+    clip-path: none !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+  .vl .par { transform: none !important; }
+  .vl .vl-plate-media { clip-path: none !important; animation: none !important; }
+  .vl .vl-plate::after { display: none; }
+  .vl-shimmer { animation: none; opacity: 0.5; }
+  .vl-play[data-playing] .vl-play-ring::after { animation: none; }
+}
+
+/* ── one column below 900px, on Sylva's 760-unit scale ───────────────────── */
+@media (max-width: 900px) {
+  .vl { height: auto; min-height: 100svh; }
+  .vl-stage {
+    position: relative;
+    left: auto;
+    top: auto;
+    margin: 0;
+    width: 100%;
+    height: calc(1625 * var(--u));
+  }
+  .vl::after {
+    background:
+      radial-gradient(90% 30% at 50% 74%, var(--floor-light-phone) 0%, var(--floor-light-phone-mid) 46%, var(--floor-light-none) 82%),
+      linear-gradient(180deg, var(--floor-light-none) 62%, var(--floor-light-phone-edge) 100%);
+  }
+  .vl-guides i:nth-child(3) { display: none; }
+  .vl-guides i:nth-child(1) { left: calc(253 * var(--u)); }
+  .vl-guides i:nth-child(2) { left: calc(506 * var(--u)); }
+
+  /* the dock keeps only its glyphs, floored to 44px targets */
+  .vl-dock-wrap { top: calc(30 * var(--u)); }
+  .vl-dock {
+    height: max(56px, calc(58 * var(--u)));
+    padding: max(6px, calc(6 * var(--u)));
+    gap: max(4px, calc(4 * var(--u)));
+    border-radius: max(17px, calc(18 * var(--u)));
+  }
+  .vl-dock-item {
+    height: max(44px, calc(46 * var(--u)));
+    width: max(44px, calc(46 * var(--u)));
+    padding: 0;
+    border-radius: max(12px, calc(13 * var(--u)));
+  }
+  .vl-dock-label { display: none; }
+  .vl-glyph { width: max(19px, calc(20 * var(--u))); height: max(19px, calc(20 * var(--u))); }
+
+  .vl-headline { left: calc(34 * var(--u)); top: calc(128 * var(--u)); font-size: calc(62 * var(--u)); line-height: calc(66 * var(--u)); }
+  .vl-lede { left: calc(34 * var(--u)); top: calc(288 * var(--u)); width: calc(400 * var(--u)); font-size: calc(19 * var(--u)); line-height: calc(27 * var(--u)); }
+
+  /* the pill is re-anchored to the left rail, centred on y 430 */
+  .vl-pill-wrap { left: calc(34 * var(--u)); top: calc(430 * var(--u)); transform: translateY(-50%); }
+  .vl-pill { height: calc(74 * var(--u)); gap: calc(16 * var(--u)); padding: 0 calc(32 * var(--u)) 0 calc(26 * var(--u)); font-size: calc(20 * var(--u)); }
+  .vl-pill-icon { width: calc(21 * var(--u)); height: calc(21 * var(--u)); }
+  .vl-pill-reveal { --mr: calc(37 * var(--u)); }
+  .vl-play { display: none; }
+
+  .vl-stat { gap: calc(11 * var(--u)); }
+  .vl-mark { width: calc(36 * var(--u)); height: calc(36 * var(--u)); }
+  .vl-stat dt { font-size: calc(16 * var(--u)); line-height: calc(22 * var(--u)); }
+  .vl-stat dd { font-size: calc(16.5 * var(--u)); line-height: calc(24 * var(--u)); }
+  .vl-stat--a { left: calc(34 * var(--u)); top: calc(540 * var(--u)); }
+  .vl-stat--b { left: calc(274 * var(--u)); top: calc(540 * var(--u)); }
+  .vl-stat--c { left: calc(490 * var(--u)); top: calc(540 * var(--u)); }
+
+  .vl-card { --mr: calc(40 * var(--u)); border-radius: calc(40 * var(--u)); }
+  .vl-card--peak { left: calc(34 * var(--u)); top: calc(1050 * var(--u)); width: calc(692 * var(--u)); height: calc(250 * var(--u)); }
+  .vl-card--peak .vl-card-label { top: calc(96 * var(--u)); }
+  .vl-card--peak .vl-card-title { top: calc(124 * var(--u)); width: calc(400 * var(--u)); font-size: calc(32 * var(--u)); line-height: calc(36 * var(--u)); }
+  .vl-card--mode { left: calc(34 * var(--u)); top: calc(1324 * var(--u)); width: calc(692 * var(--u)); height: calc(268 * var(--u)); }
+  .vl-card--mode .vl-card-title { font-size: calc(32 * var(--u)); line-height: calc(36 * var(--u)); }
+  .vl-card--mode .vl-card-label { right: calc(340 * var(--u)); }
+  /* both plates become a thumbnail on the card's outer edge */
+  .vl-card--peak .vl-plate { left: auto; right: calc(16 * var(--u)); top: calc(16 * var(--u)); width: calc(224 * var(--u)); height: calc(218 * var(--u)); }
+  .vl-card--mode .vl-plate { left: auto; right: calc(16 * var(--u)); bottom: calc(16 * var(--u)); width: calc(300 * var(--u)); height: calc(150 * var(--u)); }
+  .vl-card--mode .vl-knob { right: calc(30 * var(--u)); bottom: calc(30 * var(--u)); }
+  .vl-knob-float { left: calc(644 * var(--u)); top: calc(1218 * var(--u)); transform-origin: calc(-264 * var(--u)) calc(-43 * var(--u)); }
+
+  .vl-ghost { font-size: calc(184 * var(--u)); letter-spacing: calc(14 * var(--u)); bottom: calc(660 * var(--u)); left: calc(-10 * var(--u)); }
+  .vl-review { left: auto; right: calc(34 * var(--u)); top: calc(410 * var(--u)); }
+  .vl-review-label { display: none; }
+}

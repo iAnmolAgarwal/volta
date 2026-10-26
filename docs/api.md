@@ -70,12 +70,12 @@ Below is the trimmed live response for the sample CSV (`-F source=sample`). This
 ```json
 {
   "run": {
-    "id": "93853000000027001",
-    "created": "2026-10-26T21:57:32+05:30",
+    "id": "93853000000030001",
+    "created": "2026-10-26T22:07:31+05:30",
     "saved": true,
     "source": "sample",
     "filename": "sample_test_input.csv",
-    "csv_key": "uploads/2026/10/26/162732-28bc0896-sample_test_input.csv",
+    "csv_key": "uploads/2026/10/26/163731-4ba92c62-sample_test_input.csv",
     "errors": []
   },
   "cleaning": {
@@ -103,7 +103,7 @@ Below is the trimmed live response for the sample CSV (`-F source=sample`). This
         "index": 3, "timestamp": "2015-06-16 18:00:00", "hour": 18,
         "ambient_temp_c": 35.37, "humidity_pct": 56.92, "solar_irradiance_wm2": 16.0,
         "prediction_kw": 295.69, "mode": "Renewable Storage Mode", "overload": true,
-        "soc_pct": 10.0, "battery_kw": 0.0, "grid_kw": 295.69,
+        "soc_pct": 40.91, "pv_kw": 4.0, "battery_kw": 96.0, "grid_kw": 195.69,
         "reason": "295.7 kW > 160 and hour 18 is in the 18–22 window; 295.7 kW ≥ 200 raises a critical overload alert"
       },
       "… the other 23 hours of the window"
@@ -151,18 +151,18 @@ The window is up to 24 hours long. An out-of-range value is a `400`.
 
 ```json
 {"runs": [
-  {"id": "93853000000027001", "created": "2026-10-26T21:57:32+05:30", "source": "sample",
+  {"id": "93853000000030001", "created": "2026-10-26T22:07:31+05:30", "source": "sample",
    "filename": "sample_test_input.csv", "rows_in": 1000, "n_rows": 1000, "peak_kw": 299.82,
    "peak_timestamp": "2015-06-23 18:00:00", "overload_count": 577, "storage_hours": 672,
    "switch_count": 83, "start": "2015-06-16 15:00:00", "end": "2015-07-28 06:00:00",
-   "csv_key": "uploads/2026/10/26/162732-28bc0896-sample_test_input.csv"},
+   "csv_key": "uploads/2026/10/26/163731-4ba92c62-sample_test_input.csv"},
   "… up to 20 runs, newest first"
 ]}
 ```
 
 ## GET /api/runs/{id}
 
-`GET /api/runs/93853000000027001?window_start=2015-06-23 12:00` returns the same keys as `/api/forecast`: `run`, `cleaning`, `summary`, `window`, `hours`, `switch_events`, `overload_alerts`. They are rebuilt from the stored hours. An unknown id is a `404`.
+`GET /api/runs/93853000000030001?window_start=2015-06-23 12:00` returns the same keys as `/api/forecast`: `run`, `cleaning`, `summary`, `window`, `hours`, `switch_events`, `overload_alerts`. They are rebuilt from the stored hours. An unknown id is a `404`.
 
 ## Storage
 

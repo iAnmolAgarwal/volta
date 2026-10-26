@@ -1,7 +1,7 @@
 """AppSail entry point: the HTTP proxy between predict.py (and the dashboard) and QuickML.
 
     POST /api/predict  {"rows": [...]} -> {"predictions", "signals", "battery"}
-    GET  /api/health   -> {"status", "version", "quickml_configured"}
+    GET  /api/health   -> {"status", "version", "quickml_configured", "catalyst_context"}
 
 Secrets come only from AppSail environment variables and never appear in a
 response. Run locally with `python -m backend.app`.
@@ -14,6 +14,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
 
+from backend.quickml_sdk import in_catalyst
 from backend.service import Forecaster, RequestError, quickml_configured
 from model.quickml_client import ConfigError, PredictionError
 
@@ -39,7 +40,13 @@ def create_app(forecaster: Forecaster | None = None) -> Flask:
 
     @app.get("/api/health")
     def health():
-        return jsonify(status="ok", version=app_version, quickml_configured=quickml_configured())
+        # catalyst_context: did the gateway add the X-ZC-* headers the SDK authenticates with?
+        return jsonify(
+            status="ok",
+            version=app_version,
+            quickml_configured=quickml_configured(),
+            catalyst_context=in_catalyst(request),
+        )
 
     @app.post("/api/predict")
     def predict():

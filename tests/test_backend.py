@@ -173,7 +173,8 @@ def test_health_without_credentials(api, monkeypatch):
         monkeypatch.delenv(k, raising=False)
     resp = api.get("/api/health")
     assert resp.status_code == 200
-    assert resp.get_json() == {"status": "ok", "version": "dev", "quickml_configured": False}
+    assert resp.get_json() == {"status": "ok", "version": "dev", "quickml_configured": False, "catalyst_context": False}
+    assert api.get("/api/health", headers={"X-ZC-ProjectId": "1"}).get_json()["catalyst_context"] is True
 
 
 def test_health_with_credentials_reveals_nothing(api, monkeypatch):

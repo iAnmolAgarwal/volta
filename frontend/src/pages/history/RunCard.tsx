@@ -1,5 +1,5 @@
 import { useMemo, type MouseEvent } from "react";
-import { ArrowUpRight, CloudCheck, Database } from "lucide-react";
+import { ArrowUpRight, CloudCheck, Database, Download, LoaderCircle, RotateCw } from "lucide-react";
 import { GlassCard } from "@/components/app/GlassCard";
 import { Pill } from "@/components/app/Pill";
 import { cssVars } from "@/components/landing/cssVars";
@@ -8,6 +8,7 @@ import { useRouteLink } from "@/lib/useRouteLink";
 import { atText, createdFull, runHref, createdShort, hoursText, overloadShare, rowsText, runTitle, seriesOf, shareText, shortId, SOURCE_LABEL, spanEnds, spanText, storeOf, type CurveScale, type SavedRun } from "./model";
 import { MarkOverload, MarkPeak, MarkSpan } from "./Marks";
 import { RunCurve } from "./RunCurve";
+import { useRunCsv } from "./useRunCsv";
 
 /* One saved run as Sylva's Field Note: the paper card reads downward, a small
  * label (source · when it was saved), the headline (the file), then the moss
@@ -21,7 +22,12 @@ import { RunCurve } from "./RunCurve";
  *
  * The whole card is one real link to /dashboard?run=<id> (the headline's link
  * is stretched over the card), so Enter, a click, a middle-click and "open in
- * new tab" all work; following it records the run as the viewer's last. */
+ * new tab" all work; following it records the run as the viewer's last.
+ *
+ * "CSV" is the card's one other control: a real button beside the store chip,
+ * raised over the stretched link (never inside it), that reads the run once
+ * and hands the browser its results as a CSV. It shows its own busy state and
+ * an inline error under the row. */
 
 export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: boolean; delay: number; scale: CurveScale }) {
   const link = useRouteLink();
@@ -33,6 +39,11 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
   const overShare = overloadShare(run);
   const series = useMemo(() => seriesOf(run), [run]);
   const titleId = `vh-run-${run.id}`;
+  const csvErrId = `vh-csv-${run.id}`;
+  const csv = useRunCsv(run.id);
+  const busy = csv.status.state === "busy";
+  const failed = csv.status.state === "error";
+  const CsvIcon = busy ? LoaderCircle : failed ? RotateCw : Download;
 
   const follow = link(href);
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
@@ -72,9 +83,29 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
         <p className="vh-run-meta">
           <span className="va-num">Run {shortId(run.id)}</span> · <span className="va-num">{rowsText(run)}</span>
         </p>
-        <span className="vh-saved">
-          <Pill size="sm" icon={store.name === "Stratus" ? CloudCheck : Database}>Saved · {store.name}</Pill>
+        <span className="vh-run-actions">
+          <span className="vh-saved">
+            <Pill size="sm" icon={store.name === "Stratus" ? CloudCheck : Database}>Saved · {store.name}</Pill>
+          </span>
+          <button
+            type="button"
+            className={`va-pill va-pill--default va-pill--sm is-action vh-csv${busy ? " is-busy" : ""}`}
+            onClick={csv.download}
+            aria-busy={busy}
+            aria-describedby={failed ? csvErrId : undefined}
+            aria-label={busy ? `Preparing the CSV for run ${shortId(run.id)}` : failed ? `Retry the CSV download for run ${shortId(run.id)}` : `Download run ${shortId(run.id)} as CSV`}
+            title={busy ? "Reading the run…" : `Download this run's ${hoursText(run.n_rows)} as CSV`}
+          >
+            <span className="va-pill-glyph" aria-hidden="true"><CsvIcon strokeWidth={1.5} aria-hidden /></span>
+            <span className="va-pill-label">{busy ? "Preparing" : failed ? "Retry" : "CSV"}</span>
+          </button>
         </span>
+        {csv.status.state === "error" && (
+          <p className="vh-csv-error" id={csvErrId} role="alert">
+            <i aria-hidden="true" />
+            {csv.status.message}
+          </p>
+        )}
       </div>
 
       <figure className={`va-plate vh-plate${series ? " has-curve" : ""}`}>

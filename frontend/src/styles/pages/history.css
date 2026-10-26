@@ -189,6 +189,58 @@
 .va-card--paper .vh-saved .va-pill { border-color: var(--glass-rim); background: var(--paper); box-shadow: inset 0 0 0 1px var(--glass-edge); }
 .vh-saved .va-pill-glyph { opacity: 0.9; }
 
+/* the store chip and "CSV" share the row's right side */
+.vh-run-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--u)); }
+/* "CSV": the card's secondary control, a paper pill raised over the stretched
+   link; on hover it turns into the ink chip, as the Input card's paper action */
+.va-card--paper .va-pill.vh-csv {
+  position: relative;
+  z-index: 2;
+  height: calc(26 * var(--u));
+  padding: 0 calc(11 * var(--u));
+  gap: calc(5 * var(--u));
+  border-color: var(--paper-label);
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-family: var(--font);
+}
+.va-card--paper .va-pill.vh-csv .va-pill-glyph { opacity: 0.85; }
+.va-card--paper .va-pill.vh-csv.is-action:hover { border-color: var(--paper-ink); background: var(--paper); color: var(--paper-ink); box-shadow: none; }
+@media (hover: hover) {
+  .va-card--paper .va-pill.vh-csv.is-action:hover {
+    border-color: var(--paper-ink);
+    background: var(--paper-ink);
+    color: var(--paper);
+    box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) var(--dock-active-shadow);
+  }
+  .va-card--paper .va-pill.vh-csv.is-action:hover .va-pill-glyph { opacity: 1; color: var(--volt); }
+}
+.va-card--paper .va-pill.vh-csv.is-busy { cursor: progress; border-color: var(--paper-ink); }
+.vh-csv.is-busy .va-pill-glyph svg { animation: vh-spin 0.9s linear infinite; }
+@keyframes vh-spin { to { transform: rotate(360deg); } }
+/* the inline error: under the row, over the link, with the overload dot */
+.vh-csv-error {
+  position: relative;
+  z-index: 2;
+  flex: 1 0 100%;
+  display: flex;
+  align-items: baseline;
+  gap: calc(8 * var(--u));
+  margin: 0;
+  font-size: var(--a-small);
+  line-height: 1.4;
+  color: var(--paper-ink);
+  cursor: auto;
+}
+.vh-csv-error i {
+  flex: none;
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  border-radius: var(--r-round);
+  background: var(--overload);
+  transform: translateY(calc(-1 * var(--u)));
+}
+
 /* "Last opened": the landing's card flag, in volt */
 .vh-flag {
   display: inline-flex;
@@ -373,6 +425,9 @@
   .vh-run .va-card-head { flex-wrap: wrap; gap: calc(14 * var(--u)); }
   .vh-run .va-card-title { white-space: normal; overflow-wrap: anywhere; }
   .vh-saved .va-pill { height: max(28px, calc(40 * var(--u))); padding: 0 max(10px, calc(16 * var(--u))); gap: max(5px, calc(8 * var(--u))); }
+  .vh-run-actions { gap: calc(12 * var(--u)); }
+  .va-card--paper .va-pill.vh-csv { height: var(--tap-min); min-width: var(--tap-min); padding: 0 max(14px, calc(20 * var(--u))); gap: max(6px, calc(8 * var(--u))); }
+  .vh-csv .va-pill-glyph { width: max(14px, calc(16 * var(--u))); height: max(14px, calc(16 * var(--u))); }
   .vh-flag { height: max(calc(22 * var(--u)), calc(var(--t-min) * 4 / 3)); padding: 0 max(calc(10 * var(--u)), calc(var(--t-min) * 0.6)); font-size: max(var(--t-min), calc(11 * var(--u))); letter-spacing: 0.07em; gap: calc(var(--t-min) / 3); }
   .vh-flag i { width: calc(var(--t-min) / 2); height: calc(var(--t-min) / 2); }
   .vh-run-row { margin: calc(14 * var(--u)) 0 calc(26 * var(--u)); gap: calc(12 * var(--u)); }

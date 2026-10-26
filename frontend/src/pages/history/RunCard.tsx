@@ -5,7 +5,7 @@ import { Pill } from "@/components/app/Pill";
 import { cssVars } from "@/components/landing/cssVars";
 import { setLastRunId } from "@/lib/api";
 import { useRouteLink } from "@/lib/useRouteLink";
-import { atText, createdFull, runHref, createdShort, hoursText, overloadShare, rowsText, runTitle, seriesOf, shareText, shortId, SOURCE_LABEL, spanEnds, spanText, storeOf, type CurveScale, type SavedRun } from "./model";
+import { atText, createdFull, runHref, createdShort, hoursText, lengthText, overloadShare, runTitle, seriesOf, shareText, shortId, SOURCE_LABEL, spanEnds, spanText, storeOf, type CurveScale, type SavedRun } from "./model";
 import { MarkOverload, MarkPeak, MarkSpan } from "./Marks";
 import { RunCurve } from "./RunCurve";
 import { useRunCsv } from "./useRunCsv";
@@ -81,7 +81,7 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
     >
       <div className="vh-run-row">
         <p className="vh-run-meta">
-          <span className="va-num">Run {shortId(run.id)}</span> · <span className="va-num">{rowsText(run)}</span>
+          <span className="va-num">Run {shortId(run.id)}</span> · <span className="va-num">{lengthText(run)}</span>
         </p>
         <span className="vh-run-actions">
           <span className="vh-saved">
@@ -123,7 +123,7 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
             <div className="vh-span">
               <span className="vh-pmark" aria-hidden="true"><MarkSpan /></span>
               <dl>
-                <dt>Data span · <span className="va-num">{hoursText(run.n_rows)}</span></dt>
+                <dt>Data span</dt>
                 <dd className="va-num">{spanText(run)}</dd>
               </dl>
             </div>
@@ -142,7 +142,7 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
               <dl>
                 <dt>Overload <span className="vh-dt-note">≥&nbsp;200&nbsp;kW</span></dt>
                 <dd className="va-num">{hoursText(run.overload_count)}</dd>
-                <dd className="vh-sub va-num">{series ? shareText(overShare) : `of ${hoursText(run.n_rows)}`}</dd>
+                <dd className="vh-sub va-num">{shareText(overShare)}</dd>
               </dl>
             </div>
           </div>

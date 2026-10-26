@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 import { cssVars } from "@/components/landing/cssVars";
-import { createdFull, createdShort, SOURCE_LABEL, atText, type ListStats } from "./model";
-import { MarkLatest, MarkPeak, MarkRuns } from "./Marks";
+import { createdFull, createdShort, hoursText, SOURCE_LABEL, atText, type ListStats } from "./model";
+import { MarkLatest, MarkOverload, MarkPeak } from "./Marks";
 
 /* The header's side stats, on Sylva's diagonal (x 1250 → 1346 → 1432, +110 a
  * step), as the dashboard sets its own: a faint mark, a soft label, a bold
- * value. They follow the source filter. On a phone they sit in one row. */
+ * value. They follow the source filter. On a phone they sit in one row.
+ * Each says something the dock and the eyebrow don't (the run count is
+ * already on both): the overload hours across the runs shown, the latest
+ * run, the highest peak. */
 
 function Stat({ tone, mark, label, value, title, delay, live }: { tone: "a" | "b" | "c"; mark: ReactNode; label: ReactNode; value: ReactNode; title?: string; delay: number; live?: boolean }) {
   return (
@@ -20,16 +23,17 @@ function Stat({ tone, mark, label, value, title, delay, live }: { tone: "a" | "b
 }
 
 export function HistoryStats({ stats, filtered }: { stats: ListStats; filtered: boolean }) {
-  const { shown, total, latest, peak } = stats;
+  const { shown, total, overloadHours, latest, peak } = stats;
   return (
     <div className="vh-stats" role="group" aria-label="Saved runs at a glance">
       <Stat
         tone="a"
         delay={700}
         live
-        mark={<MarkRuns />}
-        label={filtered ? "Runs shown" : "Runs listed"}
-        value={filtered ? `${shown} of ${total}` : `${total} saved`}
+        mark={<MarkOverload />}
+        label="Overload hours"
+        value={hoursText(overloadHours)}
+        title={`Hours at or above 200 kW, summed over ${filtered ? `the ${shown} runs shown (of ${total})` : `all ${total} runs listed`}`}
       />
       <Stat
         tone="b"

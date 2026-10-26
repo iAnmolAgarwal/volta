@@ -146,6 +146,14 @@
   --inset: calc(14 * var(--u));
   padding-bottom: var(--inset);
 }
+/* Sylva's floating cards answer the pointer: the whole note lifts as its shadow grows */
+.vh-run { transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
+.vh-run:hover,
+.vh-run:has(.vh-run-link:focus-visible) { transform: translateY(calc(-4 * var(--u))); box-shadow: var(--paper-shadow-hover); }
+@media (prefers-reduced-motion: reduce) {
+  .vh-run:hover,
+  .vh-run:has(.vh-run-link:focus-visible) { transform: none; }
+}
 .vh-run .va-card-head { margin-bottom: 0; }
 .vh-run .va-card-label {
   display: flex;
@@ -190,7 +198,7 @@
 .vh-saved .va-pill-glyph { opacity: 0.9; }
 
 /* the store chip and "CSV" share the row's right side */
-.vh-run-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--u)); }
+.vh-run-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--u)); margin-left: auto; } /* stays right when the row wraps */
 /* "CSV": the card's secondary control, a paper pill raised over the stretched
    link; on hover it turns into the ink chip, as the Input card's paper action */
 .va-card--paper .va-pill.vh-csv {
@@ -370,7 +378,12 @@
   background: var(--dock-bg);
   box-shadow: inset 0 0 0 1px var(--glass-edge);
 }
-.vh-skel-card { min-height: calc(318 * var(--u)); }
+/* three dotted side-stat ghosts down the diagonal, where the stats will land */
+.vh-skel-stats .vh-mark { opacity: 0.7; }
+.vh-skel-stat { display: grid; gap: calc(7 * var(--u)); padding-top: calc(4 * var(--u)); }
+.vh-skel-stat i { position: relative; display: block; overflow: hidden; height: calc(11 * var(--u)); width: calc(78 * var(--u)); border-radius: 999px; background: var(--glass-hover); }
+.vh-skel-stat i + i { width: calc(104 * var(--u)); height: calc(13 * var(--u)); }
+.vh-skel-card { min-height: calc(392 * var(--u)); } /* a curve card: the first rows are Stratus runs */
 /* the Field Note's plate, held in place at the card's foot */
 .vh-skel-card::before {
   content: "";
@@ -378,7 +391,7 @@
   left: calc(14 * var(--u));
   right: calc(14 * var(--u));
   bottom: calc(14 * var(--u));
-  height: 56%;
+  height: 58%;
   border-radius: var(--r-portal);
   background: var(--bg-deep);
   opacity: 0.4;
@@ -448,7 +461,11 @@
   .vh-skel-resume { width: 100%; }
   .vh-skel-resume .va-shimmer-line:first-child { height: calc(110 * var(--u)); border-radius: calc(30 * var(--u)); }
   .vh-skel-dock { grid-column: 1; width: 100%; height: calc(var(--tap-min) + 2 * max(5px, calc(6 * var(--u)))); border-radius: max(16px, calc(18 * var(--u))); }
-  .vh-skel-card { min-height: calc(560 * var(--u)); }
+  .vh-skel-card { min-height: calc(711 * var(--u)); }
+  /* the phone stats wrap to three lines ("Peak across / runs / 304.6 kW"); the ghosts hold that height */
+  .vh-skel-stat { min-height: calc(var(--t-min) * 1.35 * 3.3); align-content: start; gap: calc(var(--t-min) * 0.35); }
+  .vh-skel-stat i { width: 100%; height: var(--t-min); }
+  .vh-skel-stat i + i { width: 70%; height: var(--t-min); }
   .vh-skel-card::before { left: calc(16 * var(--u)); right: calc(16 * var(--u)); bottom: calc(16 * var(--u)); border-radius: calc(30 * var(--u)); }
   .vh-stat-src { display: none; }
   .vh-dt-note { display: block; }

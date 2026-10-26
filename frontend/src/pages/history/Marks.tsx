@@ -5,18 +5,6 @@
 const SVG = { viewBox: "0 0 30 30", fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 const RING = <circle cx="15" cy="15" r="10.5" strokeDasharray="0.6 3.6" />;
 
-/** Saved runs: a dotted ring holding three stacked notes. */
-export function MarkRuns() {
-  return (
-    <svg {...SVG}>
-      {RING}
-      <path d="M10.4 11.6h9.2" />
-      <path d="M10.4 15h9.2" />
-      <path d="M10.4 18.4h5.6" />
-    </svg>
-  );
-}
-
 /** The latest run: a dotted ring with a clock's hands. */
 export function MarkLatest() {
   return (
@@ -71,4 +59,9 @@ export function MarkSpan() {
       <path d="M20.6 12.6v4.8" />
     </svg>
   );
+}
+
+/** A stat still loading: the dotted ring alone. */
+export function MarkRing() {
+  return <svg {...SVG}>{RING}</svg>;
 }

@@ -132,12 +132,6 @@ export function spanEnds(r: SavedRun): [string, string] {
   return [atText(r.start), r.start.slice(0, 10) === r.end.slice(0, 10) ? hhmm(r.end) : atText(r.end)];
 }
 
-/** "1,000 rows, all kept" or "22 of 25 rows kept". */
-export function rowsText(r: SavedRun): string {
-  if (r.rows_in > r.n_rows) return `${r.n_rows.toLocaleString("en-GB")} of ${r.rows_in.toLocaleString("en-GB")} rows kept`;
-  return `${r.n_rows.toLocaleString("en-GB")} rows, all kept`;
-}
-
 /* ── where the run is kept ───────────────────────────────────────────────── */
 
 export interface Store {
@@ -161,14 +155,20 @@ export function storeOf(r: SavedRun): Store {
 export interface ListStats {
   shown: number;
   total: number;
+  /** Hours at or above 200 kW, summed over the runs shown. */
+  overloadHours: number;
   latest: SavedRun | null;
   peak: SavedRun | null;
 }
 
 export function listStats(shown: SavedRun[], total: number): ListStats {
   let peak: SavedRun | null = null;
-  for (const r of shown) if (!peak || r.peak_kw > peak.peak_kw) peak = r;
-  return { shown: shown.length, total, latest: shown[0] ?? null, peak };
+  let overloadHours = 0;
+  for (const r of shown) {
+    if (!peak || r.peak_kw > peak.peak_kw) peak = r;
+    overloadHours += r.overload_count;
+  }
+  return { shown: shown.length, total, overloadHours, latest: shown[0] ?? null, peak };
 }
 
 export function countBySource(runs: SavedRun[]): Record<SourceFilter, number> {

@@ -10,6 +10,7 @@ import { getLastRunId, listRuns } from "@/lib/api";
 import { WORDMARK } from "@/lib/brand";
 import { FilterDock } from "./history/FilterDock";
 import { HistoryStats } from "./history/HistoryStats";
+import { MarkRing } from "./history/Marks";
 import { countBySource, createdShort, curveScale, FILTER_LABEL, hoursText, isFilter, listStats, newestFirst, runHref, runTitle, type SavedRun, type SourceFilter } from "./history/model";
 import { RunCard } from "./history/RunCard";
 import "@/styles/pages/history.css";
@@ -114,6 +115,14 @@ export default function HistoryPage() {
           <>
             <div className="vh-resume"><Shimmer variant="text" lines={1} label="Loading your last run" className="vh-skel-resume" /></div>
             <div className="vh-skel-dock"><Shimmer variant="overlay" label="Loading the filter" /></div>
+            <div className="vh-stats vh-skel-stats" aria-hidden="true">
+              {(["a", "b", "c"] as const).map((t) => (
+                <div key={t} className={`vh-stat vh-stat--${t}`}>
+                  <span className="vh-mark"><MarkRing /></span>
+                  <span className="vh-skel-stat"><i><span className="va-shimmer va-shimmer--overlay" /></i><i><span className="va-shimmer va-shimmer--overlay" /></i></span>
+                </div>
+              ))}
+            </div>
           </>
         )}
       </div>

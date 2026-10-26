@@ -20,16 +20,17 @@ export function FocusCard({ hour, hovering, delay }: { hour: RunHour; hovering: 
     >
       <RingGauge socPct={hour.soc_pct} batteryKw={hour.battery_kw} pvKw={hour.pv_kw} label={`Battery at ${hhmm(hour.timestamp)}`} className="vd-ring" />
       <p className="vd-why">{batteryWhy(hour)}</p>
-      <dl className="vd-inputs" aria-label="Telemetry for this hour">
+      {/* each side stat is its own dl, so the list holds only dt/dd (the mark sits beside it) */}
+      <div className="vd-inputs" role="group" aria-label="Telemetry for this hour">
         <div className="va-stat">
           <span className="va-stat-mark" aria-hidden="true"><Thermometer strokeWidth={1.4} aria-hidden /></span>
-          <div><dt>Temperature</dt><dd>{hour.ambient_temp_c.toFixed(1)} °C</dd></div>
+          <dl><dt>Temperature</dt><dd>{hour.ambient_temp_c.toFixed(1)} °C</dd></dl>
         </div>
         <div className="va-stat">
           <span className="va-stat-mark" aria-hidden="true"><Droplets strokeWidth={1.4} aria-hidden /></span>
-          <div><dt>Humidity</dt><dd>{Math.round(hour.humidity_pct)}%</dd></div>
+          <dl><dt>Humidity</dt><dd>{Math.round(hour.humidity_pct)}%</dd></dl>
         </div>
-      </dl>
+      </div>
     </GlassCard>
   );
 }

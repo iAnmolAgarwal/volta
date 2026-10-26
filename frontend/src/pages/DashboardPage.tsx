@@ -1,36 +1,38 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { ChevronLeft, ChevronRight, Database, History, Sparkles } from "lucide-react";
-import { AlertBanner } from "@/components/app/AlertBanner";
-import { GlassCard } from "@/components/app/GlassCard";
-import { LogItem } from "@/components/app/LogItem";
-import { MainChart } from "@/components/app/MainChart";
-import { ModeBadge } from "@/components/app/ModeBadge";
+import { Database, History, RotateCw, Sparkles, Upload } from "lucide-react";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Pill } from "@/components/app/Pill";
-import { RingGauge } from "@/components/app/RingGauge";
 import { EmptyState, ErrorState, Shimmer } from "@/components/app/States";
-import { dayMonth, forecastSample, getLastRunId, getRun, hhmm, isApiError, setLastRunId, shortMode, type Run } from "@/lib/api";
+import { forecastSample, getLastRunId, getRun, isApiError, setLastRunId, type Run } from "@/lib/api";
 import { WORDMARK } from "@/lib/brand";
+import { Dashboard } from "./dashboard/Dashboard";
+import { isUnsaved, keepUnsaved, readUnsaved, UNSAVED_URL } from "./dashboard/unsaved";
+import "@/styles/pages/dashboard.css";
 
-/* PLACEHOLDER for the Dashboard screen (M2): it proves the shell on live data
- * (the run in ?run= or the viewer's last run, the focused-hour linkage, the
- * shared components). The Dashboard screen builder replaces this page. */
+/* /dashboard, /dashboard?run=<id> and /dashboard?unsaved=1.
+ *
+ * - ?run=<id>, else the viewer's last run: read from the Data Store.
+ * - ?unsaved=1: a complete forecast the store did not keep (its quota spent,
+ *   say), handed over in sessionStorage (dashboard/unsaved.ts). Shown as is.
+ * - Neither: an empty state; "Use sample data" forecasts the sample once and
+ *   opens it here, saved or not.
+ * A bad id is an ErrorState. While a run loads, a skeleton in the dashboard's
+ * own layout holds its place. */
 
-const WINDOW = 24;
-
-type Load = { state: "idle" } | { state: "loading" } | { state: "error"; error: unknown } | { state: "ready"; run: Run };
+type Load = { state: "loading"; for: string } | { state: "error"; for: string; error: unknown } | { state: "ready"; for: string; run: Run };
 
 export default function DashboardPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const runId = params.get("run") ?? getLastRunId();
-  const [load, setLoad] = useState<Load>(runId ? { state: "loading" } : { state: "idle" });
+  const unsaved = params.get("unsaved") === "1";
+  const runId = unsaved ? null : (params.get("run") ?? getLastRunId());
+  const [load, setLoad] = useState<Load | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [starting, setStarting] = useState<{ error?: unknown } | null>(null);
-  const [windowStart, setWindowStart] = useState(0);
-  const [selected, setSelected] = useState(0);
-  const [hovered, setHovered] = useState<number | null>(null);
+  const [made, setMade] = useState(0); // forecasts made here, so a repeat at the same URL is re-read
+  // a forecast just made here: shown as is, without reading it straight back
+  const fresh = useRef<Run | null>(null);
 
   useEffect(() => {
     document.title = `Controller · ${WORDMARK}`;
@@ -38,97 +40,116 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!runId) return;
+    if (fresh.current?.run.id === runId) {
+      setLoad({ state: "ready", for: runId, run: fresh.current });
+      return;
+    }
     const ctrl = new AbortController();
-    setLoad({ state: "loading" });
+    setLoad({ state: "loading", for: runId });
     getRun(runId, { signal: ctrl.signal })
       .then((run) => {
         setLastRunId(run.run.id);
-        setWindowStart(run.window.start);
-        setSelected(run.window.start);
-        setLoad({ state: "ready", run });
+        setLoad({ state: "ready", for: runId, run });
       })
       .catch((error) => {
         if (ctrl.signal.aborted) return;
         // a stale remembered run (deleted since) is forgotten, so the next visit starts clean
         if (isApiError(error) && error.kind === "not_found" && runId === getLastRunId()) setLastRunId(null);
-        setLoad({ state: "error", error });
+        setLoad({ state: "error", for: runId, error });
       });
     return () => ctrl.abort();
   }, [runId, attempt]);
+
+  // the unsaved hand-off: this visit's copy first, else the tab's sessionStorage
+  const unsavedRun = useMemo(() => {
+    if (!unsaved) return null;
+    const mine = fresh.current;
+    return mine && isUnsaved(mine) ? mine : readUnsaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `made` re-reads the hand-off after a new forecast
+  }, [unsaved, made]);
 
   const startSample = useCallback(async () => {
     setStarting({});
     try {
       const run = await forecastSample();
-      setLastRunId(run.run.id);
+      fresh.current = run;
       setStarting(null);
-      navigate(`/dashboard?run=${run.run.id}`);
+      setMade((m) => m + 1);
+      if (isUnsaved(run)) {
+        keepUnsaved(run);
+        navigate(UNSAVED_URL, { replace: true });
+      } else {
+        setLastRunId(run.run.id);
+        navigate(`/dashboard?run=${run.run.id}`, { replace: true });
+      }
     } catch (error) {
       setStarting({ error });
     }
   }, [navigate]);
 
-  const run = load.state === "ready" ? load.run : null;
-  const n = run?.hours.length ?? 0;
-  const end = Math.min(windowStart + WINDOW, n);
-  const focusIndex = hovered ?? selected;
-  const focus = run?.hours[Math.min(Math.max(focusIndex, 0), n - 1)];
-  const inWindow = useCallback((i: number) => i >= windowStart && i < end, [windowStart, end]);
-  const alerts = useMemo(() => run?.overload_alerts.filter((a) => inWindow(a.index)) ?? [], [run, inWindow]);
-  const log = useMemo(() => {
-    if (!run) return [];
-    const switches = run.switch_events.filter((e) => inWindow(e.index)).map((e) => ({ kind: "switch" as const, index: e.index, ts: e.timestamp, title: `${shortMode(e.from)} → ${shortMode(e.to)}`, meta: undefined as string | undefined }));
-    const overloads = run.overload_alerts.filter((a) => inWindow(a.index)).map((a) => ({ kind: "overload" as const, index: a.index, ts: a.timestamp, title: "Critical overload", meta: `${a.prediction_kw.toFixed(1)} kW` }));
-    return [...switches, ...overloads].sort((a, b) => a.index - b.index || (a.kind === "switch" ? -1 : 1));
-  }, [run, inWindow]);
-
-  const step = (dir: -1 | 1) => {
-    const next = Math.min(Math.max(windowStart + dir * WINDOW, 0), Math.max(n - WINDOW, 0));
-    setWindowStart(next);
-    setSelected(next);
-  };
-  const jump = (i: number) => {
-    const ws = Math.min(Math.floor(i / WINDOW) * WINDOW, Math.max(n - WINDOW, 0));
-    if (!inWindow(i)) setWindowStart(ws);
-    setSelected(i);
-  };
+  if (unsavedRun) return <Dashboard key={`unsaved:${unsavedRun.run.created}`} run={unsavedRun} />;
 
   if (!runId) {
     return (
-      <div className="va-page">
-        <PageHeader eyebrow="Controller" title="No run yet" lede="Forecast the bundled 1,000-hour sample, or upload your own telemetry, and the controller's decisions appear here." />
+      <div className="va-page vd">
+        <PageHeader
+          eyebrow="Controller"
+          title="No run yet"
+          lede="Forecast the bundled sample, or upload your own telemetry, and the controller's decisions for every hour appear here."
+        />
         {starting?.error ? (
-          <ErrorState error={starting.error} action={<Pill icon={Sparkles} tone="volt" onClick={() => void startSample()}>Try again</Pill>} />
+          <ErrorState
+            error={starting.error}
+            title="The sample could not be forecast"
+            action={
+              <>
+                <Pill icon={RotateCw} tone="volt" onClick={() => void startSample()}>Try again</Pill>
+                <Pill icon={Upload} to="/input">Upload telemetry</Pill>
+              </>
+            }
+          />
         ) : (
           <EmptyState
             icon={Database}
-            title={starting ? "Forecasting the sample" : "Nothing to show yet"}
+            className="vd-empty"
+            title={starting ? "Forecasting the sample" : unsaved ? "That forecast is no longer here" : "Nothing to show yet"}
             action={
-              starting ? <Shimmer variant="text" lines={1} label="Forecasting" /> : (
+              starting ? (
+                <span className="vd-busy">
+                  <Shimmer variant="text" lines={1} label="Forecasting the sample" className="vd-busy-bar" />
+                  <span className="vd-busy-text">Cleaning, forecasting with QuickML, saving the run</span>
+                </span>
+              ) : (
                 <>
                   <Pill icon={Sparkles} tone="volt" onClick={() => void startSample()}>Use sample data</Pill>
-                  <Pill to="/input">Upload telemetry</Pill>
+                  <Pill icon={Upload} to="/input">Upload telemetry</Pill>
+                  <Pill icon={History} to="/history">Saved runs</Pill>
                 </>
               )
             }
           >
-            The dashboard opens your latest run. Start one with the sample data, about ten seconds.
+            {starting
+              ? "1,000 hours of June and July weather go through the model and the controller. It takes about ten seconds."
+              : unsaved
+                ? "An unsaved forecast lives only in the tab that made it. Start a new one from the sample, or upload telemetry."
+                : "The dashboard opens your latest run. Start one from the 1,000-hour sample in about ten seconds."}
           </EmptyState>
         )}
       </div>
     );
   }
 
-  if (load.state === "error") {
+  if (load?.for === runId && load.state === "error") {
     return (
-      <div className="va-page">
-        <PageHeader eyebrow="Controller" title="Controller" />
+      <div className="va-page vd">
+        <PageHeader eyebrow={`Run ${runId}`} title="Controller" lede="The dashboard could not open this run." />
         <ErrorState
           error={load.error}
           action={
             <>
-              <Pill onClick={() => setAttempt((a) => a + 1)}>Retry</Pill>
+              <Pill icon={RotateCw} onClick={() => setAttempt((a) => a + 1)}>Retry</Pill>
               <Pill icon={History} to="/history">Pick another run</Pill>
+              <Pill icon={Upload} to="/input">New forecast</Pill>
             </>
           }
         />
@@ -136,67 +157,26 @@ export default function DashboardPage() {
     );
   }
 
-  if (!run || !focus) {
-    return (
-      <div className="va-page">
-        <PageHeader eyebrow="Controller" title="Controller" lede="Loading the run from the Data Store." />
-        <Shimmer variant="chart" label="Loading the run" />
-      </div>
-    );
-  }
+  if (load?.for !== runId || load.state !== "ready") return <DashboardSkeleton />;
 
-  const first = run.hours[windowStart];
-  const lastHour = run.hours[end - 1];
+  return <Dashboard key={runId} run={load.run} />;
+}
 
+/** The loading state: the landing's sheen, laid out as the dashboard will be. */
+function DashboardSkeleton() {
   return (
-    <div className="va-page va-dash">
-      <PageHeader
-        eyebrow={`Run ${run.run.id.slice(-6)} · ${run.run.source} · ${run.summary.n_hours.toLocaleString()} h`}
-        title="Controller"
-        lede="One hour in focus drives the mode, the battery and the log: the hour under the chart, or the one the window starts on."
-        actions={
-          <>
-            <Pill icon={ChevronLeft} onClick={() => step(-1)} disabled={windowStart === 0} aria-label="Previous 24 hours">Prev</Pill>
-            <Pill>{`${hhmm(first.timestamp)} ${dayMonth(first.timestamp)} – ${hhmm(lastHour.timestamp)} ${dayMonth(lastHour.timestamp)}`}</Pill>
-            <Pill icon={ChevronRight} onClick={() => step(1)} disabled={end >= n} aria-label="Next 24 hours">Next</Pill>
-          </>
-        }
-      />
-      <AlertBanner key={windowStart} alerts={alerts} activeIndex={focusIndex} onSelect={jump} delay={380} />
-      <div className="va-dash-grid">
-        <MainChart
-          hours={run.hours}
-          start={windowStart}
-          focusIndex={focusIndex}
-          onFocusHour={setHovered}
-          delay={460}
-          className="va-dash-chart"
-        />
-        <GlassCard label={`Hour in focus · ${hhmm(focus.timestamp)} ${dayMonth(focus.timestamp)}`} title={`${focus.prediction_kw.toFixed(1)} kW`} delay={560} className="va-dash-focus">
-          <ModeBadge mode={focus.mode} overload={focus.overload} reason={focus.reason} size="lg" live />
-          <RingGauge socPct={focus.soc_pct} batteryKw={focus.battery_kw} pvKw={focus.pv_kw} className="va-dash-ring" />
-        </GlassCard>
+    <div className="va-page vd" aria-busy="true">
+      <div className="vd-hero">
+        <PageHeader eyebrow="Loading the run" title="Controller" lede="Reading the saved run and its hours from the Data Store." />
+        <div className="vd-state"><Shimmer variant="text" lines={2} label="Loading the grid state" className="vd-skel-badge" /></div>
+        <div className="vd-skel-stepper"><Shimmer variant="overlay" label="Loading the window" /></div>
       </div>
-      <GlassCard label="System log" title={`${log.length} events in this window`} delay={660}>
-        {log.length === 0 ? (
-          <EmptyState surface="plain" title="A quiet window">No mode switches and no overloads in these 24 hours.</EmptyState>
-        ) : (
-          <ol className="va-dash-log">
-            {log.map((e) => (
-              <li key={`${e.kind}${e.index}`}>
-                <LogItem
-                  kind={e.kind}
-                  label={`${e.kind === "switch" ? "Mode switch" : "Overload"} · ${hhmm(e.ts)}`}
-                  title={e.title}
-                  meta={e.meta}
-                  active={e.index === focusIndex}
-                  onClick={() => jump(e.index)}
-                />
-              </li>
-            ))}
-          </ol>
-        )}
-      </GlassCard>
+      <Shimmer variant="text" lines={1} label="Loading alerts" className="vd-skel-alert" />
+      <div className="vd-main">
+        <Shimmer variant="chart" label="Loading the load forecast" />
+        <Shimmer variant="card" label="Loading the hour in focus" className="vd-skel-focus" />
+      </div>
+      <Shimmer variant="card" label="Loading the system log" className="vd-skel-log" />
     </div>
   );
 }

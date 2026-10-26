@@ -1,0 +1,328 @@
+/* The dashboard (/dashboard): its layout and its page-local pieces.
+ *
+ * Composed on Sylva's hero (https://mengto.github.io/sylva/) at Sylva's sizes,
+ * on its 1600-unit artboard (--u; 760 units below 900px): the headline on the
+ * 46 rail with the grid-state badge under it, the lede at x 520 with the
+ * window stepper under it (where Sylva's pill sits), the side stats stepped
+ * down Sylva's diagonal (x 1250 → 1346 → 1432, +110 a step). Every value is a
+ * token from tokens.css or a unit of --u; no Sylva code is copied. */
+
+/* ── the hero band ───────────────────────────────────────────────────────── */
+.vd-hero {
+  position: relative;
+  display: grid;
+  /* the same columns as .va-head: the rail, the lede's column at x 520, the rest */
+  grid-template-columns: calc(474 * var(--u)) calc(228 * var(--u)) minmax(0, 1fr);
+  align-items: start;
+  min-height: calc(262 * var(--u)); /* the third stat's step, plus its height */
+}
+.vd-hero > .va-head { grid-column: 1 / -1; margin-bottom: calc(22 * var(--u)); }
+.vd-hero > .va-head .va-lede { max-width: calc(250 * var(--u)); }
+.vd-state { grid-column: 1; min-width: 0; padding-right: calc(40 * var(--u)); }
+.vd-state .va-mode-reason { max-width: calc(360 * var(--u)); }
+
+/* "Saved" or "Not saved: <reason>": a quiet chip beside the eyebrow */
+.vd-hero .va-eyebrow { white-space: nowrap; }
+/* negative block margins keep the eyebrow's line as tall as its caps, so the headline holds its rail */
+.vd-saved { display: inline-flex; vertical-align: middle; margin: calc(-8 * var(--u)) 0 calc(-8 * var(--u)) calc(12 * var(--u)); }
+.vd-saved .va-pill { height: calc(24 * var(--u)); padding: 0 calc(10 * var(--u)); color: var(--ink-faint); letter-spacing: var(--track-dock); }
+.vd-saved.is-not .va-pill { color: var(--ink-soft); }
+
+/* ── side stats: Sylva's .stat, on its diagonal ──────────────────────────── */
+.vd-stats { position: absolute; inset: 0; pointer-events: none; }
+.vd-stat {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  gap: calc(9 * var(--u));
+}
+/* the hero starts on the 46 rail, so Sylva's x 1250 is 1204 in here; its
+   stat A sits 24 above the headline, as ours sits level with the eyebrow */
+.vd-stat--a { left: calc(1204 * var(--u)); top: calc(2 * var(--u)); }
+.vd-stat--b { left: calc(1300 * var(--u)); top: calc(112 * var(--u)); }
+.vd-stat--c { left: calc(1386 * var(--u)); top: calc(214 * var(--u)); }
+.vd-mark { width: calc(32 * var(--u)); height: calc(32 * var(--u)); flex: none; margin-top: calc(2 * var(--u)); color: var(--ink-mark); }
+.vd-mark svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 calc(2 * var(--u)) calc(10 * var(--u)) var(--stat-shadow)); }
+.vd-stat dl { margin: 0; }
+.vd-stat dt,
+.vd-stat dd { margin: 0; white-space: nowrap; text-shadow: 0 calc(2 * var(--u)) calc(16 * var(--u)) var(--stat-shadow); }
+.vd-stat dt { font-size: var(--a-small); font-weight: var(--w-light); color: var(--ink-soft); line-height: calc(19 * var(--u)); }
+.vd-stat dd { font-size: var(--a-small); font-weight: var(--w-semibold); color: var(--ink); line-height: calc(21 * var(--u)); }
+
+/* ── the window stepper: a small dock, then a dock of 24 hours ──────────── */
+.vd-stepper {
+  grid-column: 2 / 4;
+  justify-self: start;
+  width: calc(452 * var(--u));
+  display: grid;
+  gap: calc(6 * var(--u));
+  padding: calc(5 * var(--u)) calc(5 * var(--u)) calc(8 * var(--u));
+  border: 1px solid var(--glass-edge);
+  border-radius: calc(18 * var(--u));
+  background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg);
+  box-shadow: 0 calc(12 * var(--u)) calc(34 * var(--u)) var(--dock-shadow), inset 0 1px var(--dock-inset);
+  backdrop-filter: blur(calc(14 * var(--u))) saturate(1.1);
+  -webkit-backdrop-filter: blur(calc(14 * var(--u))) saturate(1.1);
+  --mr: calc(18 * var(--u));
+}
+.vd-stepper-bar { display: flex; align-items: center; gap: calc(4 * var(--u)); }
+.vd-stepper-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: calc(36 * var(--u));
+  height: calc(36 * var(--u));
+  padding: 0;
+  color: var(--ink-soft);
+  background: var(--glass);
+  border-color: var(--glass-edge);
+}
+.vd-stepper-btn svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); display: block; }
+.vd-stepper-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--glass-rim); background: var(--dock-near-bg); box-shadow: 0 calc(7 * var(--u)) calc(16 * var(--u)) var(--dock-shadow); }
+.vd-stepper-btn:disabled { opacity: 0.32; cursor: default; }
+.vd-stepper-span {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(3 * var(--u));
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: var(--track-dock);
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  line-height: 1.2;
+}
+.vd-stepper-range { color: var(--ink); white-space: nowrap; }
+.vd-stepper-count { color: var(--ink-faint); }
+
+.vd-hours {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--count, 24), minmax(0, 1fr));
+  gap: calc(3 * var(--u));
+  height: calc(46 * var(--u));
+  margin: 0 calc(3 * var(--u));
+  padding: calc(5 * var(--u));
+  border-radius: var(--r-dock-item);
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+  cursor: pointer;
+  touch-action: pan-y; /* a horizontal drag scrubs, a vertical one still scrolls */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.vd-hours:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: calc(3 * var(--u)); }
+.vd-hour {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--glass);
+  transition: background 0.25s var(--ease), box-shadow 0.3s var(--ease), transform 0.5s var(--ease-out);
+}
+.vd-hour i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--lv, 0.2) * 100%);
+  border-radius: inherit;
+  background: var(--ink-mark);
+  transition: height var(--dur) var(--ease-out), background 0.3s var(--ease);
+}
+.vd-hour.is-storage i { background: var(--volt-soft); }
+/* the chart's overload dot, on the tile's top */
+.vd-hour.is-overload::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: calc(3 * var(--u));
+  left: 50%;
+  width: calc(4 * var(--u));
+  height: calc(4 * var(--u));
+  margin-left: calc(-2 * var(--u));
+  border-radius: var(--r-round);
+  background: var(--overload);
+}
+.vd-hours:hover .vd-hour:not(.is-on) { background: var(--glass-hover); }
+.vd-hour.is-focus { box-shadow: inset 0 0 0 1px var(--ink-soft); }
+/* the selected hour wears the paper, as the active dock item does */
+.vd-hour.is-on {
+  background: var(--paper);
+  box-shadow: 0 calc(4 * var(--u)) calc(12 * var(--u)) var(--dock-active-shadow);
+  transform: scaleY(1.06);
+}
+.vd-hour.is-on i { background: var(--paper-label); }
+.vd-hour-ticks { position: relative; height: calc(13 * var(--u)); margin: 0 calc(8 * var(--u)); }
+.vd-hour-ticks span {
+  position: absolute;
+  top: 0;
+  left: calc((var(--k) + 0.5) / var(--count, 24) * 100%);
+  transform: translateX(-50%);
+  font-size: max(var(--t-min), var(--a-caps));
+  font-weight: var(--w-light);
+  line-height: 1;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vd-hour-ticks span:first-child { transform: translateX(-30%); }
+
+/* ── the overload banner (page-local; AlertBanner's own pieces) ──────────── */
+.vd-alert-runs { color: var(--ink-soft); }
+
+/* ── the chart and the hour in focus ─────────────────────────────────────── */
+.vd-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(424 * var(--u));
+  gap: var(--a-gap);
+  align-items: stretch;
+}
+.vd-chart-wrap { min-width: 0; display: grid; scroll-margin-top: calc(130 * var(--u)); }
+.vd-chart { --chart-h: calc(372 * var(--u)); }
+.vd-ref-label {
+  fill: var(--ink-faint);
+  font-size: max(var(--t-min), var(--a-caps));
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+}
+.vd-ref-label.is-overload { fill: var(--overload); }
+.vd-ref-word { fill-opacity: 0.72; font-weight: var(--w-regular); }
+.vd-legend-charging {
+  width: calc(16 * var(--u));
+  height: calc(9 * var(--u));
+  border-radius: 0 0 calc(4 * var(--u)) calc(4 * var(--u));
+  border: 1px dashed var(--flow-battery);
+  border-top: 0;
+  opacity: 0.8;
+}
+
+.vd-focus { display: flex; flex-direction: column; gap: calc(16 * var(--u)); }
+.vd-focus .va-card-head { margin-bottom: 0; }
+.vd-focus .va-card-label { color: var(--ink-soft); }
+.vd-focus .va-card-label,
+.vd-focus .va-card-title { white-space: nowrap; }
+.vd-focus-unit { font-size: var(--a-small); font-weight: var(--w-light); color: var(--ink-faint); letter-spacing: 0; }
+.vd-source {
+  display: inline-flex;
+  align-items: center;
+  height: calc(24 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  border-radius: 999px;
+  border: 1px solid var(--glass-edge);
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.vd-source.is-hover { color: var(--volt); border-color: var(--volt-soft); }
+.vd-ring { margin-top: calc(2 * var(--u)); }
+/* the two side stats hold one row ("Charging · 75.0 kW" beside "None this hour"), so the card never grows on hover */
+.vd-ring .va-ring-stats { flex-wrap: nowrap; gap: calc(14 * var(--u)) calc(18 * var(--u)); }
+/* a touch smaller than the shared 232, so the card stands as tall as the chart */
+@media (min-width: 901px) {
+  .vd-ring { --ring: calc(206 * var(--u)); }
+  .vd-ring .va-ring-pct { font-size: calc(48 * var(--u)); }
+}
+.vd-why {
+  margin: calc(-2 * var(--u)) 0 0;
+  padding-top: calc(14 * var(--u));
+  border-top: 1px solid var(--glass-edge);
+  font-size: var(--a-small);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  min-height: calc(3 * 1.5em + 14 * var(--u)); /* three lines held, so the card never jumps on hover */
+}
+.vd-inputs { display: flex; flex-wrap: wrap; gap: calc(14 * var(--u)) calc(28 * var(--u)); margin: 0; margin-top: auto; }
+
+/* ── the system log: Field Notes under a heading on the card's own rail ──── */
+.vd-log {
+  display: grid;
+  grid-template-columns: calc(330 * var(--u)) minmax(0, 1fr);
+  gap: calc(48 * var(--u));
+  align-items: start;
+}
+.vd-log-head { position: sticky; top: calc(130 * var(--u)); }
+.vd-log-note { margin: calc(14 * var(--u)) 0 0; font-size: var(--a-small); line-height: 1.55; color: var(--ink-soft); }
+.vd-log-list {
+  position: relative;
+  display: grid;
+  gap: calc(8 * var(--u));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── states ──────────────────────────────────────────────────────────────── */
+.vd-empty { padding-top: calc(72 * var(--u)); padding-bottom: calc(72 * var(--u)); }
+.vd-busy { display: grid; justify-items: center; gap: calc(12 * var(--u)); width: calc(320 * var(--u)); }
+.vd-busy-bar { width: 100%; }
+.vd-busy-bar .va-shimmer-line:first-child { width: 100%; height: calc(6 * var(--u)); }
+.vd-busy-text { font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--ink-faint); }
+
+.vd-skel-badge { width: calc(300 * var(--u)); }
+.vd-skel-stepper {
+  position: relative;
+  grid-column: 2 / 4;
+  width: calc(452 * var(--u));
+  height: calc(118 * var(--u));
+  overflow: hidden;
+  border-radius: calc(18 * var(--u));
+  background: var(--glass-card);
+  box-shadow: inset 0 0 0 1px var(--glass-card-edge);
+}
+.vd-skel-alert { display: block; }
+.vd-skel-alert .va-shimmer-line:first-child { width: 100%; height: calc(62 * var(--u)); border-radius: var(--r-pill); background: var(--glass-card); box-shadow: inset 0 0 0 1px var(--glass-card-edge); }
+.vd-skel-focus { min-height: calc(500 * var(--u)); }
+.vd-skel-log { min-height: calc(300 * var(--u)); }
+
+/* ── one column below 900px, on Sylva's 760-unit scale ───────────────────── */
+@media (max-width: 900px) {
+  .vd-hero { grid-template-columns: minmax(0, 1fr); min-height: 0; row-gap: calc(30 * var(--u)); }
+  .vd-hero > .va-head { margin-bottom: 0; }
+  .vd-hero > .va-head .va-lede { max-width: calc(560 * var(--u)); }
+  .vd-state { padding-right: 0; }
+  .vd-hero .va-eyebrow { white-space: normal; }
+  .vd-saved { display: flex; margin: calc(14 * var(--u)) 0 0; }
+  .vd-saved .va-pill { height: max(28px, calc(40 * var(--u))); padding: 0 max(12px, calc(18 * var(--u))); }
+
+  /* Sylva's phone stats: one row under the pill, as the landing's three */
+  .vd-stats { position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(14 * var(--u)); pointer-events: auto; }
+  .vd-stat { position: static; gap: calc(11 * var(--u)); min-width: 0; }
+  .vd-mark { width: max(24px, calc(36 * var(--u))); height: max(24px, calc(36 * var(--u))); }
+  .vd-stat dt { font-size: max(var(--t-min), calc(16 * var(--u))); line-height: 1.35; }
+  .vd-stat dd { font-size: max(var(--t-min), calc(16.5 * var(--u))); line-height: 1.35; white-space: normal; }
+
+  .vd-stepper { grid-column: 1; width: 100%; padding: max(4px, calc(8 * var(--u))); border-radius: max(16px, calc(26 * var(--u))); --mr: max(16px, calc(26 * var(--u))); gap: max(6px, calc(10 * var(--u))); }
+  .vd-stepper-btn { width: var(--tap-min); height: var(--tap-min); border-radius: max(12px, calc(18 * var(--u))); }
+  .vd-stepper-btn svg { width: max(16px, calc(24 * var(--u))); height: max(16px, calc(24 * var(--u))); }
+  .vd-stepper-span { font-size: var(--a-caps); }
+  .vd-hours { height: max(var(--tap-min), calc(84 * var(--u))); gap: max(2px, calc(4 * var(--u))); padding: max(5px, calc(8 * var(--u))); border-radius: max(12px, calc(18 * var(--u))); }
+  .vd-hour.is-overload::before { width: max(4px, calc(7 * var(--u))); height: max(4px, calc(7 * var(--u))); margin-left: calc(max(4px, calc(7 * var(--u))) / -2); top: max(3px, calc(5 * var(--u))); }
+  .vd-hour-ticks { height: max(14px, calc(20 * var(--u))); }
+
+  /* a window has a few runs, never a scroll of them: the chips wrap */
+  .vd-alert-chips { flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+
+  .vd-main { grid-template-columns: minmax(0, 1fr); }
+  .vd-chart { --chart-h: max(260px, calc(600 * var(--u))); }
+  .vd-legend-charging { width: max(14px, calc(24 * var(--u))); height: max(8px, calc(13 * var(--u))); }
+  .vd-source { height: max(24px, calc(40 * var(--u))); padding: 0 max(10px, calc(16 * var(--u))); font-size: var(--a-caps); }
+  .vd-focus { gap: calc(26 * var(--u)); }
+  .vd-why { padding-top: calc(22 * var(--u)); min-height: calc(2 * 1.5em + 22 * var(--u)); }
+
+  .vd-log { grid-template-columns: minmax(0, 1fr); gap: calc(26 * var(--u)); }
+  .vd-log-head { position: static; }
+  .vd-log-list { gap: calc(12 * var(--u)); }
+
+  .vd-busy { width: 100%; }
+  .vd-skel-badge { width: 70%; }
+  .vd-skel-stepper { grid-column: 1; width: 100%; height: max(150px, calc(230 * var(--u))); border-radius: max(16px, calc(26 * var(--u))); }
+  .vd-skel-alert .va-shimmer-line:first-child { height: calc(150 * var(--u)); border-radius: calc(40 * var(--u)); }
+  .vd-skel-focus { min-height: calc(900 * var(--u)); }
+}

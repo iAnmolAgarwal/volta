@@ -82,8 +82,9 @@ class FakeRunStore:
         self._next += 1
         run_id = str(self._next)
         created = f"2026-10-26T12:00:{self._next % 60:02d}+05:30"
-        self.runs[run_id] = ({**record, "id": run_id, "created": created}, [dict(h) for h in hours])
-        return {"id": run_id, "created": created}
+        storage = {"stratus": True, "datastore": True, "reason": None}
+        self.runs[run_id] = ({**record, "id": run_id, "created": created, "storage": storage}, [dict(h) for h in hours])
+        return {"id": run_id, "created": created, "storage": storage}
 
     def list_runs(self, limit: int = 20) -> list[dict]:
         newest = sorted(self.runs.values(), key=lambda r: int(r[0]["id"]), reverse=True)[:limit]

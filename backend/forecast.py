@@ -52,7 +52,8 @@ class ForecastService:
     def _save(self, record: dict, hours: list[dict], csv_bytes: bytes | None, request) -> dict:
         """Save the run; on failure, say so in the response instead of failing the forecast."""
         run = {"saved": False, "id": None, "created": None, "source": record["source"],
-               "filename": record["filename"], "csv_key": None, "errors": []}
+               "filename": record["filename"], "csv_key": None, "errors": [],
+               "storage": {"stratus": False, "datastore": False, "reason": None}}
 
         def attempt(what: str, fn, *args):
             """(True, result), or (False, None) with the reason added to run["errors"]."""
@@ -69,6 +70,7 @@ class ForecastService:
 
         ok, store = attempt("opening the run store", self.store_factory, request)
         if not ok:
+            run["storage"]["reason"] = run["errors"][-1]
             return run
         if csv_bytes is not None:
             key = upload_key(record["filename"])
@@ -77,12 +79,14 @@ class ForecastService:
         ok, saved = attempt("saving the run", store.save, record, hours)
         if ok:
             run.update(saved, saved=True)
+        else:
+            run["storage"]["reason"] = run["errors"][-1]
         return run
 
     def list_runs(self, request=None) -> list[dict]:
         return self.store_factory(request).list_runs(RUNS_LISTED)
 
-    def get_run(self, run_id: int, window_start=None, request=None) -> dict | None:
+    def get_run(self, run_id: str, window_start=None, request=None) -> dict | None:
         found = self.store_factory(request).get_run(run_id)
         if found is None:
             return None

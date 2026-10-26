@@ -1,13 +1,15 @@
 """CatalystRunStore against a fake zcatalyst_sdk app: no network, no Catalyst account."""
 
+import json
 import re
 from datetime import datetime, timezone
 
 import pytest
 from zcatalyst_sdk.exceptions import CatalystAPIError
 
-from backend.store import (CLEANING_MAX_CHARS, HOURS_TABLE, INSERT_BATCH, RUNS_TABLE, SELECT_PAGE, CatalystRunStore, StoreError,
-                           created_iso, hour_from_row, hour_to_row, run_from_row, run_to_row, upload_key)
+from backend.store import (CLEANING_MAX_CHARS, DAILY_SAVE_LIMIT, HOUR_FIELDS, HOURS_TABLE, INDEX_KEY, RUN_ID, RUNS_INDEXED,
+                           RUNS_TABLE, SELECT_PAGE, CatalystRunStore, DailyLimitError, StoreError, created_iso,
+                           hour_from_row, run_from_row, run_to_row, upload_key)
 
 
 class FakeTable:
@@ -19,7 +21,8 @@ class FakeTable:
 
     def insert_rows(self, rows):
         if self.name in self.db.fail_insert:
-            raise CatalystAPIError("DATA_STORE_ERROR", "insert refused", http_status_code=400)
+            raise CatalystAPIError("FREE_USAGE_LIMIT_REACHED", "You have exhausted the free tier allowance for Datastore - Insert",
+                                   http_status_code=400)
         self.db.insert_calls.append((self.name, len(rows)))
         out = []
         for r in rows:
@@ -64,14 +67,21 @@ class FakeBucket:
         self.db, self.name = db, name
 
     def put_object(self, key, body, options=None):
+        if any(key.startswith(prefix) for prefix in self.db.fail_put):
+            raise CatalystAPIError("STRATUS_ERROR", "upload refused", http_status_code=500)
         self.db.objects[(self.name, key)] = (body, options)
         return True
+
+    def get_object(self, key, options=None):
+        if (self.name, key) not in self.db.objects:
+            raise CatalystAPIError("NOT_FOUND", "Object not found", http_status_code=404)
+        return self.db.objects[(self.name, key)][0]
 
 
 class FakeApp:
     def __init__(self):
         self.tables = {RUNS_TABLE: [], HOURS_TABLE: []}
-        self.objects, self.queries, self.insert_calls, self.fail_insert = {}, [], [], set()
+        self.objects, self.queries, self.insert_calls, self.fail_insert, self.fail_put = {}, [], [], set(), set()
         self.next_id = 7000
 
     def datastore(self):
@@ -116,64 +126,115 @@ def test_created_iso_adds_the_project_offset():
     assert created_iso("") == ""
 
 
-def test_hour_rows_round_trip_with_types_restored():
+def legacy_hour_row(run_id, hour):
+    """A run_hours row as runs saved before 2026-10-27 wrote it (the Data Store hands back strings)."""
+    row = {col: str(hour[key]) for key, col in HOUR_FIELDS.items()}
+    return row | {"is_overload": "true" if hour["overload"] else "false", "run_id": str(run_id)}
+
+
+def seed_legacy_run(app, record, hours):
+    run_id = FakeTable(app, RUNS_TABLE).insert_row(run_to_row(record))["ROWID"]
+    app.tables[HOURS_TABLE].extend(legacy_hour_row(run_id, h) for h in hours)
+    return run_id
+
+
+def index(app):
+    return json.loads(app.objects[("microgrid-uploads", INDEX_KEY)][0])
+
+
+NOW = datetime(2026, 10, 27, 1, 30, 0, tzinfo=timezone.utc)
+
+
+def test_hour_rows_read_back_with_types_restored():
     for h in make_hours(3):
-        row = hour_to_row("42", h)
-        assert row["run_id"] == "42" and row["is_overload"] in ("true", "false")
-        assert hour_from_row({k: str(v) for k, v in row.items()}) == h
+        assert hour_from_row(legacy_hour_row("42", h)) == h
 
 
-def test_save_inserts_the_run_then_hours_in_batches_of_200():
+def test_save_puts_the_run_in_stratus_and_one_row_in_the_data_store():
     app = FakeApp()
-    saved = CatalystRunStore(app).save(RECORD, make_hours(450))
-    assert saved == {"id": "7001", "created": "2026-10-26T21:03:11+05:30"}
-    assert app.insert_calls == [(RUNS_TABLE, 1), (HOURS_TABLE, INSERT_BATCH), (HOURS_TABLE, INSERT_BATCH), (HOURS_TABLE, 50)]
-    assert {r["run_id"] for r in app.tables[HOURS_TABLE]} == {"7001"}
-    run_row = app.tables[RUNS_TABLE][0]
-    assert run_row["source_type"] == "csv" and run_row["peak_kw"] == "212.4"
+    saved = CatalystRunStore(app).save(RECORD, make_hours(450), now=NOW)
+    assert RUN_ID.fullmatch(saved["id"]) and saved["id"].startswith("r20261027013000-")
+    assert saved["created"] == "2026-10-27T01:30:00+00:00"
+    assert saved["storage"] == {"stratus": True, "datastore": True, "reason": None}
+    assert app.insert_calls == [(RUNS_TABLE, 1)]  # one request; no run_hours rows any more
+    stored = json.loads(app.objects[("microgrid-uploads", f"runs/{saved['id']}.json")][0])
+    assert stored["hours"] == make_hours(450) and stored["run"]["cleaning"] == RECORD["cleaning"]
+    assert index(app)["runs"][0]["datastore_id"] == app.tables[RUNS_TABLE][0]["ROWID"]
+    assert (index(app)["day"], index(app)["saved_today"]) == ("2026-10-27", 1)
 
 
-def test_failed_hour_insert_removes_the_half_written_run():
-    app = FakeApp()
-    app.fail_insert.add(HOURS_TABLE)
-    with pytest.raises(StoreError, match="saving the hourly rows failed"):
-        CatalystRunStore(app).save(RECORD, make_hours(5))
-    assert app.tables[RUNS_TABLE] == []
-
-
-def test_failed_run_insert_is_a_store_error():
+def test_a_refused_data_store_insert_still_saves_the_run():
     app = FakeApp()
     app.fail_insert.add(RUNS_TABLE)
-    with pytest.raises(StoreError, match="saving the run failed"):
-        CatalystRunStore(app).save(RECORD, make_hours(5))
+    store = CatalystRunStore(app)
+    saved = store.save(RECORD, make_hours(5), now=NOW)
+    assert saved["storage"] == {"stratus": True, "datastore": False,
+                                "reason": "Data Store free-tier insert quota used up for this month"}
+    run, hours = store.get_run(saved["id"])
+    assert hours == make_hours(5) and run["peak_kw"] == 212.4 and run["storage"]["datastore"] is False
+    assert [r["id"] for r in store.list_runs()] == [saved["id"]]
 
 
-def test_get_run_pages_through_hours_in_order():
+def test_a_failed_stratus_save_is_an_error_and_leaves_no_orphan_row():
     app = FakeApp()
     store = CatalystRunStore(app)
-    run_id = store.save(RECORD, make_hours(2 * SELECT_PAGE + 5))["id"]
-    store.save(RECORD, make_hours(4))  # another run's hours must not leak in
-    run, hours = store.get_run(int(run_id))
-    assert [h["index"] for h in hours] == list(range(2 * SELECT_PAGE + 5))
+    app.fail_put.add("runs/r")
+    with pytest.raises(StoreError, match="saving the run to Stratus failed"):
+        store.save(RECORD, make_hours(5), now=NOW)
+    assert app.tables[RUNS_TABLE] == []
+    assert ("microgrid-uploads", INDEX_KEY) not in app.objects
+
+
+def test_the_daily_save_limit_counts_per_utc_day():
+    app = FakeApp()
+    store = CatalystRunStore(app)
+    for _ in range(DAILY_SAVE_LIMIT):
+        store.save(RECORD, make_hours(1), now=NOW)
+    with pytest.raises(DailyLimitError, match="daily save limit"):
+        store.save(RECORD, make_hours(1), now=NOW)
+    tomorrow = NOW.replace(day=28, hour=0, minute=0, second=1)
+    store.save(RECORD, make_hours(1), now=tomorrow)
+    assert (index(app)["day"], index(app)["saved_today"]) == ("2026-10-28", 1)
+    assert len(index(app)["runs"]) == RUNS_INDEXED
+
+
+def test_list_runs_merges_stratus_and_legacy_data_store_runs_once_each():
+    app = FakeApp()
+    legacy = seed_legacy_run(app, {**RECORD, "filename": "old.csv"}, make_hours(2))  # CREATEDTIME 2026-10-26 21:03 IST
+    store = CatalystRunStore(app)
+    new = store.save({**RECORD, "filename": "new.csv"}, make_hours(1), now=NOW)  # also writes a runs row
+    runs = store.list_runs()
+    assert [r["id"] for r in runs] == [new["id"], legacy]  # the new run's Data Store row is not listed twice
+    assert runs[0]["storage"]["stratus"] and runs[1]["storage"] == {"stratus": False, "datastore": True, "reason": None}
+    assert "cleaning" not in runs[0] and "datastore_id" not in runs[0]
+
+
+def test_list_runs_falls_back_to_the_index_when_the_data_store_fails():
+    app = FakeApp()
+    store = CatalystRunStore(app)
+    new = store.save(RECORD, make_hours(1), now=NOW)
+    class Broken:
+        def execute_query(self, query):
+            raise CatalystAPIError("ZCQL_ERROR", "select refused", http_status_code=500)
+
+    app.zcql = lambda: Broken()
+    assert [r["id"] for r in store.list_runs()] == [new["id"]]
+
+
+def test_get_legacy_run_pages_through_hours_in_order():
+    app = FakeApp()
+    run_id = seed_legacy_run(app, RECORD, make_hours(2 * SELECT_PAGE + 5))
+    seed_legacy_run(app, RECORD, make_hours(4))  # another run's hours must not leak in
+    run, hours = CatalystRunStore(app).get_run(run_id)
     assert hours == make_hours(2 * SELECT_PAGE + 5)
-    assert run["id"] == run_id and run["peak_kw"] == 212.4 and run["n_rows"] == 3
-    assert run["cleaning"] == RECORD["cleaning"]
+    assert run["id"] == run_id and run["peak_kw"] == 212.4 and run["cleaning"] == RECORD["cleaning"]
+    assert run["storage"] == {"stratus": False, "datastore": True, "reason": None}
     assert sum(HOURS_TABLE in q for q in app.queries) == 3  # 300 + 300 + 5
 
 
-def test_get_missing_run_is_none():
-    assert CatalystRunStore(FakeApp()).get_run(123) is None
-
-
-def test_list_runs_newest_first_without_the_cleaning_report():
-    app = FakeApp()
-    store = CatalystRunStore(app)
-    ids = [store.save({**RECORD, "filename": f"{i}.csv"}, make_hours(1))["id"] for i in range(3)]
-    runs = store.list_runs(2)
-    assert [r["id"] for r in runs] == ids[::-1][:2]
-    assert runs[0]["filename"] == "2.csv" and runs[0]["created"] == "2026-10-26T21:03:11+05:30"
-    assert "cleaning" not in runs[0]
-    assert app.queries[-1].endswith("ORDER BY CREATEDTIME DESC LIMIT 0, 2")
+@pytest.mark.parametrize("run_id", ["123", "r20261027013000-abcdef", "nope", "1; DROP TABLE runs", "r2026"])
+def test_get_missing_or_malformed_run_is_none(run_id):
+    assert CatalystRunStore(FakeApp()).get_run(run_id) is None
 
 
 def test_put_csv_goes_to_the_upload_bucket(monkeypatch):

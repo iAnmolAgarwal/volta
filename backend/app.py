@@ -118,8 +118,8 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
         except StoreError as e:
             return error(502, str(e))
 
-    @app.get("/api/runs/<int:run_id>")
-    def get_run(run_id: int):
+    @app.get("/api/runs/<run_id>")
+    def get_run(run_id: str):
         try:
             found = runs.get_run(run_id, request.args.get("window_start"), request)
         except WindowError as e:
@@ -128,7 +128,7 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
             return error(503, str(e))
         except StoreError as e:
             return error(502, str(e))
-        return jsonify(found) if found else error(404, f"no run {run_id}")
+        return jsonify(found) if found else error(404, f"no run {run_id[:40]}")
 
     @app.get("/api/sample")
     def sample():

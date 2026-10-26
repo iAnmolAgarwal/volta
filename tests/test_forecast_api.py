@@ -8,7 +8,7 @@ import pytest
 from backend.app import SAMPLE_CSV, create_app
 from backend.controller import decide
 from backend.service import MAX_ROWS, Forecaster
-from backend.store import StoreError
+from backend.store import DailyLimitError, StoreError
 from fakes import FakeRunStore, fake_predictions
 from model.quickml_client import ConfigError, PredictionError
 from test_backend import FakeClient, sample_rows
@@ -150,6 +150,20 @@ def test_store_failures_keep_the_forecast_and_say_so(fake):
     run = resp.get_json()["run"]
     assert run["saved"] is False and run["id"] is None and run["csv_key"] is None
     assert run["errors"] == ["Stratus upload failed: 403", "saving the run failed: quota"]
+    assert run["storage"] == {"stratus": False, "datastore": False, "reason": "saving the run failed: quota"}
+
+
+def test_past_the_daily_save_limit_the_forecast_returns_unsaved(fake):
+    store = FakeRunStore(fail_save=DailyLimitError("daily save limit reached (40 runs a day, UTC)"))
+    api = create_app(Forecaster(client_factory=lambda req: fake), store_factory=lambda req: store).test_client()
+    body = post_rows(api, {"rows": sample_rows(3)}).get_json()
+    assert len(body["hours"]) == 3 and body["run"]["saved"] is False
+    assert body["run"]["storage"]["reason"].startswith("daily save limit")
+
+
+def test_a_saved_run_reports_where_it_is_stored(api):
+    run = post_rows(api, {"rows": sample_rows(3)}).get_json()["run"]
+    assert run["saved"] is True and run["storage"]["stratus"] is True
 
 
 def test_without_catalyst_the_forecast_works_and_history_is_503(fake):

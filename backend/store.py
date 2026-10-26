@@ -1,8 +1,13 @@
-"""Run history: each forecast run in the Catalyst Data Store, each uploaded CSV in Stratus.
+"""Run history: Stratus holds every run; the Data Store gets one metadata row per run.
 
-Tables (created through the Catalyst MCP; see docs/api.md):
-    runs       one row per run; ROWID is the run id, CREATEDTIME the creation time
-    run_hours  one row per forecast hour, run_id -> runs.ROWID
+The Catalyst free tier allows 5,000 Data Store inserts a month, account-wide, and
+writing every hour as a row used it up in a handful of runs. So (docs/api.md, Persistence):
+    Stratus      runs/<id>.json    the run, its cleaning report and all its hours
+                 runs/index.json   the latest 20 run summaries and a per-UTC-day save counter
+                 uploads/...       each uploaded CSV
+    Data Store   runs              one row per run, best effort (a refused insert does not
+                                   lose the run); run_hours is only read, for runs saved
+                                   before 2026-10-27, whose ids are Data Store ROWIDs
 
 The SDK is initialised per request in admin scope from the X-ZC-* headers the
 Catalyst gateway adds, so runs are saved for logged-out visitors too. Outside
@@ -19,9 +24,13 @@ RUNS_TABLE = "runs"
 HOURS_TABLE = "run_hours"
 DEFAULT_BUCKET = "microgrid-uploads"  # UPLOAD_BUCKET overrides
 PROJECT_UTC_OFFSET = "+05:30"  # CREATEDTIME is in the project's time zone (Asia/Kolkata), without an offset
-INSERT_BATCH = 200  # Data Store bulk-insert limit
 SELECT_PAGE = 300  # ZCQL row limit per query
 CLEANING_MAX_CHARS = 10_000  # limit of the Data Store text column runs.cleaning_json
+INDEX_KEY = "runs/index.json"
+RUNS_INDEXED = 20
+DAILY_SAVE_LIMIT = 40  # saved runs per UTC day, so no visitor can spend the month's 2,000 Stratus uploads
+RUN_ID = re.compile(r"r\d{14}-[0-9a-f]{6}")  # Stratus runs: r + UTC yyyymmddHHMMSS + random, time-sortable
+LEGACY_RUN_ID = re.compile(r"\d{1,20}")  # Data Store ROWIDs of the runs saved before 2026-10-27
 
 RUN_FIELDS = {  # run record key -> runs column
     "source": "source_type", "filename": "file_name", "rows_in": "rows_in", "n_rows": "n_rows",
@@ -42,6 +51,38 @@ FLOAT_KEYS = {"peak_kw", "ambient_temp_c", "humidity_pct", "solar_irradiance_wm2
 
 class StoreError(RuntimeError):
     """The Data Store or Stratus refused or failed. Maps to HTTP 502 (503 when there is no store)."""
+
+
+class DailyLimitError(StoreError):
+    """DAILY_SAVE_LIMIT runs are already saved today (UTC); the forecast is still returned."""
+
+
+def new_run_id(now: datetime) -> str:
+    return f"r{now:%Y%m%d%H%M%S}-{uuid.uuid4().hex[:6]}"
+
+
+def run_key(run_id: str) -> str:
+    return f"runs/{run_id}.json"
+
+
+def _when(created: str) -> datetime:
+    try:
+        return datetime.fromisoformat(created)
+    except (TypeError, ValueError):
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _datastore_reason(e: Exception) -> str:
+    text = str(e)
+    if "FREE_USAGE_LIMIT" in text:
+        return "Data Store free-tier insert quota used up for this month"
+    return f"Data Store insert failed: {text[:200]}"
+
+
+def _not_found(e: Exception) -> bool:
+    status = getattr(e, "http_status_code", None) or getattr(e, "status_code", None)
+    text = str(e).lower()
+    return status == 404 or "404" in text or "not found" in text or "no such key" in text or "nosuchkey" in text
 
 
 def created_iso(createdtime: str) -> str:
@@ -78,13 +119,6 @@ def run_from_row(row: dict) -> dict:
     if "cleaning_json" in row:
         run["cleaning"] = json.loads(row["cleaning_json"] or "{}")
     return run
-
-
-def hour_to_row(run_id: str, hour: dict) -> dict:
-    row = {col: hour[key] for key, col in HOUR_FIELDS.items()}
-    row["is_overload"] = "true" if hour["overload"] else "false"
-    row["run_id"] = run_id
-    return row
 
 
 def hour_from_row(row: dict) -> dict:
@@ -129,39 +163,92 @@ class CatalystRunStore:
         except CatalystError as e:
             raise StoreError(f"{what} failed: {str(e)[:300]}") from None
 
-    def put_csv(self, key: str, data: bytes) -> None:
-        bucket = self.app.stratus().bucket(self.bucket)
-        self._call("Stratus upload", bucket.put_object, key, data, {"content_type": "text/csv"})
+    def _bucket(self):
+        return self.app.stratus().bucket(self.bucket)
 
-    def save(self, record: dict, hours: list[dict]) -> dict:
-        """Insert the run, then its hours; on a failure, remove the half-written run."""
-        datastore = self.app.datastore()
-        row = self._call("saving the run", datastore.table(RUNS_TABLE).insert_row, run_to_row(record))
-        run_id = str(row["ROWID"])
+    def put_csv(self, key: str, data: bytes) -> None:
+        self._call("Stratus upload", self._bucket().put_object, key, data, {"content_type": "text/csv"})
+
+    def _get_json(self, what: str, key: str):
+        """The JSON object at key, or None when there is none."""
+        from zcatalyst_sdk.exceptions import CatalystError
+
         try:
-            table = datastore.table(HOURS_TABLE)
-            for i in range(0, len(hours), INSERT_BATCH):
-                rows = [hour_to_row(run_id, h) for h in hours[i:i + INSERT_BATCH]]
-                self._call("saving the hourly rows", table.insert_rows, rows)
+            data = self._bucket().get_object(key)
+        except CatalystError as e:
+            if _not_found(e):
+                return None
+            raise StoreError(f"{what} failed: {str(e)[:300]}") from None
+        return json.loads(data)
+
+    def _put_json(self, what: str, key: str, value) -> None:
+        body = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
+        self._call(what, self._bucket().put_object, key, body, {"content_type": "application/json", "overwrite": "true"})
+
+    def save(self, record: dict, hours: list[dict], now: datetime | None = None) -> dict:
+        """Save the run to Stratus (the run object, then the index), and try one Data Store row."""
+        now = now or datetime.now(timezone.utc)
+        index = self._get_json("reading the run index", INDEX_KEY) or {}
+        day = f"{now:%Y-%m-%d}"
+        saved_today = index.get("saved_today", 0) if index.get("day") == day else 0
+        if saved_today >= DAILY_SAVE_LIMIT:
+            raise DailyLimitError(f"daily save limit reached ({DAILY_SAVE_LIMIT} runs a day, UTC)")
+
+        run_id, created = new_run_id(now), now.isoformat(timespec="seconds")
+        summary = {key: record.get(key) for key in RUN_FIELDS} | {"id": run_id, "created": created}
+        storage = {"stratus": True, "datastore": False, "reason": None}
+        datastore_id = None
+        try:  # evidence of the run in the Data Store; the run itself lives in Stratus
+            row = self.app.datastore().table(RUNS_TABLE).insert_row(run_to_row(record))
+            datastore_id, storage["datastore"] = str(row["ROWID"]), True
+        except Exception as e:  # noqa: BLE001 - quota, schema or network: the run is still saved
+            storage["reason"] = _datastore_reason(e)
+        try:
+            self._put_json("saving the run to Stratus", run_key(run_id),
+                           {"run": {**summary, "cleaning": record.get("cleaning"), "storage": storage}, "hours": hours})
         except StoreError:
-            try:
-                datastore.table(RUNS_TABLE).delete_row(run_id)
-            except Exception:  # noqa: BLE001 - the original error is the one to report
-                pass
+            if datastore_id:  # don't leave a Data Store row for a run that has no hours anywhere
+                try:
+                    self.app.datastore().table(RUNS_TABLE).delete_row(datastore_id)
+                except Exception:  # noqa: BLE001 - the Stratus error is the one to report
+                    pass
             raise
-        return {"id": run_id, "created": created_iso(row.get("CREATEDTIME", ""))}
+        runs = [{**summary, "storage": storage, "datastore_id": datastore_id}, *index.get("runs", [])][:RUNS_INDEXED]
+        self._put_json("updating the run index", INDEX_KEY, {"day": day, "saved_today": saved_today + 1, "runs": runs})
+        return {"id": run_id, "created": created, "storage": storage}
 
     def _query(self, what: str, query: str) -> list:
         return self._call(what, self.app.zcql().execute_query, query) or []
 
     def list_runs(self, limit: int = 20) -> list[dict]:
+        """The Stratus index merged with the Data Store's runs rows, newest first, each run once."""
+        index = self._get_json("reading the run index", INDEX_KEY) or {}
+        indexed = index.get("runs", [])
+        linked = {r.get("datastore_id") for r in indexed if r.get("datastore_id")}
+        runs = [{k: v for k, v in r.items() if k != "datastore_id"} for r in indexed]
         cols = ", ".join(["ROWID", "CREATEDTIME", *RUN_FIELDS.values()])
-        rows = _unwrap(self._query("listing runs", f"SELECT {cols} FROM {RUNS_TABLE} ORDER BY CREATEDTIME DESC LIMIT 0, {int(limit)}"), RUNS_TABLE)
-        return [run_from_row(r) for r in rows]
+        try:
+            rows = _unwrap(self._query("listing runs", f"SELECT {cols} FROM {RUNS_TABLE} ORDER BY CREATEDTIME DESC LIMIT 0, {int(limit)}"), RUNS_TABLE)
+        except StoreError:
+            if not indexed:
+                raise
+            rows = []  # the Stratus index alone still lists the recent runs
+        legacy = [run_from_row(r) | {"storage": {"stratus": False, "datastore": True, "reason": None}}
+                  for r in rows if str(r["ROWID"]) not in linked]
+        return sorted(runs + legacy, key=lambda r: _when(r.get("created")), reverse=True)[:limit]
 
-    def get_run(self, run_id: int) -> tuple[dict, list[dict]] | None:
+    def get_run(self, run_id: str) -> tuple[dict, list[dict]] | None:
         """(run, hours in order), or None when there is no such run."""
-        run_id = int(run_id)  # also keeps the queries below free of injected text
+        run_id = str(run_id)
+        if RUN_ID.fullmatch(run_id):
+            found = self._get_json("reading the run", run_key(run_id))
+            return (found["run"], found["hours"]) if found else None
+        if not LEGACY_RUN_ID.fullmatch(run_id):
+            return None
+        return self._get_legacy_run(int(run_id))
+
+    def _get_legacy_run(self, run_id: int) -> tuple[dict, list[dict]] | None:
+        """A run saved before 2026-10-27: its row in runs, its hours in run_hours."""
         found = _unwrap(self._query("reading the run", f"SELECT * FROM {RUNS_TABLE} WHERE ROWID = {run_id}"), RUNS_TABLE)
         if not found:
             return None
@@ -177,4 +264,5 @@ class CatalystRunStore:
             if len(page) < SELECT_PAGE:
                 break
             last = hours[-1]["index"]
-        return run_from_row(found[0]), hours
+        run = run_from_row(found[0]) | {"storage": {"stratus": False, "datastore": True, "reason": None}}
+        return run, hours

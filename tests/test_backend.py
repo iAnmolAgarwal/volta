@@ -140,6 +140,12 @@ def test_exactly_the_limit_is_accepted(api):
     assert post(api, {"rows": sample_rows(1) * MAX_ROWS}).status_code == 200
 
 
+def test_json_sent_as_text_plain_is_accepted(api):
+    # browsers send JSON as text/plain to skip the CORS preflight the Catalyst gateway mishandles
+    resp = api.post("/api/predict", data=json.dumps({"rows": sample_rows(3)}), content_type="text/plain;charset=UTF-8")
+    assert resp.status_code == 200 and len(resp.get_json()["predictions"]) == 3
+
+
 def test_non_json_body(api):
     resp = api.post("/api/predict", data="rows=1", content_type="text/plain")
     assert resp.status_code == 400 and resp.is_json

@@ -29,7 +29,7 @@ There are two ways to send the input. Both accept at most 2,000 rows; more is a 
 curl -F "file=@sample_test_input.csv" -F source=sample "$BASE/api/forecast"
 ```
 
-**Manual rows** (application/json). `source` defaults to `manual`:
+**Manual rows** (JSON). `source` defaults to `manual`. The body is parsed as JSON whatever its Content-Type. Browsers should send `text/plain;charset=UTF-8` with no custom headers, because the Catalyst gateway answers CORS preflights itself, without CORS headers. `/api/predict` works the same way.
 
 ```bash
 curl -H "Content-Type: application/json" "$BASE/api/forecast" -d '{

@@ -88,6 +88,11 @@ def test_manual_rows_are_cleaned_and_saved_without_a_csv(api, store):
     assert body["run"]["source"] == "manual" and body["run"]["csv_key"] is None and store.csvs == {}
 
 
+def test_manual_rows_sent_as_text_plain_are_accepted(api):
+    resp = api.post("/api/forecast", data=json.dumps({"rows": sample_rows(5)}), content_type="text/plain;charset=UTF-8")
+    assert resp.status_code == 200 and resp.get_json()["run"]["source"] == "manual"
+
+
 def test_sample_source_and_window_start(api):
     body = upload(api, source="sample", window_start="2015-06-17 00:00:00").get_json()
     assert body["run"]["source"] == "sample"

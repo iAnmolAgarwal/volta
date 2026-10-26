@@ -50,6 +50,11 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
             body["details"] = details
         return jsonify(body), status
 
+    def json_body():
+        # The Catalyst gateway answers CORS preflights itself, without CORS headers, so browsers
+        # send JSON as text/plain (a "simple" request, no preflight). Parse it whatever the type.
+        return request.get_json(force=True, silent=True)
+
     @app.get("/api/health")
     def health():
         # catalyst_context: did the gateway add the X-ZC-* headers the SDK authenticates with?
@@ -62,7 +67,7 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
 
     @app.post("/api/predict")
     def predict():
-        payload = request.get_json(silent=True)
+        payload = json_body()
         if payload is None:
             return error(400, 'body must be JSON: {"rows": [...]}')
         try:
@@ -83,7 +88,7 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
         elif request.files or request.form:
             return error(400, "upload the CSV as the multipart field 'file'")
         else:
-            payload = request.get_json(silent=True)
+            payload = json_body()
             if not isinstance(payload, dict):
                 return error(400, 'send a CSV as the multipart field "file", or JSON: {"rows": [...]}')
             csv_bytes, filename, rows = None, None, payload.get("rows")

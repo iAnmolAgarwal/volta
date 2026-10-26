@@ -192,3 +192,25 @@ Noise left over:
 The noise floor is about 8.52 kW RMSE: the leftover looks like white Gaussian noise (no autocorrelation, skew and excess kurtosis near 0), so no row-local feature can remove it. The same formula fitted on FIT scores 8.279 on VAL.
 
 The fitted slope (8.54 ± 0.05) and threshold (23.95 °C) match the cooling term in the starter predict.py, 8.5 * max(0, T - 24). The starter curve's cooling term is right; its sine base, which smooths over the hour blocks, is what costs it.
+
+## Live endpoint check (2026-10-26, Development)
+
+Recorded by hand after the QuickML endpoint was published; not produced by `python model/baselines.py`.
+Proxy `https://microgrid-proxy-50047164504.development.catalystappsail.in`, version `34e92bb`.
+
+- `curl` POST `/api/predict` with 3 rows: HTTP 200, 3 predictions (89.69, 234.03, 258.10 kW).
+- `python predict.py --input sample_test_input.csv --output /tmp/p.csv`: wrote 1,000 rows.
+- `python test_eval.py`, in the repo and in a clean folder holding only `predict.py`, `test_eval.py` and
+  `sample_test_input.csv` with an empty environment:
+
+  ```
+  Loaded 1000 test rows from 'sample_test_input.csv'.
+  Your predict.py script is completely valid!
+     Sample output values: [244.01 234.46 232.74]...
+  SUCCESS
+  ```
+
+- Against the reference formula (`python scripts/compare_formula.py /tmp/p.csv`): RMS difference
+  0.121 kW, max 0.229 kW, mean -0.070 kW over 1,000 rows.
+- Latency of a 1,000-row request from this machine: 0.77 s with rows not yet cached (one QuickML call),
+  0.33 s when served from the proxy cache. A second run measured 0.98 s.

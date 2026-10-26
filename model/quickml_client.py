@@ -1,36 +1,37 @@
-"""Client for the demand-forecast endpoint, used by predict.py and the app.
+"""QuickML client used by the AppSail proxy (backend/).
 
-QuickMLClient.from_env() picks one of two transports:
-- proxy: PREDICT_PROXY_URL (or DEFAULT_PROXY_URL once our AppSail route is
-  live). POSTs features, needs no credentials. This is what graders use.
-- direct QuickML: QUICKML_ENDPOINT_URL, QUICKML_ENDPOINT_KEY, CATALYST_ORG and
-  a Zoho OAuth refresh token (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET,
-  ZOHO_REFRESH_TOKEN). Access tokens are cached until shortly before expiry.
+QuickMLClient.from_env() calls a published QuickML endpoint directly:
+QUICKML_ENDPOINT_URL, QUICKML_ENDPOINT_KEY, ZOHO_ORG_ID and a Zoho OAuth
+refresh token (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN).
+Access tokens are cached until shortly before they expire.
 
-Rows go out QUICKML_BATCH_SIZE at a time (default 1) with a timeout
+Rows go out QUICKML_BATCH_SIZE at a time (default 1), up to
+QUICKML_CONCURRENCY requests in parallel (default 8), each with a timeout
 (QUICKML_TIMEOUT seconds) and retries with exponential backoff
-(QUICKML_RETRIES). Nothing falls back to a made-up curve: every failure
-raises, and error messages never contain secret values.
+(QUICKML_RETRIES). Every failure raises, and error messages never contain
+secret values.
 
-Needs only requests, numpy and pandas, so it runs wherever predict.py does.
+(predict.py does not use this module: it carries its own minimal client for
+the proxy so it runs when copied alone.)
 """
 
 import math
 import os
+import threading
 import time
 from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlsplit
 
 import numpy as np
 import pandas as pd
 import requests
 
-DEFAULT_PROXY_URL = ""  # set to the AppSail predict route once it is deployed
 ZOHO_TOKEN_URL = "https://accounts.zoho.in/oauth/v2/token"
 DIRECT_VARS = [
     "QUICKML_ENDPOINT_URL",
     "QUICKML_ENDPOINT_KEY",
-    "CATALYST_ORG",
+    "ZOHO_ORG_ID",  # sent as the CATALYST-ORG header; AppSail reserves CATALYST* variable names
     "ZOHO_CLIENT_ID",
     "ZOHO_CLIENT_SECRET",
     "ZOHO_REFRESH_TOKEN",
@@ -124,17 +125,6 @@ class Http:
         raise PredictionError(self.redact(f"POST {host} failed after {self.retries + 1} attempt(s), last: {problem}"))
 
 
-class ProxyTransport:
-    """Our AppSail route: plain JSON in, JSON out, no credentials."""
-
-    def __init__(self, url: str, http: Http):
-        self.url, self.http = url, http
-        self.name = f"proxy {urlsplit(url).netloc}"
-
-    def __call__(self, payload: dict) -> dict:
-        return self.http.post(self.url, json=payload)
-
-
 class ZohoTokenProvider:
     """Access tokens from a Zoho refresh token, cached until shortly before they expire."""
 
@@ -147,11 +137,13 @@ class ZohoTokenProvider:
         }
         self.http, self.clock = http, clock
         self._token, self._expires_at = None, 0.0
+        self._lock = threading.Lock()  # concurrent requests share one refresh
 
     def token(self) -> str:
-        if self._token is None or self.clock() >= self._expires_at:
-            self._refresh()
-        return self._token
+        with self._lock:
+            if self._token is None or self.clock() >= self._expires_at:
+                self._refresh()
+            return self._token
 
     def invalidate(self) -> None:
         self._token = None
@@ -198,25 +190,32 @@ class QuickMLTransport:
 
 
 class QuickMLClient:
-    """Sends feature rows in chunks and returns predictions in input order."""
+    """Sends feature rows in chunks, concurrently, and returns predictions in input order."""
 
-    def __init__(self, transport: Callable[[dict], dict], batch_size: int = 1):
-        if batch_size < 1:
-            raise ConfigError("batch_size must be >= 1")
-        self.transport, self.batch_size = transport, batch_size
+    def __init__(self, transport: Callable[[dict], dict], batch_size: int = 1, concurrency: int = 1):
+        if batch_size < 1 or concurrency < 1:
+            raise ConfigError("batch_size and concurrency must be >= 1")
+        self.transport, self.batch_size, self.concurrency = transport, batch_size, concurrency
         self.name = getattr(transport, "name", type(transport).__name__)
 
     def predict(self, features: pd.DataFrame) -> np.ndarray:
         """One float per feature row, in the same order."""
         rows = features.to_dict(orient="records")
-        preds: list[float] = []
-        for start in range(0, len(rows), self.batch_size):
+        starts = range(0, len(rows), self.batch_size)
+
+        def send(start: int) -> list[float]:
             chunk = rows[start : start + self.batch_size]
             try:
-                preds.extend(exchange(self.transport, chunk))
+                return exchange(self.transport, chunk)
             except PredictionError as e:
                 raise PredictionError(f"{self.name}, rows {start}-{start + len(chunk) - 1}: {e}") from None
-        return np.asarray(preds, dtype=float)
+
+        if self.concurrency == 1 or len(starts) <= 1:
+            chunks = [send(s) for s in starts]
+        else:
+            with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
+                chunks = list(pool.map(send, starts))  # map keeps input order
+        return np.asarray([p for chunk in chunks for p in chunk], dtype=float)
 
     @classmethod
     def from_env(
@@ -229,39 +228,31 @@ class QuickMLClient:
             return (env.get(name) or "").strip()
 
         batch_size = _number(get("QUICKML_BATCH_SIZE"), "QUICKML_BATCH_SIZE", 1, int, minimum=1)
+        concurrency = _number(get("QUICKML_CONCURRENCY"), "QUICKML_CONCURRENCY", 8, int, minimum=1)
         timeout = _number(get("QUICKML_TIMEOUT"), "QUICKML_TIMEOUT", 15.0, float, minimum=0.1)
         retries = _number(get("QUICKML_RETRIES"), "QUICKML_RETRIES", 3, int, minimum=0)
-        session = session or requests.Session()
 
-        proxy = get("PREDICT_PROXY_URL")
-        if not proxy and not get("QUICKML_ENDPOINT_URL"):
-            proxy = DEFAULT_PROXY_URL
-        if proxy:
-            if urlsplit(proxy).scheme not in ("http", "https"):
-                raise ConfigError("PREDICT_PROXY_URL must be an http(s) URL")
-            return cls(ProxyTransport(proxy, Http(session, timeout, retries, sleep)), batch_size)
-
-        if get("QUICKML_ENDPOINT_URL"):
-            missing = [name for name in DIRECT_VARS if not get(name)]
-            if missing:
-                raise ConfigError(f"direct QuickML access also needs {', '.join(missing)} (see .env.example)")
-            secrets = [get("QUICKML_ENDPOINT_KEY"), get("ZOHO_CLIENT_SECRET"), get("ZOHO_REFRESH_TOKEN")]
-            http = Http(session, timeout, retries, sleep, secrets)
-            tokens = ZohoTokenProvider(get("ZOHO_CLIENT_ID"), get("ZOHO_CLIENT_SECRET"), get("ZOHO_REFRESH_TOKEN"), http, clock)
-            transport = QuickMLTransport(
-                get("QUICKML_ENDPOINT_URL"),
-                get("QUICKML_ENDPOINT_KEY"),
-                get("CATALYST_ORG"),
-                get("QUICKML_ENVIRONMENT") or "Production",
-                tokens,
-                http,
-            )
-            return cls(transport, batch_size)
-
-        raise ConfigError(
-            "no prediction endpoint configured: set PREDICT_PROXY_URL (our AppSail route), or "
-            "QUICKML_ENDPOINT_URL with its credentials for direct QuickML access (see .env.example)"
+        missing = [name for name in DIRECT_VARS if not get(name)]
+        if missing:
+            raise ConfigError(f"QuickML is not configured: missing {', '.join(missing)} (see .env.example)")
+        secrets = [get("QUICKML_ENDPOINT_KEY"), get("ZOHO_CLIENT_SECRET"), get("ZOHO_REFRESH_TOKEN")]
+        http = Http(session or requests.Session(), timeout, retries, sleep, secrets)
+        tokens = ZohoTokenProvider(get("ZOHO_CLIENT_ID"), get("ZOHO_CLIENT_SECRET"), get("ZOHO_REFRESH_TOKEN"), http, clock)
+        transport = QuickMLTransport(
+            get("QUICKML_ENDPOINT_URL"),
+            get("QUICKML_ENDPOINT_KEY"),
+            get("ZOHO_ORG_ID"),
+            get("QUICKML_ENVIRONMENT") or "Production",
+            tokens,
+            http,
         )
+        return cls(transport, batch_size, concurrency)
+
+
+def is_configured(env: Mapping[str, str] | None = None) -> bool:
+    """True when every variable direct QuickML access needs is set (values are not checked)."""
+    env = os.environ if env is None else env
+    return all((env.get(name) or "").strip() for name in DIRECT_VARS)
 
 
 def _number(raw: str, name: str, default, kind, minimum):

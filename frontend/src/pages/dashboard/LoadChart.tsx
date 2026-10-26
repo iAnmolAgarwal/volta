@@ -1,11 +1,12 @@
-import { useId, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useId, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { clsx } from "clsx";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts";
-import { BatteryCharging, UtilityPole } from "lucide-react";
+import { BatteryCharging, TriangleAlert, UtilityPole } from "lucide-react";
 import { GlassCard } from "@/components/app/GlassCard";
 import { NARROW, useMedia } from "@/components/landing/useMedia";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { dayMonth, hhmm, isStorage, OVERLOAD_AT_KW, PEAK_HOURS, shortMode, STORAGE_ABOVE_KW, type ModeName, type RunHour } from "@/lib/api";
+import { ModeTrack, type TrackUnit } from "./ModeTrack";
 import { chargeSource, supplyOf } from "./supply";
 
 /* The dashboard's load chart, as the landing's chart cards are built: a paper
@@ -15,8 +16,9 @@ import { chargeSource, supplyOf } from "./supply";
  * areas, a glass tooltip, a legend), in Screen 1's chart look.
  *
  * 24h and 72h are hourly, with the supply split so the stack is an energy
- * balance: the grid serving the load (lime), the battery's discharge
- * (moss-sage) and the solar serving the load (warm amber) sum to the predicted
+ * balance: the grid serving the load (--flow-grid, lime, solid), the battery's
+ * discharge (--flow-battery, pale green, a thin solid edge) and the solar
+ * serving the load (--flow-solar, Sylva's warm light, a dotted edge) sum to the predicted
  * demand every hour, so the white demand line rides on the stack's top; the
  * battery's charging is drawn below the axis. 7 days and All are daily: an
  * envelope from each day's lowest to highest hour, the daily mean as the line,
@@ -24,6 +26,9 @@ import { chargeSource, supplyOf } from "./supply";
  *
  * The 160 and 200 kW lines are labelled past the plot's right end, in spaced
  * caps; a faint band marks each 18–22 evening window (hourly ranges).
+ * Under the plot runs the mode track (ModeTrack.tsx): Main Grid against
+ * Renewable Storage on the chart's own x scale, per hour or per day, with the
+ * overload hours dotted; the axis ticks sit under it.
  * MainChart stacks the backend's net fields, whose top overshoots the demand
  * in charging hours, hence this page-local chart
  * (design-notes/m2/dashboard-requests.md). */
@@ -71,12 +76,26 @@ interface DayRow {
   peakTs: string;
 }
 
-/* the three supply tones (dashboard.css: --vd-grid, --vd-battery, --vd-solar, from the flow tokens) */
+/* the three supply flows, each on its own flow token (dashboard.css: --vd-grid,
+ * --vd-battery, --vd-solar), told apart by fill weight and edge: the grid a
+ * solid lime edge over a deep gradient, the battery a thin solid edge over a
+ * lighter fill, the solar a dotted edge over the faintest wash */
 const SERIES = [
-  { key: "grid" as const, color: "var(--vd-grid)", name: "Grid to load", top: 0.42, bottom: 0.05, width: 1.5 },
-  { key: "battery" as const, color: "var(--vd-battery)", name: "Battery discharge", top: 0.55, bottom: 0.2, width: 1.2 },
-  { key: "pv" as const, color: "var(--vd-solar)", name: "Solar to load", top: 0.6, bottom: 0.24, width: 1.2 },
+  { key: "grid" as const, color: "var(--vd-grid)", name: "Grid to load", top: 0.42, bottom: 0.05, width: 1.5, dash: undefined, edge: 1 },
+  { key: "battery" as const, color: "var(--vd-battery)", name: "Battery discharge", top: 0.42, bottom: 0.14, width: 1.1, dash: undefined, edge: 0.8 },
+  { key: "pv" as const, color: "var(--vd-solar)", name: "Solar to load", top: 0.26, bottom: 0.06, width: 1.4, dash: "1.5 2.5", edge: 1 },
 ];
+
+/* the plot's margins: every label on the plate keeps 12 px from the plate's edges
+ * (the y ticks on the left, the 160 / 200 labels on the right) */
+const PLATE_PAD = 12;
+const Y_AXIS_W = 40;
+/** Past the plot's right end: the label's 10 px offset, its width ("OVERLOAD" in
+ * spaced caps, 78 px wide; "200" alone on a phone, 24 px) and the plate padding. */
+const RIGHT = { wide: 10 + 78 + PLATE_PAD, narrow: 6 + 24 + PLATE_PAD };
+/** Over the plot: on the wide layout the range select sits on the plate's top right
+ * (36 px tall, 12 px in), so the plot starts 12 px under it; on a phone it sits under the plate. */
+const TOP = { wide: PLATE_PAD + 36 + PLATE_PAD, narrow: 26 };
 
 const config = {
   grid: { label: "Grid", color: "var(--vd-grid)" },
@@ -273,6 +292,18 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
   const span = RANGES.find((r) => r.id === range)?.hours ?? 24;
   const daily = DAILY.includes(range);
   const narrow = useMedia(NARROW);
+  // the tooltip shows only while a pointer is on the plate; a scroll under a still
+  // pointer hides it (and drops the hover), so it never lingers at a stale hour
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    if (!live) return;
+    const off = () => {
+      setLive(false);
+      onFocusHour(null);
+    };
+    window.addEventListener("scroll", off, { passive: true });
+    return () => window.removeEventListener("scroll", off);
+  }, [live, onFocusHour]);
 
   const all = useMemo(() => toRows(hours), [hours]);
   // each hour's calendar day in the run, as an ordinal (the daily ranges' x)
@@ -304,6 +335,14 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
     return days.filter((_, k) => k % step === 0).map((d) => d.d);
   }, [daily, rows, span, days, narrow]);
   const bands = useMemo(() => (daily ? [] : peakBands(rows)), [daily, rows]);
+  const units = useMemo<TrackUnit[]>(
+    () =>
+      daily
+        ? days.map((d) => ({ x: d.d, storage: d.storageHours * 2 > d.hours, overload: d.overloadHours > 0, focusAt: d.peakIndex }))
+        : rows.map((r) => ({ x: r.i, storage: isStorage(r.mode), overload: r.overload, focusAt: r.i })),
+    [daily, days, rows],
+  );
+  const track = narrow ? { h: 8, gap: 6 } : { h: 10, gap: 7 };
 
   const xFirst = daily ? (days[0]?.d ?? 0) : (rows[0]?.i ?? 0);
   const xLast = daily ? (days[days.length - 1]?.d ?? 0) : (rows[rows.length - 1]?.i ?? 0);
@@ -336,6 +375,10 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
         ? `${dayMonth(rows[0].ts)} – ${dayMonth(rows[n - 1].ts)} · ${n.toLocaleString()} h, by day: low to peak and the mean`
         : `${hhmm(rows[0].ts)} ${dayMonth(rows[0].ts)} – ${hhmm(rows[n - 1].ts)} ${dayMonth(rows[n - 1].ts)} · ${n.toLocaleString()} h`;
 
+  const storageN = rows.filter((r) => isStorage(r.mode)).length;
+  const overloadN = rows.filter((r) => r.overload).length;
+  const trackSummary = `Mode track: ${storageN} of ${n} hours on Renewable Storage, ${n - storageN} on Main Grid, ${overloadN} at critical overload.`;
+
   /** The hour a chart event lands on: the hour itself, or the day's peak hour. */
   const hourAt = (k: unknown): number | undefined => {
     if (k == null) return undefined;
@@ -343,8 +386,38 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
     return rows[Number(k)]?.i;
   };
   const pick = (s: { activeTooltipIndex?: unknown } | null | undefined) => {
+    setLive(true);
     const i = hourAt(s?.activeTooltipIndex);
     if (i != null) onPick(i);
+  };
+
+  /* The keyboard: the plot is one slider over the page's focused hour (Recharts'
+   * own keyboard layer is off, so there is never a second cursor). Arrows step an
+   * hour (a day on the daily ranges, landing on its peak hour); Home / End go to
+   * the range's ends. */
+  const stops = daily ? days.map((d) => d.peakIndex) : rows.map((r) => r.i);
+  const focusAt = focusIndex == null ? -1 : daily ? days.findIndex((d) => focusIndex >= d.first && focusIndex <= d.last) : rows.findIndex((r) => r.i === focusIndex);
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (stops.length === 0) return;
+    const last = stops.length - 1;
+    const at = focusAt < 0 ? 0 : focusAt;
+    const to: Record<string, number> = { ArrowRight: at + 1, ArrowUp: at + 1, ArrowLeft: at - 1, ArrowDown: at - 1, Home: 0, End: last };
+    if (!(e.key in to)) return;
+    e.preventDefault();
+    setLive(false);
+    onFocusHour(null);
+    onPick(stops[Math.max(0, Math.min(last, to[e.key]))]);
+  };
+  const focusHour = focusIndex != null ? hours[focusIndex] : undefined;
+  /** The hour under a client x: the plot spans the surface less its margins, linear over [xFirst, xLast]. */
+  const hourAtX = (clientX: number, surface: Element | null): number | undefined => {
+    if (!surface || stops.length === 0) return undefined;
+    const box = surface.getBoundingClientRect();
+    const left = box.left + PLATE_PAD + Y_AXIS_W;
+    const width = box.width - PLATE_PAD - Y_AXIS_W - (narrow ? RIGHT.narrow : RIGHT.wide);
+    if (width <= 0 || clientX < left - 1 || clientX > left + width + 1) return undefined;
+    const x = Math.round(xFirst + ((clientX - left) / width) * (xLast - xFirst));
+    return daily ? days.find((d) => d.d === x)?.peakIndex : rows.find((r) => r.i === x)?.i;
   };
 
   const rangeControl = (
@@ -360,18 +433,39 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
   return (
     <GlassCard variant="paper" className={clsx("va-chart-card vd-chart", className)} delay={delay} aria-labelledby="vd-chart-title">
       <div className="va-plate va-chart-plate">
+        <div
+          className="vd-plot"
+          role="slider"
+          tabIndex={0}
+          aria-label="Hour in focus on the chart"
+          aria-valuemin={stops[0] ?? 0}
+          aria-valuemax={stops[stops.length - 1] ?? 0}
+          aria-valuenow={focusIndex ?? undefined}
+          aria-valuetext={focusHour ? `${hhmm(focusHour.timestamp)} ${dayMonth(focusHour.timestamp)}, ${focusHour.prediction_kw.toFixed(1)} kW, ${shortMode(focusHour.mode)}${focusHour.overload ? ", critical overload" : ""}` : undefined}
+          onKeyDown={onKey}
+          // a click or a tap pins the hour under it, read from the click's own x (Recharts
+          // reports hover a frame later, and its touch callback can miss the hour)
+          onClick={(e) => {
+            const i = hourAtX(e.clientX, e.currentTarget.querySelector(".recharts-surface"));
+            if (i != null) onPick(i);
+          }}
+        >
         <div className="va-plate-media" key={range}>
           <span className="va-axis-unit" aria-hidden="true">kW</span>
           <ChartContainer config={config} className="va-chart aspect-auto h-full w-full" initialDimension={{ width: 900, height: 340 }}>
             <ComposedChart
               data={(daily ? days : rows) as (Row | DayRow)[]}
-              margin={{ top: 26, right: narrow ? 34 : 88, bottom: 4, left: 0 }}
+              margin={{ top: narrow ? TOP.narrow : TOP.wide, right: narrow ? RIGHT.narrow : RIGHT.wide, bottom: 4, left: PLATE_PAD }}
+              accessibilityLayer={false}
               onMouseMove={(s) => {
+                setLive(true);
                 const i = hourAt(s?.activeTooltipIndex);
                 if (i != null) onFocusHour(i);
               }}
-              onMouseLeave={() => onFocusHour(null)}
-              onClick={pick}
+              onMouseLeave={() => {
+                setLive(false);
+                onFocusHour(null);
+              }}
               onTouchStart={pick}
               onTouchMove={pick}
             >
@@ -392,8 +486,8 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                 </linearGradient>
               </defs>
               <CartesianGrid vertical={false} stroke="var(--chart-grid-line)" />
-              <XAxis dataKey={daily ? "d" : "i"} type="number" domain={[xFirst, xLast]} ticks={ticks} tickFormatter={fmtTick} tickLine={false} axisLine={false} tickMargin={10} interval="preserveStartEnd" />
-              <YAxis domain={[yMin, yMax]} ticks={yTicks} interval={0} tickLine={false} axisLine={false} width={40} tickMargin={6} tickFormatter={axisNum} />
+              <XAxis dataKey={daily ? "d" : "i"} type="number" domain={[xFirst, xLast]} ticks={ticks} tickFormatter={fmtTick} tickLine={false} axisLine={false} tickMargin={10 + track.gap + track.h} height={30 + track.gap + track.h} interval="preserveStartEnd" />
+              <YAxis domain={[yMin, yMax]} ticks={yTicks} interval={0} tickLine={false} axisLine={false} width={Y_AXIS_W} tickMargin={6} tickFormatter={axisNum} />
               {bands.map(([a, b], k) => (
                 <ReferenceArea
                   key={a}
@@ -410,7 +504,8 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
               <ReferenceLine y={STORAGE_ABOVE_KW} stroke="var(--chart-ref-line)" strokeDasharray="2 4" label={narrow ? STORAGE_LABEL.Narrow : STORAGE_LABEL.Wide} />
               <ReferenceLine y={OVERLOAD_AT_KW} stroke="var(--overload-soft)" strokeDasharray="2 4" label={narrow ? OVERLOAD_LABEL.Narrow : OVERLOAD_LABEL.Wide} />
               <ChartTooltip
-                cursor={{ stroke: "var(--chart-ref-line)" }}
+                active={live ? undefined : false}
+                cursor={false}
                 content={daily ? <DayTip compact={narrow} /> : <HourTip compact={narrow} />}
                 wrapperStyle={{ outline: "none" }}
                 {...(narrow ? { position: { y: 4 } } : {})}
@@ -454,6 +549,8 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                       type="monotone"
                       stroke={s.color}
                       strokeWidth={s.width}
+                      strokeOpacity={s.edge}
+                      strokeDasharray={s.dash}
                       fill={`url(#${s.key}${uid})`}
                       isAnimationActive={false}
                       activeDot={{ r: 2.5, fill: s.color, stroke: "var(--bg-deep)", strokeWidth: 1.2 }}
@@ -492,9 +589,12 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
               {focusRow && focusX != null && (
                 <ReferenceDot x={focusX} y={focusRow.demand} r={4.5} fill={focusRow.overload ? "var(--flow-overload)" : "var(--vd-grid)"} stroke="var(--bg-deep)" strokeWidth={2} className="va-focus-dot" />
               )}
+              <ModeTrack units={units} xFirst={xFirst} xLast={xLast} focusX={focusX} height={track.h} gap={track.gap} label onHover={onFocusHour} onPick={onPick} />
             </ComposedChart>
           </ChartContainer>
         </div>
+        </div>
+        {!narrow && <div className="vd-plate-range">{rangeControl}</div>}
       </div>
 
       <div className="vd-chart-foot">
@@ -502,8 +602,9 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
           <p className="va-card-label">Load forecast</p>
           <h2 className="va-card-title" id="vd-chart-title">Predicted load and supply</h2>
           <p className="va-chart-desc">{desc}</p>
+          <p className="sr-only">{trackSummary}</p>
         </div>
-        <div className="vd-chart-range">{rangeControl}</div>
+        {narrow && <div className="vd-chart-range">{rangeControl}</div>}
         <ul className="va-legend" aria-label="Legend">
           {daily ? (
             <>
@@ -514,7 +615,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
           ) : (
             <>
               {SERIES.map((s) => (
-                <li key={s.key}><i className="va-legend-swatch" style={{ "--sw": s.color } as CSSProperties} aria-hidden="true" />{s.name}</li>
+                <li key={s.key}><i className={clsx("va-legend-swatch", s.dash && "is-dotted")} style={{ "--sw": s.color } as CSSProperties} aria-hidden="true" />{s.name}</li>
               ))}
               <li><i className="vd-legend-charging" aria-hidden="true" />Charging, below 0</li>
               <li><i className="va-legend-line" aria-hidden="true" />Predicted demand</li>
@@ -523,6 +624,12 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
           <li><i className="va-legend-dash" aria-hidden="true" />{STORAGE_ABOVE_KW} kW storage</li>
           <li><i className="va-legend-dash va-legend-dash--overload" aria-hidden="true" />{OVERLOAD_AT_KW} kW overload</li>
           {!daily && <li><i className="va-legend-band" aria-hidden="true" />18–22 evening window</li>}
+        </ul>
+        <ul className="va-legend vd-track-legend" aria-label="Mode track legend">
+          <li className="vd-track-cap">{daily ? "Mode track · each day's majority" : "Mode track"}</li>
+          <li><span className="vd-key" aria-hidden="true"><i className="is-grid" /></span><UtilityPole className="vd-key-icon" strokeWidth={1.5} aria-hidden />Main Grid</li>
+          <li><span className="vd-key" aria-hidden="true"><i className="is-storage" /></span><BatteryCharging className="vd-key-icon" strokeWidth={1.5} aria-hidden />Renewable Storage</li>
+          <li><span className="vd-key" aria-hidden="true"><i className="is-grid" /><b /></span><TriangleAlert className="vd-key-icon" strokeWidth={1.5} aria-hidden />{daily ? "A day with overload hours" : "Overload hour"}</li>
         </ul>
       </div>
     </GlassCard>

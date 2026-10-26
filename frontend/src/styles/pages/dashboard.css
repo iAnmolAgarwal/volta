@@ -7,21 +7,21 @@
  * down Sylva's diagonal (x 1250 → 1346 → 1432, +110 a step). Every value is a
  * token from tokens.css or a unit of --u; no Sylva code is copied. */
 
-/* ── the supply tones: three distinct flows, all from the flow tokens ─────
-   grid stays the lime; the battery is its pale green taken down into the
-   portal's moss (a mid sage); the sun's warm light is taken to an amber. */
+/* ── the supply flows: each on its own flow token, as tokens.css names them
+   (grid the lime, battery Sylva's pale green, solar its warm light); the chart
+   tells them apart by fill weight and edge (LoadChart.tsx SERIES) ───────── */
 .vd {
   --vd-grid: var(--flow-grid);
-  --vd-battery: color-mix(in oklab, var(--flow-battery) 58%, var(--portal-bg));
-  --vd-solar: color-mix(in oklab, var(--flow-solar) 72%, var(--overload) 28%);
+  --vd-battery: var(--flow-battery);
+  --vd-solar: var(--flow-solar);
   --vd-grid-glow: var(--flow-grid-glow);
-  --vd-battery-glow: color-mix(in oklab, var(--vd-battery) 40%, transparent);
-  --vd-solar-glow: color-mix(in oklab, var(--vd-solar) 40%, transparent);
+  --vd-battery-glow: var(--flow-battery-glow);
+  --vd-solar-glow: var(--flow-solar-glow);
+  /* every label on the chart plate keeps this far from the plate's edges
+     (the round-2 judge's 12 px; the same floor as --t-min and the tick size) */
+  --vd-plate-pad: var(--t-min);
   /* where the fixed dock ends: Sylva's 38 top + its 46 height */
   --vd-dock-end: calc((38 + 46) * var(--u));
-}
-@supports (color: oklch(from red l c h)) {
-  .vd { --vd-solar: oklch(from var(--flow-solar) calc(l - 0.09) calc(c + 0.08) calc(h - 20)); }
 }
 .vd-area--grid { --area-glow: var(--vd-grid-glow); }
 .vd-area--battery { --area-glow: var(--vd-battery-glow); }
@@ -41,8 +41,9 @@
   background: linear-gradient(180deg, var(--bg-hero) 0%, var(--bg-hero) 58%, transparent 100%);
   backdrop-filter: blur(calc(10 * var(--u)));
   -webkit-backdrop-filter: blur(calc(10 * var(--u)));
-  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
-  mask-image: linear-gradient(180deg, #000 62%, transparent);
+  /* a mask reads only alpha: any opaque token serves */
+  -webkit-mask-image: linear-gradient(180deg, var(--bg-deep) 62%, transparent);
+  mask-image: linear-gradient(180deg, var(--bg-deep) 62%, transparent);
   opacity: 0;
   transition: opacity 0.35s var(--ease);
 }
@@ -69,9 +70,24 @@
 /* "Saved" or "Not saved: <reason>": a quiet chip beside the eyebrow */
 .vd-hero .va-eyebrow { white-space: nowrap; }
 /* negative block margins keep the eyebrow's line as tall as its caps, so the headline holds its rail */
-.vd-saved { display: inline-flex; vertical-align: middle; margin: calc(-8 * var(--u)) 0 calc(-8 * var(--u)) calc(12 * var(--u)); }
-.vd-saved .va-pill { height: calc(24 * var(--u)); padding: 0 calc(10 * var(--u)); color: var(--ink-faint); letter-spacing: var(--track-dock); }
+.vd-chips { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); vertical-align: middle; margin: calc(-8 * var(--u)) 0 calc(-8 * var(--u)) calc(12 * var(--u)); }
+.vd-saved { display: inline-flex; }
+/* on the wide layout the pair stands on the lede's rail (x 520), level with the
+   eyebrow, and the lede steps down under it, so the chips never cross a guide */
+@media (min-width: 901px) {
+  .vd-hero .va-eyebrow { position: relative; }
+  .vd-chips { position: absolute; top: 50%; left: calc(474 * var(--u)); margin: 0; transform: translateY(-50%); }
+  .vd-hero > .va-head .va-lede { margin-top: calc(40 * var(--u)); }
+}
+.vd-chips .va-pill { height: calc(24 * var(--u)); padding: 0 calc(10 * var(--u)); color: var(--ink-faint); letter-spacing: var(--track-dock); }
 .vd-saved.is-not .va-pill { color: var(--ink-soft); }
+/* "Download CSV": the same chip, made a dock item (it lifts and brightens on hover, as the dock's do) */
+.vd-chips .vd-csv { color: var(--ink-soft); }
+.vd-chips .vd-csv:hover { color: var(--ink); }
+.vd-chips .vd-csv:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: calc(2 * var(--u)); }
+.vd-csv.is-done,
+.vd-csv.is-done:hover { color: var(--volt); border-color: var(--volt-soft); }
+.vd-csv.is-done .va-pill-glyph { opacity: 1; }
 
 /* ── side stats: Sylva's .stat, on its diagonal ──────────────────────────── */
 .vd-stats { position: absolute; inset: 0; pointer-events: none; }
@@ -86,6 +102,19 @@
 .vd-stat--a { left: calc(1204 * var(--u)); top: calc(2 * var(--u)); }
 .vd-stat--b { left: calc(1300 * var(--u)); top: calc(112 * var(--u)); }
 .vd-stat--c { left: calc(1386 * var(--u)); top: calc(214 * var(--u)); }
+/* the diagonal's scope, in the eyebrow's spaced caps, over stat A */
+.vd-stats-cap {
+  position: absolute;
+  left: calc(1204 * var(--u));
+  top: calc(-30 * var(--u));
+  margin: 0;
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
 .vd-mark { width: calc(32 * var(--u)); height: calc(32 * var(--u)); flex: none; margin-top: calc(2 * var(--u)); color: var(--ink-mark); }
 .vd-mark svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 calc(2 * var(--u)) calc(10 * var(--u)) var(--stat-shadow)); }
 .vd-stat dl { margin: 0; }
@@ -229,12 +258,24 @@
 
 /* the chart card: the landing's paper card, its moss plate inset 14 at the top,
    then the label, title and range under it (the "Next-24h peak" card) */
-.vd-chart { --chart-h: calc(372 * var(--u)); display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
+/* 372, plus the mode track and its gap, plus the range select's row over the plot, so the plot keeps its height */
+.vd-chart { --chart-h: calc(429 * var(--u)); display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
 .vd-chart .va-chart-plate { margin: 0; flex: none; }
-.vd-chart:has(.recharts-surface:focus-visible) .va-chart-plate,
-.vd-chart:has(.recharts-wrapper:focus-visible) .va-chart-plate { outline: 2px solid var(--focus-ring-dark); outline-offset: calc(3 * var(--u)); }
-.vd-chart .recharts-wrapper:focus-visible { outline: none; }
-.vd-chart .va-axis-unit { top: calc(6 * var(--u)); }
+/* the plot is one slider over the focused hour (arrow keys); its ring is drawn round the plate */
+.vd-plot { position: absolute; inset: 0; border-radius: inherit; }
+.vd-plot:focus-visible { outline: none; }
+.vd-chart .va-chart-plate:has(.vd-plot:focus-visible) { outline: 2px solid var(--focus-ring-dark); outline-offset: calc(3 * var(--u)); }
+/* the axes: every tick in faint ink, Lexend, at the 12 px floor (Recharts 3 draws
+   tick labels as .recharts-cartesian-axis-tick-value in its own layer, with a
+   default grey fill this overrides); the unit sits 12 px in from the plate's edge */
+.vd-chart .recharts-cartesian-axis-tick-value {
+  fill: var(--ink-faint);
+  font-family: var(--font);
+  font-size: var(--t-min);
+  font-weight: var(--w-light);
+  font-variant-numeric: tabular-nums;
+}
+.vd-chart .va-axis-unit { top: calc(6 * var(--u)); left: var(--vd-plate-pad); font-size: var(--t-min); letter-spacing: var(--track-dock); }
 .vd-chart-foot {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -246,9 +287,20 @@
 .vd-chart-heading .va-card-title { color: var(--paper-ink); }
 .vd-chart .va-chart-desc { margin: calc(8 * var(--u)) 0 0; color: var(--paper-label); }
 .vd-chart-range { padding-top: calc(4 * var(--u)); }
+/* the wide layout's range select: the dock-glass pill on the plate's top right, as
+   shadcn's "Area Chart - Interactive" puts it in the header, so it stays above the fold;
+   the kW unit sits on the same row, at the plate's left */
+.vd-plate-range { position: absolute; z-index: 2; top: var(--vd-plate-pad); right: var(--vd-plate-pad); }
+@media (min-width: 901px) {
+  .vd-chart .va-axis-unit { top: calc(var(--vd-plate-pad) + 20 * var(--u)); transform: translateY(-50%); }
+}
 .vd-chart .va-legend { grid-column: 1 / -1; margin: 0; color: var(--paper-label); }
 /* on paper, each swatch is ringed in the paper's ink so the pale tones still read */
 .vd-chart .va-legend-swatch { box-shadow: 0 0 0 1px var(--paper-label), 0 0 calc(6 * var(--u)) var(--sw); }
+/* the charging key: its dashed edge in the paper's label ink, over a wash of the battery's token */
+.vd-chart .vd-legend-charging { border-color: var(--paper-label); background: var(--flow-battery-glow); }
+/* the solar swatch carries its dotted edge, as the plate draws it */
+.vd-chart .va-legend-swatch.is-dotted { box-shadow: 0 0 calc(6 * var(--u)) var(--sw); outline: 1px dotted var(--paper-label); outline-offset: 1px; }
 .vd-chart .va-legend-line { background: var(--paper-ink); }
 .vd-chart .va-legend-dash { border-top-color: var(--paper-label); }
 .vd-chart .va-legend-dash--overload { border-top-color: var(--overload); }
@@ -269,6 +321,46 @@
 }
 .vd-ref-label.is-overload { fill: var(--overload); }
 .vd-ref-word { fill-opacity: 0.72; font-weight: var(--w-regular); }
+/* ── the mode track under the plot (ModeTrack.tsx): the stepper's two tile
+   tones in the mode tokens, the chart's red overload dot ──────────────── */
+.vd-track-tile rect { transition: fill-opacity 0.2s var(--ease), stroke-opacity 0.2s var(--ease); stroke: var(--ink); stroke-opacity: 0; stroke-width: 1.2; }
+.vd-track-tile.is-grid rect { fill: var(--mode-grid); fill-opacity: 0.3; }
+.vd-track-tile.is-storage rect { fill: var(--mode-storage); fill-opacity: 0.72; }
+.vd-track-tile.is-focus rect { fill-opacity: 1; stroke-opacity: 1; }
+.vd-track-tile.is-grid.is-focus rect { fill-opacity: 0.62; }
+.vd-track-dot { fill: var(--mode-overload); stroke: var(--bg-deep); stroke-width: 1; }
+.vd-track-hit { fill: transparent; cursor: pointer; touch-action: pan-y; }
+.vd-track:has(.vd-track-hit:hover) .vd-track-tile:not(.is-focus) rect { fill-opacity: 0.5; }
+.vd-track:has(.vd-track-hit:hover) .vd-track-tile.is-storage:not(.is-focus) rect { fill-opacity: 0.86; }
+/* the strip's row label, in the ticks' own style (faint ink, Lexend, the 12 px
+   floor), right-aligned in the y-axis gutter and 12 px clear of the plate's edge */
+.vd-track-label {
+  fill: var(--ink-faint);
+  font-family: var(--font);
+  font-size: var(--t-min);
+  font-weight: var(--w-light);
+  letter-spacing: 0;
+}
+
+/* its legend: a caption in spaced caps, then each mode as a key (a tile on a
+   chip of the plate's moss), its icon and its name */
+.vd-chart .vd-track-legend { padding-top: calc(12 * var(--u)); border-top: 1px solid color-mix(in oklab, var(--paper-label) 22%, transparent); }
+.vd-track-cap { font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--paper-label); }
+.vd-key {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: calc(26 * var(--u));
+  height: calc(14 * var(--u));
+  border-radius: calc(5 * var(--u));
+  background: var(--portal-bg);
+}
+.vd-key i { width: calc(18 * var(--u)); height: calc(6 * var(--u)); border-radius: 999px; }
+.vd-key i.is-grid { background: color-mix(in oklab, var(--mode-grid) 30%, var(--portal-bg)); }
+.vd-key i.is-storage { background: color-mix(in oklab, var(--mode-storage) 72%, var(--portal-bg)); }
+.vd-key b { position: absolute; width: calc(5 * var(--u)); height: calc(5 * var(--u)); border-radius: var(--r-round); background: var(--mode-overload); }
+.vd-key-icon { width: calc(14 * var(--u)); height: calc(14 * var(--u)); flex: none; margin-right: calc(-2 * var(--u)); color: var(--paper-ink); }
+
 .vd-legend-charging {
   width: calc(16 * var(--u));
   height: calc(9 * var(--u));
@@ -319,6 +411,23 @@
 .vd-inputs { display: flex; flex-wrap: wrap; gap: calc(14 * var(--u)) calc(28 * var(--u)); margin: 0; margin-top: auto; }
 .vd-inputs dl { margin: 0; }
 
+/* ── the whole run: the side stats, on the system log's two rails ────────── */
+.vd-run {
+  display: grid;
+  grid-template-columns: calc(330 * var(--u)) minmax(0, 1fr);
+  gap: calc(48 * var(--u));
+  align-items: center;
+}
+.vd-run-head .va-card-title { margin: 0; }
+.vd-run-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, max-content));
+  justify-content: space-between;
+  gap: calc(20 * var(--u)) calc(28 * var(--u));
+  padding-right: calc(12 * var(--u));
+}
+.vd-run .vd-stat { position: static; }
+
 /* ── the system log: Field Notes under a heading on the card's own rail ──── */
 .vd-log {
   display: grid;
@@ -367,8 +476,9 @@
   .vd-hero > .va-head .va-lede { max-width: calc(560 * var(--u)); }
   .vd-state { padding-right: 0; }
   .vd-hero .va-eyebrow { white-space: normal; }
-  .vd-saved { display: flex; margin: calc(14 * var(--u)) 0 0; }
-  .vd-saved .va-pill { height: max(28px, calc(40 * var(--u))); padding: 0 max(12px, calc(18 * var(--u))); }
+  .vd-chips { display: flex; flex-wrap: wrap; gap: max(8px, calc(12 * var(--u))); margin: calc(14 * var(--u)) 0 calc(10 * var(--u)); }
+  /* one height for the pair: the download is a tap target, so the Saved chip matches it */
+  .vd-chips .va-pill { height: var(--tap-min); padding: 0 max(14px, calc(20 * var(--u))); }
 
   /* Sylva's phone stats: one row under the pill, as the landing's three */
   .vd-stats { position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(14 * var(--u)); pointer-events: auto; }
@@ -392,7 +502,7 @@
   .vd { --vd-dock-end: calc(30 * var(--u) + max(56px, 58 * var(--u))); }
   .vd::before { height: calc(var(--vd-dock-end) + 22px); }
   .vd-state .va-mode-pill { min-width: 0; }
-  .vd-chart { --chart-h: max(260px, calc(600 * var(--u))); padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(30 * var(--u)); }
+  .vd-chart { --chart-h: max(274px, calc(600 * var(--u) + 14px)); /* the range select sits under the plate here */ padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(30 * var(--u)); }
   .vd-chart .va-chart-plate { margin: 0; }
   .vd-chart-foot { grid-template-columns: minmax(0, 1fr); padding: calc(26 * var(--u)) calc(16 * var(--u)) 0; gap: calc(20 * var(--u)); }
   .vd-chart-range .va-range { width: 100%; }
@@ -400,10 +510,20 @@
   .vd-legend-band { width: max(12px, calc(22 * var(--u))); height: max(10px, calc(16 * var(--u))); }
   .vd-legend-dot { width: max(8px, calc(14 * var(--u))); height: max(8px, calc(14 * var(--u))); }
   .vd-legend-charging { width: max(14px, calc(24 * var(--u))); height: max(8px, calc(13 * var(--u))); }
+  .vd-chart .vd-track-legend { padding-top: calc(18 * var(--u)); }
+  .vd-track-cap { flex-basis: 100%; }
+  .vd-key { width: max(22px, calc(40 * var(--u))); height: max(12px, calc(22 * var(--u))); border-radius: max(4px, calc(7 * var(--u))); }
+  .vd-key i { width: max(15px, calc(28 * var(--u))); height: max(5px, calc(9 * var(--u))); }
+  .vd-key b { width: max(4px, calc(8 * var(--u))); height: max(4px, calc(8 * var(--u))); }
+  .vd-key-icon { width: max(14px, calc(22 * var(--u))); height: max(14px, calc(22 * var(--u))); }
   .vd-source { height: max(24px, calc(40 * var(--u))); padding: 0 max(10px, calc(16 * var(--u))); font-size: var(--a-caps); }
   .vd-focus { gap: calc(26 * var(--u)); }
   .vd-why { padding-top: calc(22 * var(--u)); min-height: calc(2 * 1.5em + 22 * var(--u)); }
 
+  .vd-stats-cap { position: static; grid-column: 1 / -1; margin-bottom: calc(-4 * var(--u)); }
+  .vd-run { grid-template-columns: minmax(0, 1fr); gap: calc(26 * var(--u)); align-items: start; }
+  .vd-run-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; gap: calc(26 * var(--u)) calc(14 * var(--u)); padding-right: 0; }
+  .vd-run .vd-stat dt { white-space: normal; }
   .vd-log { grid-template-columns: minmax(0, 1fr); gap: calc(26 * var(--u)); }
   .vd-log-head { position: static; }
   .vd-log-list { gap: calc(12 * var(--u)); }

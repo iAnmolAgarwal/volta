@@ -34,7 +34,8 @@ const send = (method, params = {}) => new Promise((r) => { const i = ++id; pendi
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const evaluate = async (expr) => (await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true })).result?.result?.value;
 const until = async (expr, what, ms = 30_000) => {
-  for (const t0 = Date.now(); Date.now() - t0 < ms; await wait(250)) if (await evaluate(expr)) return;
+  // !!(...) so a DOM node comes back as true: a node itself doesn't serialise by value
+  for (const t0 = Date.now(); Date.now() - t0 < ms; await wait(250)) if (await evaluate(`!!(${expr})`)) return;
   throw new Error(`e2e: timed out waiting for ${what}`);
 };
 const shot = async (name) => {

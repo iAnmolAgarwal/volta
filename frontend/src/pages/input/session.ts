@@ -1,6 +1,8 @@
 /* The screen's work survives a trip to the dashboard and back: the day form,
- * the edited rows and the last report are kept for the tab's session. Every
- * read and write is guarded; without storage the page simply starts fresh. */
+ * the edited rows and the last report are kept for the tab's session. A chosen
+ * file's name is not: the drop zone's chip is drawn from the post in flight or
+ * the last report, so it never outlives the result it belongs to. Every read
+ * and write is guarded; without storage the page simply starts fresh. */
 
 import type { Run } from "@/lib/api";
 import type { What } from "./errors";
@@ -12,7 +14,6 @@ const LAST_KEY = "volta:input:last";
 export interface Draft {
   spec: GenSpec;
   rows: Row[];
-  fileName: string | null;
 }
 
 export interface Last {
@@ -44,10 +45,10 @@ export function loadDraft(): Draft {
   const rows = Array.isArray(d?.rows) ? d.rows.filter((r) => r && typeof r.id === "number") : [];
   bumpIds(rows);
   const spec = d?.spec && typeof d.spec.start === "string" ? { ...DEFAULT_SPEC, ...d.spec } : DEFAULT_SPEC;
-  return { spec, rows, fileName: typeof d?.fileName === "string" ? d.fileName : null };
+  return { spec, rows };
 }
 
-export const saveDraft = (d: Draft) => write(DRAFT_KEY, d);
+export const saveDraft = (d: Draft) => write(DRAFT_KEY, { spec: d.spec, rows: d.rows });
 
 export function loadLast(): Last | null {
   const l = read<Last>(LAST_KEY);

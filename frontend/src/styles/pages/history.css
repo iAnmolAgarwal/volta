@@ -186,6 +186,11 @@
   margin: calc(10 * var(--u)) 0 calc(22 * var(--u));
 }
 .vh-run-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 0;
   font-size: var(--a-small);
   font-weight: var(--w-light);
@@ -198,7 +203,15 @@
 .vh-saved .va-pill-glyph { opacity: 0.9; }
 
 /* the store chip and "CSV" share the row's right side */
-.vh-run-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--u)); margin-left: auto; } /* stays right when the row wraps */
+.vh-run-actions { display: inline-flex; flex: none; align-items: center; gap: calc(8 * var(--u)); margin-left: auto; } /* stays right when the row wraps */
+/* one line on the grid: the meta gives way (with its full text in a title), so every card's plate sits at one offset */
+@media (min-width: 901px) {
+  .vh-run-row { flex-wrap: nowrap; column-gap: calc(4 * var(--u)); }
+  .vh-run-row:has(.vh-csv-error) { flex-wrap: wrap; }
+  .vh-run-actions { gap: calc(4 * var(--u)); }
+  .vh-saved .va-pill { padding: 0 calc(8 * var(--u)); gap: calc(4 * var(--u)); }
+  .va-card--paper .va-pill.vh-csv { padding: 0 calc(9 * var(--u)); gap: calc(4 * var(--u)); }
+}
 /* "CSV": the card's secondary control, a paper pill raised over the stretched
    link; on hover it turns into the ink chip, as the Input card's paper action */
 .va-card--paper .va-pill.vh-csv {
@@ -311,9 +324,8 @@
 .vh-curve-wrap { margin: calc(-22 * var(--u)) calc(-24 * var(--u)) 0; }
 .vh-curve { position: relative; height: calc(90 * var(--u)); }
 .vh-curve-svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; }
-.vh-curve-env { fill: var(--flow-grid); opacity: 0.08; }
-.vh-curve-max { fill: none; stroke: var(--flow-grid); stroke-opacity: 0.3; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.vh-curve-mean { fill: none; stroke: var(--flow-grid); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+/* the landing's line: lime, 1.6 */
+.vh-curve-line { fill: none; stroke: var(--flow-grid); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 /* the line's soft glow, in screen space (the landing's 4-unit drop-shadow) */
 .vh-curve-glow { filter: drop-shadow(0 0 calc(4 * var(--u)) var(--flow-grid-glow)); }
 /* the 200 kW reference: the landing's faint 2/4 dash */
@@ -325,7 +337,7 @@
   height: 1px;
   background: repeating-linear-gradient(90deg, var(--chart-ref-line) 0 calc(2 * var(--u)), transparent calc(2 * var(--u)) calc(6 * var(--u)));
 }
-/* the highest bucket: the landing's playhead dot, red when it is an overload */
+/* the line's peak: the landing's playhead dot (r 3.5, a deep ring), red when it is an overload */
 .vh-curve-peak {
   position: absolute;
   left: var(--x);
@@ -353,9 +365,12 @@
   white-space: nowrap;
   color: var(--ink-soft);
 }
-.vh-curve-step { color: var(--ink-faint); }
-.vh-plate.has-curve .vh-plate-body { gap: calc(14 * var(--u)); }
-.vh-plate.has-curve .vh-readings { padding-top: calc(14 * var(--u)); }
+.vh-plate .vh-plate-body { gap: calc(14 * var(--u)); }
+.vh-plate .vh-readings { padding-top: calc(14 * var(--u)); }
+/* a run without a series: its span row in a box of the curve's height (the
+   curve less the plate's top padding it bleeds into, plus its time row), so
+   every plate in a grid row is one height */
+.vh-span-box { display: flex; align-items: center; min-height: calc(76 * var(--u) + 1.2 * var(--a-caps)); }
 
 /* the knob: a picture of the card's link, on the plate's corner */
 .vh-knob { z-index: 2; pointer-events: none; }
@@ -455,7 +470,8 @@
   .vh-curve-wrap { margin: calc(-26 * var(--u)) calc(-26 * var(--u)) 0; }
   .vh-curve { height: calc(176 * var(--u)); }
   .vh-curve-axis { margin: calc(14 * var(--u)) calc(26 * var(--u)) 0; letter-spacing: 0.07em; }
-  .vh-plate.has-curve .vh-plate-body { gap: calc(22 * var(--u)); }
+  .vh-plate .vh-plate-body { gap: calc(22 * var(--u)); }
+  .vh-span-box { min-height: calc(164 * var(--u) + 1.2 * var(--a-caps)); }
 
   .vh-empty { padding-top: calc(90 * var(--u)); padding-bottom: calc(90 * var(--u)); }
   .vh-skel-resume { width: 100%; }

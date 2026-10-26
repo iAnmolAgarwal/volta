@@ -1,11 +1,12 @@
 import { useMemo, type MouseEvent } from "react";
-import { ArrowUpRight, CloudCheck, Database, Download, LoaderCircle, RotateCw } from "lucide-react";
+import { ArrowUpRight, Check, CloudCheck, Database, Download, LoaderCircle, RotateCw } from "lucide-react";
 import { GlassCard } from "@/components/app/GlassCard";
 import { Pill } from "@/components/app/Pill";
 import { cssVars } from "@/components/landing/cssVars";
 import { setLastRunId } from "@/lib/api";
+import { runCsvName } from "@/lib/csv";
 import { useRouteLink } from "@/lib/useRouteLink";
-import { atText, createdFull, runHref, createdShort, hoursText, lengthText, overloadShare, runTitle, seriesOf, shareText, shortId, SOURCE_LABEL, spanEnds, spanText, storeOf, type CurveScale, type SavedRun } from "./model";
+import { atText, createdFull, runHref, createdShort, hoursText, lengthText, overloadShare, runTitle, seriesOf, shareText, shortId, SOURCE_LABEL, spanEnds, spanText, storeOf, type SavedRun } from "./model";
 import { MarkOverload, MarkPeak, MarkSpan } from "./Marks";
 import { RunCurve } from "./RunCurve";
 import { useRunCsv } from "./useRunCsv";
@@ -16,9 +17,10 @@ import { useRunCsv } from "./useRunCsv";
  * in side-stat form. The knob sits on the plate's lower-right corner.
  *
  * A Stratus run carries its demand as a 48-point series, so its plate leads
- * with the run's shape (the landing Field Note's curve, on one kW scale for
- * every card, `scale`), its two ends on the data's clock under it. The older
- * Data Store runs have no series and keep the span row.
+ * with the run's shape (the landing Field Note's curve), its two ends on the
+ * data's clock under it. The older Data Store runs have no series and keep
+ * the span row, in a box of the curve's height, so every plate in a row
+ * lines up.
  *
  * The whole card is one real link to /dashboard?run=<id> (the headline's link
  * is stretched over the card), so Enter, a click, a middle-click and "open in
@@ -26,10 +28,10 @@ import { useRunCsv } from "./useRunCsv";
  *
  * "CSV" is the card's one other control: a real button beside the store chip,
  * raised over the stretched link (never inside it), that reads the run once
- * and hands the browser its results as a CSV. It shows its own busy state and
- * an inline error under the row. */
+ * and hands the browser its results as a CSV. It shows its own busy state, a
+ * brief check once the file is handed over, and an inline error under the row. */
 
-export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: boolean; delay: number; scale: CurveScale }) {
+export function RunCard({ run, last, delay }: { run: SavedRun; last: boolean; delay: number }) {
   const link = useRouteLink();
   const href = runHref(run.id);
   const store = storeOf(run);
@@ -43,7 +45,9 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
   const csv = useRunCsv(run.id);
   const busy = csv.status.state === "busy";
   const failed = csv.status.state === "error";
-  const CsvIcon = busy ? LoaderCircle : failed ? RotateCw : Download;
+  const done = csv.status.state === "done";
+  const CsvIcon = busy ? LoaderCircle : failed ? RotateCw : done ? Check : Download;
+  const meta = `Run ${shortId(run.id)} · ${lengthText(run)}`;
 
   const follow = link(href);
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
@@ -80,8 +84,8 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
       }
     >
       <div className="vh-run-row">
-        <p className="vh-run-meta">
-          <span className="va-num">Run {shortId(run.id)}</span> · <span className="va-num">{lengthText(run)}</span>
+        <p className="vh-run-meta va-num" title={run.rows_in > run.n_rows ? `Run ${shortId(run.id)}: the cleaner kept ${run.n_rows.toLocaleString("en-GB")} of ${run.rows_in.toLocaleString("en-GB")} rows` : undefined}>
+          {meta}
         </p>
         <span className="vh-run-actions">
           <span className="vh-saved">
@@ -89,7 +93,7 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
           </span>
           <button
             type="button"
-            className={`va-pill va-pill--default va-pill--sm is-action vh-csv${busy ? " is-busy" : ""}`}
+            className={`va-pill va-pill--default va-pill--sm is-action vh-csv${busy ? " is-busy" : ""}${done ? " is-done" : ""}`}
             onClick={csv.download}
             aria-busy={busy}
             aria-describedby={failed ? csvErrId : undefined}
@@ -99,6 +103,7 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
             <span className="va-pill-glyph" aria-hidden="true"><CsvIcon strokeWidth={1.5} aria-hidden /></span>
             <span className="va-pill-label">{busy ? "Preparing" : failed ? "Retry" : "CSV"}</span>
           </button>
+          <span className="sr-only" aria-live="polite">{done ? `${runCsvName(run.id)} downloaded` : ""}</span>
         </span>
         {csv.status.state === "error" && (
           <p className="vh-csv-error" id={csvErrId} role="alert">
@@ -112,20 +117,21 @@ export function RunCard({ run, last, delay, scale }: { run: SavedRun; last: bool
         <div className="vh-plate-body">
           {series ? (
             <div className="vh-curve-wrap">
-              <RunCurve series={series} scale={scale} label={curveLabel(run, series.step_hours, series.mean_kw)} />
+              <RunCurve mean={series.mean_kw} label={curveLabel(run, series.step_hours, series.mean_kw)} />
               <p className="vh-curve-axis va-num">
                 <span>{spanEnds(run)[0]}</span>
-                <span className="vh-curve-step">{series.step_hours === 1 ? "Hourly" : `${series.step_hours} h a point`}</span>
                 <span>{spanEnds(run)[1]}</span>
               </p>
             </div>
           ) : (
-            <div className="vh-span">
-              <span className="vh-pmark" aria-hidden="true"><MarkSpan /></span>
-              <dl>
-                <dt>Data span</dt>
-                <dd className="va-num">{spanText(run)}</dd>
-              </dl>
+            <div className="vh-span-box">
+              <div className="vh-span">
+                <span className="vh-pmark" aria-hidden="true"><MarkSpan /></span>
+                <dl>
+                  <dt>Data span</dt>
+                  <dd className="va-num">{spanText(run)}</dd>
+                </dl>
+              </div>
             </div>
           )}
           <div className="vh-readings">

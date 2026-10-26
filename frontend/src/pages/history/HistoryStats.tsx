@@ -33,7 +33,7 @@ export function HistoryStats({ stats, filtered }: { stats: ListStats; filtered: 
         mark={<MarkOverload />}
         label="Overload hours"
         value={hoursText(overloadHours)}
-        title={`Hours at or above 200 kW, summed over ${filtered ? `the ${shown} runs shown (of ${total})` : `all ${total} runs listed`}`}
+        title={`Hours at or above 200 kW, summed over ${shown === 1 ? "the one run shown" : filtered ? `the ${shown} runs shown (of ${total})` : `all ${total} runs listed`}`}
       />
       <Stat
         tone="b"

@@ -7,7 +7,8 @@
 // post) -> Open on dashboard -> History lists the run -> reopen it. At 1440 and 390 it also
 // loads every route. It fails if any request is an OPTIONS preflight, if the console logs an
 // error, or if the landing falls back to the snapshot.
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 const [base, csvPath, port = "9333", shots = ""] = process.argv.slice(2);
@@ -52,6 +53,14 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok: !!ok, detail }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  " + detail : ""}`); };
 
 await send("Runtime.enable"); await send("Log.enable"); await send("Page.enable"); await send("Network.enable"); await send("DOM.enable");
+const downloads = mkdtempSync(`${tmpdir()}/volta-e2e-`);
+await send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: downloads });
+const downloaded = async (name, ms = 15_000) => {
+  for (const t0 = Date.now(); Date.now() - t0 < ms; await wait(250)) {
+    if (existsSync(`${downloads}/${name}`)) return readFileSync(`${downloads}/${name}`, "utf8");
+  }
+  return null;
+};
 
 // 1. Landing, live
 await size(1440, 900);
@@ -84,11 +93,20 @@ check("  -> dashboard shows the new run", !!runId, runUrl);
 await wait(2000);
 await shot("03-dashboard-1440");
 
+check("Dashboard Download CSV", await clickText("a,button", "Download CSV"));
+const dashCsv = await downloaded(`volta-run-${runId}.csv`);
+check("  -> CSV with header + 48 rows", dashCsv?.startsWith("timestamp,") && dashCsv.trim().split(/\r?\n/).length === 49, `${dashCsv?.trim().split(/\r?\n/).length ?? 0} lines`);
+
 // 4. History lists it, reopen
 await go("/history");
 await until(`document.querySelector('a[href*="${runId}"]')`, "the run in History", 20_000);
 check("History lists the run", true, runId);
 await shot("04-history-1440");
+const csvFiles = () => readdirSync(downloads).filter((f) => f.endsWith(".csv"));
+const before = csvFiles().length;
+check("History card CSV", await evaluate(`(() => { const b = document.querySelector('button[aria-label="Download run ${runId.slice(-6)} as CSV"]'); if (!b) return false; b.click(); return true; })()`));
+for (const t0 = Date.now(); Date.now() - t0 < 15_000 && csvFiles().length <= before; ) await wait(250);
+check("  -> a second CSV file", csvFiles().length > before, csvFiles().join(" "));
 await evaluate(`document.querySelector('a[href*="${runId}"]').click()`);
 await until(`location.search.includes("${runId}")`, "reopening the run");
 check("History reopens the run", true);

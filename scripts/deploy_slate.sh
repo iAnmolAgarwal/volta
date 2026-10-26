@@ -11,6 +11,9 @@ npm run build
 mkdir -p dist/.catalyst
 # SPA fallback: deep links (/dashboard, /input, /history) serve index.html; _redirects alone was not honoured
 printf 'framework = "static"\ndeployment_name = "default"\n\n[[redirects]]\nfrom = "/*"\nto = "/index.html"\nstatus = 200\n' > dist/.catalyst/slate-config.toml
+# Slate serves every file, index.html included, with "Cache-Control: public, max-age=31536000",
+# and ignored _headers and [[headers]] (tried 2026-10-27). A browser that opened an earlier
+# deploy can keep its old HTML and fail on deleted assets until a hard refresh.
 # Slate's static mode served 404 for deep links despite both redirect configs above, so
 # each app route also gets its own copy of index.html (assets are root-absolute, /assets/...).
 for route in dashboard input history; do

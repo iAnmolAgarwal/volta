@@ -54,7 +54,7 @@ export function LiquidMetal({ onUnavailable }: { onUnavailable?: () => void }) {
       ptr += (ptrT - ptr) * (1 - Math.exp(-dt * 9));
       const cw = (box.w + 2 * box.pad) * dpr;
       const ch = (box.h + 2 * box.pad) * dpr;
-      r.draw({
+      const status = r.draw({
         cx: cw / 2,
         cy: ch / 2,
         hx: (box.w / 2) * dpr,
@@ -63,7 +63,13 @@ export function LiquidMetal({ onUnavailable }: { onUnavailable?: () => void }) {
         hover,
         ptr: [(ptrPos.x + box.pad) * dpr, (ptrPos.y + box.pad) * dpr, ptr],
         height: ch,
+        dpr,
       });
+      if (status === "failed") {
+        onUnavailable?.();
+        return;
+      }
+      if (status === "ok" && canvas.dataset.ready !== "true") canvas.dataset.ready = "true";
       schedule();
     };
     const schedule = () => {

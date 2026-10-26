@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from "react";
 import { Activity, History, LogIn, ToggleRight, Zap } from "lucide-react";
 import { FINE_HOVER, NARROW, REDUCED_MOTION } from "./useMedia";
+import { MARK_LABEL } from "@/lib/brand";
 
 /* The floating dock, after Sylva's: pills that magnify on a spring as the
  * pointer nears them (anchored at the top, so they grow downward), a specular
@@ -233,7 +234,7 @@ export function Dock() {
   return (
     <div className="vl-dock-wrap">
       <nav ref={navRef} className="vl-dock par" style={{ "--pd": 5 } as CSSProperties} data-spec aria-label="Primary">
-        <a className="vl-dock-item vl-dock-mark" href="#top" data-dock="mark" data-spec aria-label="VOLTA, home" style={{ "--d": `${DELAYS[0]}ms` } as CSSProperties}>
+        <a className="vl-dock-item vl-dock-mark" href="#top" data-dock="mark" data-spec aria-label={MARK_LABEL} style={{ "--d": `${DELAYS[0]}ms` } as CSSProperties}>
           <Zap aria-hidden strokeWidth={1.25} />
         </a>
         {ITEMS.map((it, i) => (

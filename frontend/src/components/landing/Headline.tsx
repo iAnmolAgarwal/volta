@@ -2,8 +2,9 @@ import { cssVars } from "./cssVars";
 import { HEADLINES } from "./headlines";
 
 /* The three headline options from the developer's direction, and the small
- * review switcher (glass chips bottom-left, mirrored in ?h=1|2|3). The
- * switcher goes once the developer picks one. */
+ * review switcher (faint chips on the headline's rail, mirrored in ?h=1|2|3).
+ * It writes the URL only from its own click, with replaceState, keeping any
+ * hash. The switcher goes once the developer picks one. */
 
 export function Headline({ option }: { option: number }) {
   const [a, b] = HEADLINES[option];

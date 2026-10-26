@@ -7,8 +7,10 @@ import { readHeadlineParam } from "./headlines";
 import { LaunchPill, PlayButton } from "./HeroButtons";
 import { ModeCard, PeakCard, PeakKnob } from "./Cards";
 import { SideStats } from "./SideStats";
-import { FINE_HOVER, REDUCED_MOTION } from "./useMedia";
+import { FINE_HOVER, NARROW, REDUCED_MOTION, useMedia } from "./useMedia";
+import { useAfterPaint } from "./useAfterPaint";
 import { cssVars } from "./cssVars";
+import { PAGE_TITLE, WORDMARK } from "@/lib/brand";
 import "@/styles/landing.css";
 
 /* Screen 1: the VOLTA landing page, on Sylva's 1600-unit stage (760 below
@@ -17,6 +19,8 @@ import "@/styles/landing.css";
 
 const STEP_MS = 600; // playback: ~0.6s an hour, ~15s for the day
 const INTRO_MS = 2900; // after the staged wipes, the clips come off
+const ANNOUNCE_MS = 5200; // how long "Played 24 h · held at HH:00" stays under the disc
+const FLASH_MS = 900; // reduced motion: the plates' one non-motion cue
 
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 const sceneState = (h: Hour) => ({ mode: h.mode, overload: h.overload, pvKw: h.pvKw, batteryKw: h.batteryKw });
@@ -31,8 +35,18 @@ export function Landing() {
   const [playing, setPlaying] = useState(false);
   const [played, setPlayed] = useState(false);
   const [headline, setHeadline] = useState(readHeadlineParam);
+  const [announce, setAnnounce] = useState<string | null>(null);
+  const [flash, setFlash] = useState(false);
+  const narrow = useMedia(NARROW);
+  // the scene (three.js, its own chunk) mounts once the hero has painted and the page is idle
+  const sceneOn = useAfterPaint();
   const run = useRef(0);
   const timer = useRef<number | undefined>(undefined);
+  const after = useRef<number[]>([]);
+
+  useEffect(() => {
+    document.title = PAGE_TITLE;
+  }, []);
 
   const hour = forecast.hours[Math.min(index, forecast.hours.length - 1)];
 
@@ -127,6 +141,10 @@ export function Landing() {
   const play = useCallback(async () => {
     const id = ++run.current;
     clearInterval(timer.current);
+    after.current.forEach(clearTimeout);
+    after.current = [];
+    setAnnounce(null);
+    setFlash(false);
     setPlayed(true);
     setPlaying(true);
     setIndex(0);
@@ -136,25 +154,43 @@ export function Landing() {
     setForecast(f);
     setLoading(false);
     const last = f.hours.length - 1;
+    // the end state, said out loud: under the disc, and to screen readers
+    const finish = (cue: boolean) => {
+      setPlaying(false);
+      setAnnounce(`Played ${f.hours.length} h · held at ${hh(f.hours[last].hour)}`);
+      if (cue) {
+        setFlash(true);
+        after.current.push(window.setTimeout(() => setFlash(false), FLASH_MS));
+      }
+      after.current.push(window.setTimeout(() => setAnnounce(null), ANNOUNCE_MS));
+    };
     if (window.matchMedia(REDUCED_MOTION).matches) {
       setIndex(last);
-      setPlaying(false);
+      finish(true);
       return;
     }
     let i = 0;
     timer.current = window.setInterval(() => {
       i += 1;
+      setIndex(Math.min(i, last));
       if (i >= last) {
         clearInterval(timer.current);
-        setPlaying(false);
+        finish(false);
       }
-      setIndex(Math.min(i, last));
     }, STEP_MS);
   }, []);
-  useEffect(() => () => clearInterval(timer.current), []);
+  useEffect(() => () => {
+    clearInterval(timer.current);
+    after.current.forEach(clearTimeout);
+  }, []);
 
-  const caption = playing ? (loading ? "Fetching forecast" : `Playing ${hh(hour.hour)}`) : "Run sample forecast";
+  const caption = playing ? (loading ? "Fetching forecast" : `Playing ${hh(hour.hour)}`) : (announce ?? "Run sample forecast");
+  const switcher = <HeadlineSwitcher option={headline} onChange={setHeadline} />;
+  const cards = { forecast, hour, index, loading, played, flash };
 
+  // DOM order follows the screen, so the tab order does too: the dock, the
+  // review chips (desktop: under the dock, on the headline's rail), the pill,
+  // the play disc, card 1's knob, then card 2's.
   return (
     <main
       ref={rootRef}
@@ -162,19 +198,19 @@ export function Landing() {
       className={`vl${phase !== "pre" ? " is-ready" : ""}${phase === "done" ? " intro-done" : ""}`}
     >
       {/* the scene fills the hero at z 3, aria-hidden and click-through; its sparks listen on window */}
-      <GridScene className="vl-scene" onReady={onSceneReady} />
+      {sceneOn && <GridScene className="vl-scene" onReady={onSceneReady} />}
 
       <Dock />
 
       <div className="vl-stage">
+        {!narrow && switcher}
         <div className="vl-guides fade" style={cssVars({ "--d": "900ms" })} aria-hidden="true">
           <i /><i /><i />
         </div>
-        <div className="vl-ghost fade" style={cssVars({ "--d": "1150ms" })} aria-hidden="true">VOLTA</div>
+        <div className="vl-ghost" aria-hidden="true">{WORDMARK}</div>
 
         {/* card 1 sits behind the canvas; its knob floats above it */}
-        <PeakCard forecast={forecast} hour={hour} index={index} loading={loading} played={played} />
-        <PeakKnob />
+        <PeakCard {...cards} />
 
         <Headline option={headline} />
         <p className="vl-lede mask par" style={cssVars({ "--d": "480ms", "--pd": 14, "--pr": 1 })}>
@@ -182,15 +218,16 @@ export function Landing() {
         </p>
 
         <LaunchPill />
-        <PlayButton onPlay={() => void play()} playing={playing} caption={caption} />
+        {narrow && switcher}
+        <PlayButton onPlay={() => void play()} playing={playing} announcing={announce != null} caption={caption} />
+        <p className="sr-only" role="status">{announce}</p>
+
+        <PeakKnob />
 
         <SideStats socPct={hour.socPct} overloadHours={forecast.overloadHours} total={forecast.hours.length} />
 
-        <ModeCard forecast={forecast} hour={hour} index={index} loading={loading} played={played} />
+        <ModeCard {...cards} />
       </div>
-
-      {/* on the hero, like the dock, so it sits level with the dock's row */}
-      <HeadlineSwitcher option={headline} onChange={setHeadline} />
     </main>
   );
 }

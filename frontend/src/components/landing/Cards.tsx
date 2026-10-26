@@ -1,12 +1,20 @@
+import { lazy, Suspense, type ComponentType } from "react";
 import { Activity, ToggleRight } from "lucide-react";
 import { STORAGE_MODE, type Forecast, type Hour } from "@/lib/forecast";
-import { FlowChart, PeakChart } from "./CardCharts";
 import { cssVars } from "./cssVars";
 
 /* The two floating paper cards (Sylva's). Card 1 reads label, title, then
  * plate on top; it sits behind the 3D canvas, so its knob lives outside it
- * (KnobFloat) to stay in front of the landscape. Card 2 sits in front and
- * reads label, title, then plate, with its knob on the plate's corner. */
+ * (PeakKnob) to stay in front of the landscape. Card 2 sits in front and
+ * reads label, title, then plate, with its knob on the plate's corner.
+ *
+ * The charts are a lazy chunk: the plates paint at once (dark moss), and the
+ * charts arrive before their draw-in starts. They are aria-hidden; the card
+ * titles, labels and the side stats carry the same data as text. */
+
+const charts = () => import("./CardCharts");
+const PeakChart = lazy(() => charts().then((m) => ({ default: m.PeakChart })));
+const FlowChart = lazy(() => charts().then((m) => ({ default: m.FlowChart })));
 
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
@@ -16,6 +24,7 @@ interface CardProps {
   index: number;
   loading: boolean;
   played: boolean;
+  flash: boolean;
 }
 
 function SnapshotChip({ show }: { show: boolean }) {
@@ -23,7 +32,7 @@ function SnapshotChip({ show }: { show: boolean }) {
   return <span className="vl-chip vl-chip--snapshot">Snapshot · offline</span>;
 }
 
-export function PeakCard({ forecast, index, loading, played }: CardProps) {
+export function PeakCard({ forecast, index, loading, played, flash }: CardProps) {
   const { peak } = forecast;
   return (
     <article
@@ -32,9 +41,11 @@ export function PeakCard({ forecast, index, loading, played }: CardProps) {
       style={cssVars({ "--d": "760ms", "--pd": 10, "--pr": 2.2 })}
       aria-labelledby="vl-peak-title"
     >
-      <figure className="vl-plate">
-        <div className="vl-plate-media">
-          <PeakChart hours={forecast.hours} playhead={played ? index : null} />
+      <figure className="vl-plate" data-flash={flash || undefined}>
+        <div className="vl-plate-media" aria-hidden="true">
+          <Suspense fallback={null}>
+            <PeakChart hours={forecast.hours} playhead={played ? index : null} />
+          </Suspense>
         </div>
         <SnapshotChip show={forecast.source === "snapshot" && !loading} />
         {loading && <span className="vl-shimmer" aria-hidden="true" />}
@@ -47,18 +58,29 @@ export function PeakCard({ forecast, index, loading, played }: CardProps) {
   );
 }
 
+/** A card knob: Sylva's white disc, inside a hit area floored at 44px on phones. */
+function Knob({ href, label, Icon }: { href: string; label: string; Icon: ComponentType<{ strokeWidth?: number; "aria-hidden"?: boolean }> }) {
+  return (
+    <a className="vl-knob" href={href} aria-label={label}>
+      <span className="vl-knob-disc" aria-hidden="true">
+        <Icon aria-hidden strokeWidth={1.4} />
+      </span>
+    </a>
+  );
+}
+
 /** Card 1's knob, outside the card so it paints above the scene. */
 export function PeakKnob() {
   return (
     <span className="vl-knob-float par" style={cssVars({ "--pd": 10, "--pr": 2.2 })}>
-      <a className="vl-knob mask-circle" href="#forecast" style={cssVars({ "--d": "1100ms" })} aria-label="Open the forecast">
-        <Activity aria-hidden strokeWidth={1.4} />
-      </a>
+      <span className="vl-knob-reveal mask-circle" style={cssVars({ "--d": "1100ms" })}>
+        <Knob href="#forecast" label="Open the forecast" Icon={Activity} />
+      </span>
     </span>
   );
 }
 
-export function ModeCard({ forecast, hour, index, loading, played }: CardProps) {
+export function ModeCard({ forecast, hour, index, loading, played, flash }: CardProps) {
   const storage = hour.mode === STORAGE_MODE;
   return (
     <article
@@ -78,17 +100,17 @@ export function ModeCard({ forecast, hour, index, loading, played }: CardProps) 
       <h2 className="vl-card-title" id="vl-mode-title" aria-live="polite">
         {storage ? "Renewable Storage" : "Main Grid"}
       </h2>
-      <figure className="vl-plate">
-        <div className="vl-plate-media">
-          <FlowChart hours={forecast.hours} playhead={played ? index : null} />
+      <figure className="vl-plate" data-flash={flash || undefined}>
+        <div className="vl-plate-media" aria-hidden="true">
+          <Suspense fallback={null}>
+            <FlowChart hours={forecast.hours} playhead={played ? index : null} />
+          </Suspense>
         </div>
         <SnapshotChip show={forecast.source === "snapshot" && !loading} />
         {played && !loading && <span className="vl-chip vl-chip--hour">{hh(hour.hour)}</span>}
         {loading && <span className="vl-shimmer" aria-hidden="true" />}
       </figure>
-      <a className="vl-knob" href="#controller" aria-label="Open the controller">
-        <ToggleRight aria-hidden strokeWidth={1.4} />
-      </a>
+      <Knob href="#controller" label="Open the controller" Icon={ToggleRight} />
     </article>
   );
 }

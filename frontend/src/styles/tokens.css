@@ -118,7 +118,7 @@
   :root { --u: calc(1900px / 1600); }
 }
 
-/* Phones: a single column on a 390-wide scale */
-@media (max-width: 720px) {
-  :root { --u: calc(100vw / 390); }
+/* One column below 900px, on Sylva's 760-unit scale (Sylva floors small targets with max()) */
+@media (max-width: 900px) {
+  :root { --u: calc(100vw / 760); }
 }

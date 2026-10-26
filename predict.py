@@ -8,8 +8,11 @@ when copied alone into an empty folder. All rows go to the proxy in one POST
 ({proxy}/api/predict); the proxy builds the QuickML features and calls the
 published QuickML endpoint. PREDICT_PROXY_URL overrides DEFAULT_PROXY_URL.
 
-predict(input_df) returns one float per input row, in input order. There is no
-fallback curve: if the proxy cannot be reached or answers badly, this raises.
+predict(input_df) returns one float per input row, in input order (the input
+may be unsorted and may carry extra columns in any order). Missing weather
+values are interpolated in time order, then forward/back-filled at the ends.
+There is no fallback curve: if the proxy cannot be reached or answers badly,
+this raises.
 """
 
 import argparse
@@ -44,6 +47,24 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     out = {name: hour.between(lo, hi).astype(int) for name, (lo, hi) in HOUR_BLOCKS.items()}
     out["cool_24"] = (temp - 24).clip(lower=0)
     return pd.DataFrame(out, index=df.index)
+
+
+def fill_missing_weather(df: pd.DataFrame) -> pd.DataFrame:
+    """INPUT_COLUMNS with gaps in the weather columns filled, rows in the original order.
+
+    Values are interpolated against time (so uneven gaps are weighted correctly)
+    after sorting by timestamp, then the leading/trailing gaps are back/forward
+    filled. A column with no values at all stays missing; the proxy fills it.
+    """
+    out = df[INPUT_COLUMNS].copy()
+    ts = pd.to_datetime(out["timestamp"], format="ISO8601")
+    weather = out[INPUT_COLUMNS[1:]].apply(pd.to_numeric, errors="coerce").astype(float)
+    order = np.argsort(ts.to_numpy(), kind="stable")
+    in_time = weather.iloc[order].set_axis(ts.iloc[order])
+    filled = in_time.interpolate(method="time").ffill().bfill()
+    weather.iloc[order] = filled.to_numpy()
+    out[INPUT_COLUMNS[1:]] = weather
+    return out
 
 
 def _rows(df: pd.DataFrame) -> list[dict]:
@@ -105,7 +126,7 @@ def predict(input_df: pd.DataFrame) -> np.ndarray:
         return np.array([], dtype=float)
     build_features(input_df)  # fail fast, locally, on timestamps the proxy would reject
 
-    body = _post(_proxy_url(), _rows(input_df))
+    body = _post(_proxy_url(), _rows(fill_missing_weather(input_df)))
     values = body.get("predictions") if isinstance(body, dict) else None
     if not isinstance(values, list) or len(values) != len(input_df):
         got = f"{len(values)} values" if isinstance(values, list) else "no 'predictions' list"

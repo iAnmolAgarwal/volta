@@ -20,3 +20,6 @@ predictions.csv
 
 # AppSail bundle (scripts/build_appsail.sh)
 dist/
+
+# design-loop screenshots (large; the final review set lives in design/review/)
+design-notes/*/shots/

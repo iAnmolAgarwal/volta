@@ -2,12 +2,14 @@
 
 Steps of `step_hours` (one hour by default). The battery follows the mode the
 controller picked and never changes it. Each step:
-- PV produces pv_kw_per_wm2 x solar irradiance. PV charges the battery first, in
-  either mode, up to charge_kw; the rest of the PV serves the load.
-- Renewable Storage Mode is peak shaving: the battery covers only the import above
-  grid_cap_kw (demand minus PV serving the load), up to max_discharge_kw.
-- Main Grid Mode: the grid also charges the battery at up to grid_charge_kw, within
-  charge_kw together with PV.
+- PV produces pv_kw_per_wm2 x solar irradiance.
+- Renewable Storage Mode is peak shaving. PV serves the load first. If the rest of
+  the load is above grid_cap_kw, the battery covers the excess, up to
+  max_discharge_kw, and takes no PV. Otherwise spare PV charges the battery, up to
+  charge_kw, but never so much that the grid import goes above grid_cap_kw.
+- Main Grid Mode: PV charges the battery first, up to charge_kw, and the grid tops it
+  up at up to grid_charge_kw, within charge_kw together with PV. The rest of the PV
+  serves the load.
 - The state of charge never leaves [min_soc, max_soc]; the battery does less instead.
   The main grid covers whatever the battery and PV do not. Surplus PV is curtailed.
 No conversion losses.
@@ -70,11 +72,15 @@ def simulate(schedule: Iterable[tuple[str, float, float]], params: BatteryParams
     for mode, demand_kw, solar_wm2 in schedule:
         demand = check_demand(demand_kw)
         pv = p.pv_kw_per_wm2 * _solar(solar_wm2)
-        pv_in = min(pv, p.charge_kw)
         if mode == STORAGE_MODE:
-            import_kw = demand - (pv - pv_in)  # what the grid would supply without the battery
-            discharge, grid_in = min(max(0.0, import_kw - p.grid_cap_kw), p.max_discharge_kw), 0.0
+            net = demand - pv  # the load PV leaves for the grid and the battery
+            if net > p.grid_cap_kw:  # shave the peak; charging from PV now would only add grid import
+                pv_in, discharge = 0.0, min(net - p.grid_cap_kw, p.max_discharge_kw)
+            else:  # spare PV charges, but never lifts the import above the cap
+                pv_in, discharge = min(pv, p.charge_kw, p.grid_cap_kw - net), 0.0
+            grid_in = 0.0
         elif mode == GRID_MODE:
+            pv_in = min(pv, p.charge_kw)
             discharge, grid_in = 0.0, min(p.grid_charge_kw, p.charge_kw - pv_in)
         else:
             raise ValueError(f"unknown mode {mode!r}")

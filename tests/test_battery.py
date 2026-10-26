@@ -115,9 +115,48 @@ def test_pv_above_the_charge_limit_serves_the_load():
 
 
 def test_pv_and_peak_shaving_in_the_same_hour():
-    # 200 kW demand, 40 kW PV into the battery, 80 kW shaved: net discharge 40 kW, grid at the cap
+    # 200 kW demand, 40 kW PV to the load, 160 kW left: the battery shaves 40 kW, the grid sits at the cap
     (step,) = simulate([(S, 200.0, 160.0)])
     assert (step.pv_kw, step.battery_kw, step.grid_kw) == pytest.approx((40.0, 40.0, 120.0))
+
+
+def test_storage_pv_serves_the_peak_before_charging():
+    # the sample's 2015-06-16 15:00: charging from PV here used to leave the grid 24 kW over the cap
+    (step,) = simulate([(S, 244.01, 169.0)])
+    assert (step.pv_kw, step.battery_kw, step.grid_kw) == pytest.approx((42.25, 81.76, 120.0))
+
+
+def test_storage_pv_charging_never_lifts_the_grid_above_the_cap():
+    (step,) = simulate([(S, 150.0, 160.0)])  # 40 kW PV, 110 kW left: only 10 kW may go to the battery
+    assert (step.battery_kw, step.grid_kw) == pytest.approx((-10.0, 120.0))
+
+
+def test_storage_at_the_floor_leaves_everything_to_the_grid():
+    (step,) = simulate([(S, 244.0, 169.0)], BatteryParams(start_soc=0.10))
+    assert (step.battery_kw, step.grid_kw) == pytest.approx((0.0, 244.0 - 42.25))
+    assert step.soc_end == pytest.approx(0.10)
+
+
+@pytest.mark.parametrize("params", PARAM_SETS)
+@pytest.mark.parametrize("seed", range(3))
+def test_storage_grid_stays_at_or_under_the_cap_unless_the_battery_is_at_a_limit(params, seed):
+    p = params
+    for (mode, _, _), step in zip(random_schedule(seed), simulate(random_schedule(seed), p)):
+        if mode != S or step.grid_kw <= p.grid_cap_kw + 1e-6:
+            continue
+        at_floor = step.soc_end <= p.min_soc + 1e-9
+        assert at_floor or step.battery_kw >= p.max_discharge_kw - 1e-6
+
+
+def test_energy_balances_every_hour_on_the_sample():
+    test = load_test()
+    demand = 100 + 4 * (test["ambient_temp_c"] - 20).clip(lower=0)
+    modes = [decide(ts, d)["mode"] for ts, d in zip(test["timestamp"], demand)]
+    for step in simulate(zip(modes, demand, test["solar_irradiance_wm2"])):
+        curtailed = step.grid_kw + step.pv_kw + step.battery_kw - step.demand_kw
+        assert curtailed >= -1e-6  # the load is met exactly ...
+        if curtailed > 1e-6:  # ... or PV beyond the load and the charge is curtailed
+            assert step.pv_kw > step.demand_kw + max(0.0, -step.battery_kw) - 1e-6
 
 
 def test_grid_mode_charges_from_pv_first_then_the_grid():

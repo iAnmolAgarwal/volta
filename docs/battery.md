@@ -4,15 +4,12 @@
 
 ## Each hour
 
-1. **PV.** `pv_kw = pv_kw_per_wm2 × solar_irradiance_wm2`.
-   - PV charges the battery first, in either mode, up to `charge_kw`.
-   - PV the battery can't take serves the load.
-   - PV beyond the load is curtailed; nothing is exported.
-2. **Renewable Storage Mode: peak shaving.**
-   - The import is the demand minus the PV serving the load.
-   - The battery discharges `min(import − grid_cap_kw, max_discharge_kw)`, and only when the import is above `grid_cap_kw`.
-   - The grid supplies the rest.
-3. **Main Grid Mode.** The battery never discharges. The grid adds up to `grid_charge_kw` of charging, within `charge_kw` together with PV.
+1. **PV.** `pv_kw = pv_kw_per_wm2 × solar_irradiance_wm2`. PV beyond the load and what the battery takes is curtailed; nothing is exported.
+2. **Renewable Storage Mode: peak shaving.** PV serves the load first, leaving `net = demand − pv`.
+   - If `net` is above `grid_cap_kw`, the battery discharges `min(net − grid_cap_kw, max_discharge_kw)`. It takes no PV that hour, because charging during a peak would only add grid import.
+   - Otherwise, spare PV charges the battery, up to `charge_kw`, but never so much that the grid import goes above `grid_cap_kw`.
+   - The grid supplies the rest. It exceeds the cap only when the battery is at its discharge limit or at the floor.
+3. **Main Grid Mode.** The battery never discharges. PV charges it first, up to `charge_kw`, and the rest of the PV serves the load. The grid adds up to `grid_charge_kw` of charging, within `charge_kw` together with PV.
 4. **Limits.** The state of charge stays in `[min_soc, max_soc]`. Near a limit the battery does less:
    - near the floor it discharges less;
    - near full it charges less, cutting grid charging before PV.
@@ -55,12 +52,15 @@ Method:
   - every 24-hour window both charging and discharging, with a state-of-charge swing ≥ 20 points.
 - **Choice:** a passing combination with margin on both limits and realistic C-rates.
 
-| Model, on the sample | At floor (10%) | Full (100%) | Smallest 24-hour swing |
-|---|---|---|---|
-| Before: 500 kWh, discharge 150 kW to cover all demand, grid charge 100 kW, no PV | 58.8% of hours | 16.0% | n/a |
-| **Now: live QuickML predictions** | **5.1%** | **6.9%** | **69.5 points** |
-| Now: reference-formula predictions (what the test uses) | 4.9% | 7.2% | 69.5 points |
-| Now: formula predictions × 0.9 (modes re-decided) | 1.1% | 23.8% | 68.2 points |
-| Now: formula predictions × 1.1 (modes re-decided) | 11.0% | 0.8% | 60.2 points |
+| Model, on the sample | At floor (10%) | Full (100%) | Smallest 24-hour swing | Storage hours with the grid over the cap |
+|---|---|---|---|---|
+| First model: 500 kWh, discharge 150 kW to cover all demand, grid charge 100 kW, no PV | 58.8% of hours | 16.0% | n/a | n/a |
+| PV charging first in storage mode (until 2026-10-27), live QuickML | 5.1% | 6.9% | 69.5 points | 418 of 672 |
+| **Now (PV serves the peak first), live QuickML predictions** | **8.8%** | **4.0%** | **69.5 points** | **219 of 672**, every one at the 100 kW discharge limit or the floor |
+| Now: reference-formula predictions (what the test uses) | 8.6% | 4.0% | 69.5 points | 218 |
+| Now: formula predictions × 0.9 (modes re-decided) | 1.6% | 23.2% | 68.6 points | 152 |
+| Now: formula predictions × 1.1 (modes re-decided) | 20.7% | 0.3% | 60.2 points | 279 |
 
-The targets still hold with demand 10% higher or lower. `tests/test_battery.py::test_sample_soc_is_lively_with_the_default_params` checks them on every run, against the reference formula, which agrees with the live endpoint to 0.12 kW RMS.
+**The change of 2026-10-27.** Storage mode used to send PV into the battery before peak shaving. On the sample's 15:00, demand was 244 kW and PV 42 kW, so the battery discharged 100 kW gross while it took the PV, and the grid ended up at 144 kW, 24 kW over the cap, with discharge headroom left. PV now serves the load first: the battery gives 81.8 kW and the grid sits at the cap, 120 kW. Storage hours over the cap fell from 418 to 219. The battery works harder, so it reaches the floor a little more often.
+
+The targets hold at the sample's demand and at 10% lower. At 10% higher demand, the battery is at the floor 20.7% of the time, above the 15% target, so the parameters would need a larger battery for a site that much hotter. `tests/test_battery.py::test_sample_soc_is_lively_with_the_default_params` checks them on every run, against the reference formula, which agrees with the live endpoint to 0.12 kW RMS.

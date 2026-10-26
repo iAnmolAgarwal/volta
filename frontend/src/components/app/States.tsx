@@ -48,7 +48,9 @@ export function EmptyState({ title, children, action, icon: Icon = Inbox, surfac
 /** An error, with the API's message and details when it is an ApiError. */
 export function ErrorState({ error, title, action, surface = "card", className }: { error: unknown; title?: ReactNode; action?: ReactNode; surface?: "card" | "plain"; className?: string }) {
   const api = error instanceof ApiError ? error : null;
-  const message = api ? api.message : error instanceof Error ? error.message : String(error);
+  // the browser's raw "Failed to fetch" says nothing; a bare "HTTP 503" repeats the code shown after it
+  const raw = api ? api.message : error instanceof Error ? error.message : String(error);
+  const message = api?.kind === "network" ? "Check the connection, then try again." : api && raw === `HTTP ${api.status}` ? "The server answered with an error." : raw;
   const details = api?.details ?? [];
   const shown = details.slice(0, 5);
   return (

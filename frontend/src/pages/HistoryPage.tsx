@@ -14,6 +14,8 @@ import { countBySource, createdShort, FILTER_LABEL, hoursText, isFilter, listSta
 import { RunCard } from "./history/RunCard";
 import "@/styles/pages/history.css";
 
+const RUNS_LISTED = 20; // GET /api/runs returns at most the 20 newest
+
 /* /history: the saved runs (GET /api/runs, the latest 20, newest first) as
  * Sylva's Field Notes, under the dashboard's hero: the headline on the 46 rail
  * with the viewer's last run under it, the lede at x 520 with the source
@@ -87,7 +89,7 @@ export default function HistoryPage() {
           eyebrow={
             <>
               History ·{" "}
-              {load.state === "loading" ? "Reading the run index" : load.state === "error" ? "Unavailable" : runs.length === 0 ? "Nothing saved yet" : <span className="va-num">{runs.length} of the latest 20</span>}
+              {load.state === "loading" ? "Reading the run index" : load.state === "error" ? "Unavailable" : runs.length === 0 ? "Nothing saved yet" : <span className="va-num">{runs.length >= RUNS_LISTED ? `the latest ${RUNS_LISTED}` : `${runs.length} saved`}</span>}
             </>
           }
           title="Saved runs"
@@ -106,7 +108,7 @@ export default function HistoryPage() {
           </div>
         )}
         {ready && <FilterDock value={filter} counts={counts} onChange={setFilter} />}
-        {ready && <HistoryStats stats={stats} filtered={filter !== "all"} />}
+        {ready && shown.length > 0 && <HistoryStats stats={stats} filtered={filter !== "all"} />}
         {load.state === "loading" && (
           <>
             <div className="vh-resume"><Shimmer variant="text" lines={1} label="Loading your last run" className="vh-skel-resume" /></div>
@@ -152,7 +154,7 @@ export default function HistoryPage() {
           icon={Layers}
           surface="plain"
           className="vh-empty"
-          title={`No ${FILTER_LABEL[filter].toLowerCase()} runs here`}
+          title={`No ${filter === "csv" ? "CSV" : FILTER_LABEL[filter].toLowerCase()} runs here`}
           action={
             <>
               <Pill icon={Layers} onClick={() => setFilter("all")}>Show all {runs.length}</Pill>
@@ -160,7 +162,7 @@ export default function HistoryPage() {
             </>
           }
         >
-          None of the latest {runs.length} saved runs came from {filter === "csv" ? "a CSV upload" : filter === "manual" ? "the form" : "the sample"}.
+          None of the {runs.length >= RUNS_LISTED ? `latest ${RUNS_LISTED}` : runs.length} saved runs came from {filter === "csv" ? "a CSV upload" : filter === "manual" ? "the form" : "the sample"}.
         </EmptyState>
       )}
 

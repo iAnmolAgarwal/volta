@@ -43,3 +43,29 @@ def decide(ts, demand_kw) -> dict:
     evening = EVENING_FIRST_HOUR <= hour_of(ts) <= EVENING_LAST_HOUR
     mode = STORAGE_MODE if demand > STORAGE_ABOVE_KW or evening else GRID_MODE
     return {"mode": mode, "overload": demand >= OVERLOAD_AT_KW}
+
+
+def _kw(demand: float) -> str:
+    """Demand for a sentence: one decimal, or two when one would print a threshold (160.04 -> 160.04)."""
+    text = f"{demand:.1f}"
+    return f"{demand:.2f}" if float(text) in (STORAGE_ABOVE_KW, OVERLOAD_AT_KW) else text
+
+
+def explain(ts, demand_kw) -> str:
+    """Plain-English reason for decide(ts, demand_kw), built from the same thresholds."""
+    demand, hour = check_demand(demand_kw), hour_of(ts)
+    window = f"{EVENING_FIRST_HOUR}–{EVENING_LAST_HOUR}"
+    high = demand > STORAGE_ABOVE_KW
+    evening = EVENING_FIRST_HOUR <= hour <= EVENING_LAST_HOUR
+    kw = f"{_kw(demand)} kW"
+    if high and evening:
+        why = f"{kw} > {STORAGE_ABOVE_KW:g} and hour {hour} is in the {window} window"
+    elif high:
+        why = f"{kw} > {STORAGE_ABOVE_KW:g}"
+    elif evening:
+        why = f"hour {hour} is in the {window} window"
+    else:
+        why = f"{kw} ≤ {STORAGE_ABOVE_KW:g} and hour {hour} is outside {window}"
+    if demand >= OVERLOAD_AT_KW:
+        why += f"; {kw} ≥ {OVERLOAD_AT_KW:g} raises a critical overload alert"
+    return why

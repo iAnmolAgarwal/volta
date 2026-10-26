@@ -5,6 +5,7 @@ import { LogItem } from "@/components/app/LogItem";
 import { Pill } from "@/components/app/Pill";
 import { Shimmer } from "@/components/app/States";
 import { dayMonth, hhmm, type Run } from "@/lib/api";
+import { STEP_SERVER } from "./steps";
 import { dashboardHref, storageOf } from "./unsaved";
 
 /* What comes back from a post: the cleaning report on the moss glass, and the
@@ -59,23 +60,31 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString
 
 /* ── busy ────────────────────────────────────────────────────────────────── */
 
-/* The API reports no progress, so the steps advance on the usual timings of a
- * day's post (QuickML is about 3 s of it); the last one holds until the answer. */
-const STEPS = [
-  { label: "Cleaning", from: 0 },
-  { label: "QuickML, every hour", from: 0.6 },
-  { label: "Controller and battery", from: 2.6 },
-  { label: "Saving the run", from: 3.3 },
-];
+/* The steps follow the request itself, never a timer: a step is ticked only
+ * once the browser has seen it finish (the rows checked, the file read, the
+ * sample fetched). The server cleans, forecasts, runs the controller and saves
+ * inside one request and reports no progress, so that step stays open, in
+ * progress, until the answer arrives; the report replacing this card is the
+ * last tick. */
 
-export function BusyCard({ title, startedAt, onCancel }: { title: string; startedAt: number; onCancel?: () => void }) {
+export interface BusyCardProps {
+  title: string;
+  startedAt: number;
+  /** The route this post takes, in order. */
+  steps: string[];
+  /** The step in progress; every step before it has really finished. */
+  at: number;
+  onCancel?: () => void;
+}
+
+export function BusyCard({ title, startedAt, steps, at, onCancel }: BusyCardProps) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 100);
     return () => window.clearInterval(t);
   }, []);
   const s = Math.max(0, (now - startedAt) / 1000);
-  const at = STEPS.reduce((k, step, i) => (s >= step.from ? i : k), 0);
+  const onServer = steps[at] === STEP_SERVER;
   return (
     <GlassCard
       label={<>Working · <span className="va-num">{s.toFixed(1)} s</span></>}
@@ -86,15 +95,20 @@ export function BusyCard({ title, startedAt, onCancel }: { title: string; starte
     >
       <div className="vi-busy-body">
         <ol className="vi-steps" aria-label="Steps">
-          {STEPS.map((step, i) => (
-            <li key={step.label} className={i < at ? "is-done" : i === at ? "is-now" : undefined} aria-current={i === at ? "step" : undefined}>
+          {steps.map((step, i) => (
+            <li key={step} className={i < at ? "is-done" : i === at ? "is-now" : undefined} aria-current={i === at ? "step" : undefined}>
               <span className="vi-step-dot" aria-hidden="true">{i < at && <CircleCheck strokeWidth={1.5} aria-hidden />}</span>
-              {step.label}
+              {step}
+              {i < at ? <span className="vi-sr"> (done)</span> : i === at ? <span className="vi-sr"> (in progress)</span> : null}
             </li>
           ))}
         </ol>
-        <Shimmer variant="text" lines={3} label={`Forecasting: ${STEPS[at].label}`} className="vi-busy-lines" />
-        <p className="vi-note">A day takes about three seconds; the 1,000-hour sample a little longer.</p>
+        <Shimmer variant="text" lines={3} label={`Forecasting: ${steps[at]}`} className="vi-busy-lines" />
+        <p className="vi-note">
+          {onServer
+            ? "One request does the cleaning, the QuickML forecast, the controller and the save. It sends no progress, so this step stays open until the answer arrives."
+            : "Nothing has reached the forecast service yet."}
+        </p>
       </div>
     </GlassCard>
   );

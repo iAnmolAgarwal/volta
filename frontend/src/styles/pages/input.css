@@ -39,8 +39,15 @@
   gap: var(--a-gap);
   align-items: start;
 }
+/* a sample or CSV result takes the top of the left column, level with the cards that made it */
+.vi-grid:has(> .vi-result--quick:not(:empty)) {
+  grid-template-rows: auto auto 1fr auto;
+  grid-template-areas: "quick side" "day side" "rows side" "result result";
+}
 .vi-day { grid-area: day; }
-.vi-result { grid-area: result; min-width: 0; }
+.vi-result { min-width: 0; }
+.vi-result--manual { grid-area: result; }
+.vi-result--quick { grid-area: quick; }
 .vi-rows-slot { grid-area: rows; min-width: 0; scroll-margin-top: calc(120 * var(--u)); }
 .vi-side-rail { grid-area: side; align-self: stretch; min-width: 0; }
 .vi-side {
@@ -50,6 +57,10 @@
   flex-direction: column;
   gap: var(--a-gap);
   min-width: 0;
+}
+/* the DOM leads with the sample (a phone's order); a desktop keeps the drop zone on top */
+@media (min-width: 901px) {
+  .vi-side > .vi-sample { order: 1; }
 }
 
 /* ── "Describe the 24 hours": a spec sheet of lines ──────────────────────── */
@@ -279,7 +290,8 @@
 
 /* ── one column below 900px, on Sylva's 760-unit scale ───────────────────── */
 @media (max-width: 900px) {
-  .vi-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "day" "rows" "result" "side"; }
+  /* a phone: the sample, then the CSV (each with its own result under it), then the manual form, rows and result */
+  .vi-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "side" "day" "rows" "result"; }
   .vi-side { position: static; }
   .vi-side-rail { align-self: start; }
   .vi-rows-slot,
@@ -401,6 +413,9 @@
 .vi-last-cap { margin: var(--a-gap) 0 calc(12 * var(--u)) var(--a-pad); }
 .vi-result-grid > .vi-busy,
 .vi-result-grid > .vi-error { grid-column: 1; grid-row: 1; }
+/* beside the quick cards the busy and error cards take the column's full width */
+.vi-result--quick .vi-result-grid > .vi-busy,
+.vi-result--quick .vi-result-grid > .vi-error { grid-column: 1 / -1; }
 
 /* busy: the steps advance; the current one wears the volt dot */
 .vi-steps { display: flex; flex-wrap: wrap; gap: calc(8 * var(--u)) calc(22 * var(--u)); margin: 0; padding: 0; list-style: none; font-size: var(--a-small); color: var(--ink-faint); }

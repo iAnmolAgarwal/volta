@@ -1,34 +1,92 @@
-"""HackSphere 3.0 predictions: telemetry rows -> features -> QuickML endpoint -> kW.
+"""HackSphere 3.0 predictions: telemetry rows -> our Catalyst proxy -> QuickML -> kW.
 
     python predict.py                                  # preview on sample_test_input.csv
     python predict.py --input X.csv --output Y.csv     # writes timestamp,target_demand_kw
 
+Self-contained on purpose: needs only pandas, numpy and requests, so it runs
+when copied alone into an empty folder. All rows go to the proxy in one POST
+({proxy}/api/predict); the proxy builds the QuickML features and calls the
+published QuickML endpoint. PREDICT_PROXY_URL overrides DEFAULT_PROXY_URL.
+
 predict(input_df) returns one float per input row, in input order. There is no
-fallback curve: a missing configuration or a failed endpoint call raises.
-Endpoint settings come from environment variables; see .env.example.
+fallback curve: if the proxy cannot be reached or answers badly, this raises.
 """
 
 import argparse
+import math
+import os
 import sys
+import time
 
 import numpy as np
 import pandas as pd
+import requests
 
-from model.data import INPUT_COLUMNS
-from model.features import QUICKML_FEATURES, build_features
-from model.quickml_client import ConfigError, PredictionError, QuickMLClient
+DEFAULT_PROXY_URL = ""  # the AppSail service URL; not a secret
+TIMEOUT_S = 120
+ATTEMPTS = 3  # connection errors and 5xx (for example a cold start) are retried
+INPUT_COLUMNS = ["timestamp", "ambient_temp_c", "humidity_pct", "solar_irradiance_wm2"]
 
-_client = None  # built from the environment on first use, then reused
-
-
-def get_client() -> QuickMLClient:
-    global _client
-    if _client is None:
-        _client = QuickMLClient.from_env()
-    return _client
+# Inline copy of the QuickML columns built by model/features.py (a test keeps them
+# identical): hour-block flags with night (0-5) as the reference, plus the cooling hinge.
+HOUR_BLOCKS = {"blk_dawn": (6, 6), "blk_morning": (7, 9), "blk_day": (10, 17), "blk_evening": (18, 22), "blk_late": (23, 23)}
+FILL_TEMP_C = 18.55  # model/features.py FILL_VALUES["ambient_temp_c"]
 
 
-def predict(input_df: pd.DataFrame, client: QuickMLClient | None = None) -> np.ndarray:
+class PredictionError(RuntimeError):
+    """The proxy could not be reached, or answered with something unusable."""
+
+
+def build_features(df: pd.DataFrame) -> pd.DataFrame:
+    """The QuickML feature columns for each row (row-local, same as model/features.py)."""
+    hour = pd.to_datetime(df["timestamp"], format="ISO8601").dt.hour
+    temp = pd.to_numeric(df["ambient_temp_c"], errors="coerce").fillna(FILL_TEMP_C).astype(float)
+    out = {name: hour.between(lo, hi).astype(int) for name, (lo, hi) in HOUR_BLOCKS.items()}
+    out["cool_24"] = (temp - 24).clip(lower=0)
+    return pd.DataFrame(out, index=df.index)
+
+
+def _rows(df: pd.DataFrame) -> list[dict]:
+    """JSON-safe raw rows: original timestamp strings, numbers, and null for missing values."""
+    rows = []
+    for rec in df[INPUT_COLUMNS].to_dict(orient="records"):
+        row = {"timestamp": str(rec["timestamp"])}
+        for col in INPUT_COLUMNS[1:]:
+            v = pd.to_numeric(rec[col], errors="coerce")
+            row[col] = None if pd.isna(v) else float(v)
+        rows.append(row)
+    return rows
+
+
+def _proxy_url() -> str:
+    url = (os.environ.get("PREDICT_PROXY_URL") or DEFAULT_PROXY_URL).strip().rstrip("/")
+    if not url:
+        raise PredictionError("no proxy configured: set DEFAULT_PROXY_URL in predict.py or PREDICT_PROXY_URL")
+    return url + "/api/predict"
+
+
+def _post(url: str, rows: list[dict]) -> dict:
+    problem = ""
+    for attempt in range(ATTEMPTS):
+        try:
+            resp = requests.post(url, json={"rows": rows}, timeout=TIMEOUT_S)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            problem = f"{type(e).__name__}: {str(e)[:300]}"
+        else:
+            if resp.status_code < 300:
+                try:
+                    return resp.json()
+                except ValueError:
+                    raise PredictionError(f"proxy answered with non-JSON: {resp.text[:300]!r}") from None
+            problem = f"HTTP {resp.status_code}: {resp.text[:300]!r}"
+            if resp.status_code < 500:
+                break  # the request itself is wrong; retrying will not help
+        if attempt < ATTEMPTS - 1:
+            time.sleep(2**attempt)
+    raise PredictionError(f"POST {url} failed: {problem}")
+
+
+def predict(input_df: pd.DataFrame) -> np.ndarray:
     """Parameters:
 
         input_df (pandas.DataFrame): DataFrame with columns
@@ -37,21 +95,32 @@ def predict(input_df: pd.DataFrame, client: QuickMLClient | None = None) -> np.n
     Returns:
         numpy.ndarray: Predicted demand (kW) for each input row, in input order.
 
-    Raises ConfigError if no endpoint is configured and PredictionError if the
-    endpoint call fails. It never substitutes made-up values.
+    Raises PredictionError if the proxy is unset, unreachable or answers badly,
+    and ValueError for unusable input. It never substitutes made-up values.
     """
     missing = [c for c in INPUT_COLUMNS if c not in input_df.columns]
     if missing:
         raise ValueError(f"input is missing columns: {', '.join(missing)}")
-    features = build_features(input_df)[QUICKML_FEATURES]
-    preds = (client or get_client()).predict(features)
-    if len(preds) != len(input_df):
-        raise PredictionError(f"got {len(preds)} predictions for {len(input_df)} rows")
+    if len(input_df) == 0:
+        return np.array([], dtype=float)
+    build_features(input_df)  # fail fast, locally, on timestamps the proxy would reject
+
+    body = _post(_proxy_url(), _rows(input_df))
+    values = body.get("predictions") if isinstance(body, dict) else None
+    if not isinstance(values, list) or len(values) != len(input_df):
+        got = f"{len(values)} values" if isinstance(values, list) else "no 'predictions' list"
+        raise PredictionError(f"expected {len(input_df)} predictions, got {got}")
+    try:
+        preds = np.array([float(v) for v in values], dtype=float)
+    except (TypeError, ValueError):
+        raise PredictionError("non-numeric prediction in the proxy response") from None
+    if not all(math.isfinite(p) for p in preds):
+        raise PredictionError("NaN or infinite prediction in the proxy response")
     return preds
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Predict hourly demand (kW) with the QuickML endpoint.")
+    parser = argparse.ArgumentParser(description="Predict hourly demand (kW) with our QuickML endpoint.")
     parser.add_argument("--input", default="sample_test_input.csv", help="telemetry CSV (default: %(default)s)")
     parser.add_argument("--output", help="write timestamp,target_demand_kw here; omit to print a preview")
     args = parser.parse_args(argv)
@@ -60,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     df = pd.read_csv(args.input)
     try:
         preds = predict(df)
-    except (ConfigError, PredictionError, ValueError) as e:
+    except (PredictionError, ValueError) as e:
         print(f"predict.py: error: {e}", file=sys.stderr)
         return 1
 

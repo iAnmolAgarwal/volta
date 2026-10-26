@@ -9,13 +9,14 @@ ENDPOINT_VARS = [
     "QUICKML_ENDPOINT_URL",
     "QUICKML_ENDPOINT_KEY",
     "QUICKML_ENVIRONMENT",
-    "CATALYST_ORG",
+    "ZOHO_ORG_ID",
     "ZOHO_CLIENT_ID",
     "ZOHO_CLIENT_SECRET",
     "ZOHO_REFRESH_TOKEN",
     "QUICKML_BATCH_SIZE",
     "QUICKML_TIMEOUT",
     "QUICKML_RETRIES",
+    "QUICKML_CONCURRENCY",
 ]
 
 
@@ -53,6 +54,11 @@ class FakeSession:
         return answer
 
 
-def proxy_answer(call) -> FakeResponse:
-    """A healthy proxy: one prediction per row from fake_model."""
-    return FakeResponse(200, {"predictions": [fake_model(r) for r in call["json"]["data"]]})
+def fake_predictions(rows: list[dict]) -> list[float]:
+    """What a healthy proxy answers for raw telemetry rows: fake_model on the real features."""
+    import pandas as pd
+
+    from model.features import QUICKML_FEATURES, build_features
+
+    feats = build_features(pd.DataFrame(rows))[QUICKML_FEATURES].to_dict(orient="records")
+    return [fake_model(r) for r in feats]

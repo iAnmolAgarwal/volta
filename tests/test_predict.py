@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -9,94 +10,159 @@ import pandas as pd
 import pytest
 
 import predict
-from fakes import ENDPOINT_VARS, FakeResponse, FakeSession, fake_model, proxy_answer
-from model.data import ROOT, load_test
-from model.features import QUICKML_FEATURES, build_features
-from model.quickml_client import ConfigError, PredictionError, QuickMLClient
+from fakes import ENDPOINT_VARS, FakeResponse, fake_predictions
+from model.data import ROOT, TARGET, load_test, load_train
+from model.features import QUICKML_FEATURES
+from model.features import build_features as model_build_features
 
 SAMPLE = ROOT / "sample_test_input.csv"
 
 
+@pytest.fixture
+def no_sleep(monkeypatch):
+    monkeypatch.setattr(predict.time, "sleep", lambda s: None)
+
+
+@pytest.fixture
+def use_proxy(proxy_server, no_endpoint_env, monkeypatch):
+    monkeypatch.setenv("PREDICT_PROXY_URL", proxy_server.url)
+    return proxy_server
+
+
 def expected(df: pd.DataFrame) -> np.ndarray:
-    rows = build_features(df)[QUICKML_FEATURES].to_dict(orient="records")
-    return np.array([fake_model(r) for r in rows])
-
-
-def mock_client(handler=proxy_answer, batch_size: int = 7, retries: int = 0) -> QuickMLClient:
-    env = {"PREDICT_PROXY_URL": "https://proxy.example/predict",
-           "QUICKML_BATCH_SIZE": str(batch_size), "QUICKML_RETRIES": str(retries)}
-    return QuickMLClient.from_env(env, session=FakeSession(handler), sleep=lambda s: None)
+    return np.array(fake_predictions(df.to_dict(orient="records")))
 
 
 def clean_env(**extra) -> dict:
-    env = {k: v for k, v in os.environ.items() if k not in ENDPOINT_VARS}
+    env = {k: v for k, v in os.environ.items() if k not in ENDPOINT_VARS and k != "PYTHONPATH"}
     return {**env, **extra}
 
 
-def run_cli(*args, env) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, "predict.py", *args], cwd=ROOT, env=env, capture_output=True, text=True)
+def run(args, cwd, env) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, *args], cwd=cwd, env=env, capture_output=True, text=True)
 
 
-# --- predict() ---------------------------------------------------------------
+# --- the inline feature builder ------------------------------------------------
 
 
-def test_returns_one_float_per_row_in_order():
+@pytest.mark.parametrize("load", [load_train, load_test], ids=["train", "test"])
+def test_inline_features_equal_the_feature_module(load):
+    raw = load().drop(columns=TARGET, errors="ignore")
+    raw["timestamp"] = raw["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")  # as read from CSV
+    pd.testing.assert_frame_equal(predict.build_features(raw), model_build_features(raw)[QUICKML_FEATURES])
+
+
+def test_inline_features_handle_missing_temperature_like_the_module():
+    raw = pd.DataFrame({"timestamp": ["2015-07-01 18:00:00"], "ambient_temp_c": [None],
+                        "humidity_pct": [50.0], "solar_irradiance_wm2": [0.0]})
+    pd.testing.assert_frame_equal(predict.build_features(raw), model_build_features(raw)[QUICKML_FEATURES])
+
+
+# --- predict() -------------------------------------------------------------------
+
+
+def test_one_post_with_all_rows_in_order(use_proxy):
     df = pd.read_csv(SAMPLE)
-    preds = predict.predict(df, client=mock_client())
+    preds = predict.predict(df)
     assert isinstance(preds, np.ndarray) and preds.dtype == float and len(preds) == len(df)
     np.testing.assert_allclose(preds, expected(df))
+    assert use_proxy.batches == [1000]
 
 
-def test_shuffled_input_keeps_its_own_order():
+def test_shuffled_input_keeps_its_own_order(use_proxy):
     df = pd.read_csv(SAMPLE).sample(frac=1, random_state=1)
-    np.testing.assert_allclose(predict.predict(df, client=mock_client()), expected(df))
+    np.testing.assert_allclose(predict.predict(df), expected(df))
 
 
-def test_endpoint_failure_raises_instead_of_a_fallback():
-    with pytest.raises(PredictionError, match="HTTP 503"):
-        predict.predict(load_test(), client=mock_client(lambda call: FakeResponse(503, text="down")))
+def test_missing_weather_goes_out_as_null(monkeypatch, no_endpoint_env):
+    sent = {}
+
+    def fake_post(url, json, timeout):
+        sent.update(url=url, json=json, timeout=timeout)
+        return FakeResponse(200, {"predictions": [100.0]})
+
+    monkeypatch.setenv("PREDICT_PROXY_URL", "https://proxy.example/")
+    monkeypatch.setattr(predict.requests, "post", fake_post)
+    df = pd.DataFrame({"timestamp": ["2015-07-01 18:00:00"], "ambient_temp_c": [np.nan],
+                       "humidity_pct": ["n/a"], "solar_irradiance_wm2": [12]})
+    assert predict.predict(df).tolist() == [100.0]
+    assert sent["url"] == "https://proxy.example/api/predict" and sent["timeout"] == 120
+    assert sent["json"] == {"rows": [{"timestamp": "2015-07-01 18:00:00", "ambient_temp_c": None,
+                                      "humidity_pct": None, "solar_irradiance_wm2": 12.0}]}
 
 
-def test_short_response_raises():
-    def drop_last(call):
-        answer = proxy_answer(call)
-        answer._body["predictions"].pop()
-        return answer
-
-    with pytest.raises(PredictionError, match="expected 7 predictions, got 6"):
-        predict.predict(load_test(), client=mock_client(drop_last))
+def test_server_errors_are_retried_then_raise(use_proxy, no_sleep):
+    use_proxy.status = 502
+    with pytest.raises(predict.PredictionError, match="HTTP 502"):
+        predict.predict(load_test())
+    assert len(use_proxy.batches) == predict.ATTEMPTS
 
 
-def test_no_configuration_raises(no_endpoint_env, monkeypatch):
-    monkeypatch.setattr(predict, "_client", None)
-    with pytest.raises(ConfigError, match="no prediction endpoint configured"):
+def test_client_errors_are_not_retried(use_proxy, no_sleep):
+    use_proxy.status = 400
+    with pytest.raises(predict.PredictionError, match="HTTP 400"):
+        predict.predict(load_test())
+    assert len(use_proxy.batches) == 1
+
+
+@pytest.mark.parametrize(
+    "body, message",
+    [({"predictions": [1.0]}, "expected 3 predictions, got 1 values"), ({"error": "x"}, "no 'predictions' list"),
+     ({"predictions": [1, "a", 2]}, "non-numeric"), ({"predictions": [1, None, 2]}, "non-numeric"),
+     ({"predictions": [1, float("inf"), 2]}, "NaN or infinite")],
+)
+def test_unusable_responses_raise(monkeypatch, no_endpoint_env, body, message):
+    monkeypatch.setenv("PREDICT_PROXY_URL", "https://proxy.example")
+    monkeypatch.setattr(predict.requests, "post", lambda url, json, timeout: FakeResponse(200, body))
+    with pytest.raises(predict.PredictionError, match=message):
+        predict.predict(load_test().head(3))
+
+
+def test_no_proxy_configured_raises(no_endpoint_env, monkeypatch):
+    monkeypatch.setattr(predict, "DEFAULT_PROXY_URL", "")
+    with pytest.raises(predict.PredictionError, match="no proxy configured"):
         predict.predict(load_test())
 
 
-def test_missing_input_column_raises():
+def test_bad_input_fails_before_any_request(no_endpoint_env, monkeypatch):
+    monkeypatch.setattr(predict.requests, "post", lambda *a, **k: pytest.fail("should not POST"))
     with pytest.raises(ValueError, match="missing columns: humidity_pct"):
-        predict.predict(load_test().drop(columns="humidity_pct"), client=mock_client())
+        predict.predict(load_test().drop(columns="humidity_pct"))
+    with pytest.raises(ValueError):
+        predict.predict(load_test().head(2).assign(timestamp=["2015-07-01 00:00:00", "garbage"]))
 
 
-def test_self_test_passes_against_a_mock_endpoint(proxy_server, no_endpoint_env, monkeypatch, capsys):
+def test_self_test_passes_against_the_fake_proxy(use_proxy, monkeypatch, capsys):
     import test_eval
 
-    monkeypatch.setenv("PREDICT_PROXY_URL", proxy_server.url)
-    monkeypatch.setenv("QUICKML_BATCH_SIZE", "250")
-    monkeypatch.setattr(predict, "_client", None)
     monkeypatch.chdir(ROOT)
     test_eval.test_student_submission()
     assert capsys.readouterr().out.rstrip().endswith("SUCCESS")
-    assert proxy_server.batches == [250, 250, 250, 250]
 
 
-# --- CLI ---------------------------------------------------------------------
+# --- CLI and the copy-alone run -----------------------------------------------------
+
+
+def test_copied_alone_it_passes_the_self_test(proxy_server, tmp_path):
+    for name in ["predict.py", "test_eval.py", "sample_test_input.csv"]:
+        shutil.copy(ROOT / name, tmp_path / name)
+    env = clean_env(PREDICT_PROXY_URL=proxy_server.url)
+
+    assert run(["-c", "import model"], tmp_path, env).returncode != 0  # the repo is out of reach
+
+    result = run(["test_eval.py"], tmp_path, env)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.rstrip().endswith("SUCCESS")
+
+    result = run(["predict.py", "--input", "sample_test_input.csv", "--output", "p.csv"], tmp_path, env)
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "p.csv").read_text().startswith("timestamp,target_demand_kw\n")
 
 
 def test_cli_writes_the_contract_format(proxy_server, tmp_path):
     out = tmp_path / "p.csv"
-    env = clean_env(PREDICT_PROXY_URL=proxy_server.url, QUICKML_BATCH_SIZE="100")
-    result = run_cli("--input", str(SAMPLE), "--output", str(out), env=env)
+    result = run(["predict.py", "--input", str(SAMPLE), "--output", str(out)], ROOT,
+                 clean_env(PREDICT_PROXY_URL=proxy_server.url))
     assert result.returncode == 0, result.stderr
 
     lines = out.read_text().splitlines()
@@ -107,33 +173,29 @@ def test_cli_writes_the_contract_format(proxy_server, tmp_path):
     assert list(stamps) == raw["timestamp"].tolist()  # original strings, original order
     assert all(re.fullmatch(r"\d+\.\d{2}", v) for v in values)
     np.testing.assert_allclose([float(v) for v in values], expected(pd.read_csv(SAMPLE)), atol=0.005)
-    assert proxy_server.batches == [100] * 10
 
 
-def test_cli_fails_loudly_when_the_endpoint_is_down(tmp_path):
+def test_cli_fails_loudly_when_the_proxy_is_down(tmp_path):
     with socket.socket() as s:  # a port with nothing listening
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
     out = tmp_path / "p.csv"
-    env = clean_env(PREDICT_PROXY_URL=f"http://127.0.0.1:{port}/predict", QUICKML_RETRIES="0")
-    result = run_cli("--input", str(SAMPLE), "--output", str(out), env=env)
+    result = run(["predict.py", "--input", str(SAMPLE), "--output", str(out)], ROOT,
+                 clean_env(PREDICT_PROXY_URL=f"http://127.0.0.1:{port}"))
     assert result.returncode == 1
     assert "predict.py: error:" in result.stderr and "ConnectionError" in result.stderr
     assert not out.exists()
 
 
-def test_cli_without_configuration_exits_non_zero(no_endpoint_env, monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(predict, "_client", None)
+def test_cli_without_a_proxy_exits_non_zero(no_endpoint_env, monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(predict, "DEFAULT_PROXY_URL", "")
     out = tmp_path / "p.csv"
     assert predict.main(["--input", str(SAMPLE), "--output", str(out)]) == 1
-    assert "no prediction endpoint configured" in capsys.readouterr().err
+    assert "no proxy configured" in capsys.readouterr().err
     assert not out.exists()
 
 
-def test_cli_without_arguments_previews_the_sample(proxy_server, no_endpoint_env, monkeypatch, capsys):
-    monkeypatch.setenv("PREDICT_PROXY_URL", proxy_server.url)
-    monkeypatch.setenv("QUICKML_BATCH_SIZE", "500")
-    monkeypatch.setattr(predict, "_client", None)
+def test_cli_without_arguments_previews_the_sample(use_proxy, monkeypatch, capsys):
     monkeypatch.chdir(ROOT)
     assert predict.main([]) == 0
     assert "Generated 1000 predictions" in capsys.readouterr().out

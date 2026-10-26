@@ -16,7 +16,7 @@ from test_backend import FakeClient, sample_rows
 SAMPLE = SAMPLE_CSV.read_bytes()
 TOP_KEYS = {"run", "cleaning", "summary", "window", "hours", "switch_events", "overload_alerts"}
 HOUR_KEYS = {"index", "timestamp", "hour", "ambient_temp_c", "humidity_pct", "solar_irradiance_wm2", "prediction_kw",
-             "mode", "overload", "soc_pct", "battery_kw", "grid_kw", "reason"}
+             "mode", "overload", "soc_pct", "pv_kw", "battery_kw", "grid_kw", "reason"}
 
 
 @pytest.fixture
@@ -210,3 +210,20 @@ def test_unexpected_store_fault_still_returns_the_forecast(fake):
     resp = upload(api)
     assert resp.status_code == 200 and len(resp.get_json()["hours"]) == 1000
     assert resp.get_json()["run"]["errors"] == ["saving the run failed: unexpected RuntimeError"]
+
+
+def test_solar_reaches_the_battery(api):
+    from backend.battery import BatteryParams
+
+    body = upload(api).get_json()
+    factor = BatteryParams().pv_kw_per_wm2
+    assert all(h["pv_kw"] == pytest.approx(factor * h["solar_irradiance_wm2"], abs=0.01) for h in body["hours"])
+    assert any(h["pv_kw"] > 0 and h["battery_kw"] < 0 and h["mode"].startswith("Renewable") for h in body["hours"])
+
+
+def test_predict_battery_uses_solar_and_fills_missing_solar(api):
+    rows = sample_rows(3)
+    rows[1]["solar_irradiance_wm2"] = None
+    battery = api.post("/api/predict", data=json.dumps({"rows": rows}), content_type="application/json").get_json()["battery"]
+    assert battery[0]["pv_kw"] == pytest.approx(0.25 * rows[0]["solar_irradiance_wm2"])
+    assert battery[1]["pv_kw"] == pytest.approx(0.25 * 8.0)  # the training median, as the features use

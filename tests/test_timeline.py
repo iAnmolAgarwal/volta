@@ -12,7 +12,7 @@ def hours_for(demands, start="2015-06-16 15:00:00"):
     stamps = pd.date_range(start, periods=len(demands), freq="h")
     clean = pd.DataFrame({"timestamp": stamps, "ambient_temp_c": 25.0, "humidity_pct": 50.0, "solar_irradiance_wm2": 0.0})
     decisions = [decide(ts, p) for ts, p in zip(stamps, demands)]
-    steps = simulate([(d["mode"], p) for d, p in zip(decisions, demands)], BatteryParams())
+    steps = simulate([(d["mode"], p, 0.0) for d, p in zip(decisions, demands)], BatteryParams())
     return build_hours(clean, demands, decisions, steps)
 
 
@@ -22,10 +22,10 @@ def test_hours_carry_prediction_mode_battery_and_reason():
         "index": 0, "timestamp": "2015-06-16 15:00:00", "hour": 15,
         "ambient_temp_c": 25.0, "humidity_pct": 50.0, "solar_irradiance_wm2": 0.0,
         "prediction_kw": 212.4, "mode": S, "overload": True,
-        "soc_pct": 50.0, "battery_kw": 150.0, "grid_kw": 62.4,
+        "soc_pct": 68.45, "pv_kw": 0.0, "battery_kw": 92.4, "grid_kw": 120.0,  # shaves the import to the 120 kW cap
         "reason": "212.4 kW > 160; 212.4 kW ≥ 200 raises a critical overload alert",
     }
-    assert h[1]["mode"] == G and h[1]["battery_kw"] == -100.0 and h[1]["soc_pct"] == 70.0
+    assert h[1]["mode"] == G and h[1]["battery_kw"] == -75.0 and h[1]["soc_pct"] == 77.83
 
 
 def test_switch_events_mark_each_mode_change():

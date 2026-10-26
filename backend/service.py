@@ -17,7 +17,7 @@ import pandas as pd
 from backend.battery import BatteryParams, BatteryStep, simulate
 from backend.controller import decide
 from model.data import INPUT_COLUMNS
-from model.features import QUICKML_FEATURES, build_features
+from model.features import FILL_VALUES, QUICKML_FEATURES, build_features
 from backend.quickml_sdk import SdkTransport, in_catalyst
 from model.quickml_client import ConfigError, PredictionError, QuickMLClient, is_configured, settings
 
@@ -151,19 +151,23 @@ class Forecaster:
             known.update(new)
         return np.array([known[k] for k in keys], dtype=float)
 
-    def schedule(self, stamps, preds) -> tuple[list[dict], list[BatteryStep]]:
-        """Controller decisions and battery steps for predictions in time order."""
+    def schedule(self, stamps, preds, solar) -> tuple[list[dict], list[BatteryStep]]:
+        """Controller decisions and battery steps for predictions in time order.
+
+        `solar` (W/m2 per hour) only feeds the battery's PV; the controller never sees it.
+        """
         try:
             decisions = [decide(ts, p) for ts, p in zip(stamps, preds)]
         except ValueError as e:  # e.g. a negative prediction from the model
             raise PredictionError(f"unusable prediction from QuickML: {e}") from None
-        return decisions, simulate(((d["mode"], p) for d, p in zip(decisions, preds)), self.battery)
+        return decisions, simulate(((d["mode"], p, s) for d, p, s in zip(decisions, preds, solar)), self.battery)
 
     def forecast(self, payload, request=None) -> dict:
         """`request` is the incoming HTTP request; the SDK path authenticates from its headers."""
         raw = parse_rows(payload)
         preds = self.predict_features(build_features(raw)[QUICKML_FEATURES], request)
-        decisions, steps = self.schedule(pd.to_datetime(raw["timestamp"], format="ISO8601"), preds)
+        solar = pd.to_numeric(raw["solar_irradiance_wm2"]).fillna(FILL_VALUES["solar_irradiance_wm2"])
+        decisions, steps = self.schedule(pd.to_datetime(raw["timestamp"], format="ISO8601"), preds, solar)
         originals = raw["timestamp"].tolist()
         return {
             "predictions": preds.tolist(),

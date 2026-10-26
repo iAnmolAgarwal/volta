@@ -40,7 +40,7 @@ class ForecastService:
         cleaned, report = clean(frame)
         raw = self.forecaster.predict_features(build_features(cleaned)[QUICKML_FEATURES], request)
         preds = np.round(raw, 2)
-        decisions, steps = self.forecaster.schedule(cleaned["timestamp"], preds)
+        decisions, steps = self.forecaster.schedule(cleaned["timestamp"], preds, cleaned["solar_irradiance_wm2"])
         hours = build_hours(cleaned, preds, decisions, steps)
         body = view(hours, window_start)  # a bad window_start fails here, before anything is saved
         record = {"source": source, "filename": filename, "rows_in": report["rows_in"], "n_rows": len(hours),

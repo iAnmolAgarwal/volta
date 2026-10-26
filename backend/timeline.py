@@ -45,6 +45,7 @@ def build_hours(clean: pd.DataFrame, preds, decisions: list[dict], steps: list[B
             "mode": d["mode"],
             "overload": bool(d["overload"]),
             "soc_pct": round(100 * s.soc_end, 2),  # state of charge at the end of the hour
+            "pv_kw": round(s.pv_kw, 2),
             "battery_kw": round(s.battery_kw, 2),  # > 0 discharging, < 0 charging
             "grid_kw": round(s.grid_kw, 2),
             "reason": explain(ts, pred),

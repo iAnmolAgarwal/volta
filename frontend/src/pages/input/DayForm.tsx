@@ -67,11 +67,14 @@ export function DayForm({ spec, onChange, onGenerate, hasRows, disabled, delay }
         <Line icon={CalendarClock} name="Start" note="The first hour; 23 more follow, one an hour">
           <Field
             label="First hour"
-            type="datetime-local"
-            step={3600}
             value={spec.start}
             onChange={(ev) => onChange({ ...spec, start: ev.target.value })}
             error={e.start}
+            hint={e.start ? undefined : "24-hour, as the table writes it"}
+            placeholder="2015-06-17 00:00"
+            inputMode="text"
+            autoComplete="off"
+            spellCheck={false}
             disabled={disabled}
             className="vi-wide"
           />

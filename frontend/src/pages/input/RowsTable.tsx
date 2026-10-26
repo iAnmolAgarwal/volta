@@ -29,7 +29,10 @@ export interface RowsTableProps {
 export function RowsTable({ rows, onRows, onSubmit, busy, delay }: RowsTableProps) {
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
   useEffect(() => {
-    if (focus) document.getElementById(focus.id)?.focus();
+    const el = focus ? document.getElementById(focus.id) : null;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [focus]);
   const focusOn = (id: string) => setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
 
@@ -107,7 +110,6 @@ export function RowsTable({ rows, onRows, onSubmit, busy, delay }: RowsTableProp
                   <tr key={r.id} className={Object.keys(e).length ? "is-bad" : undefined}>
                     <th scope="row" className="vi-c-num">
                       <span className="vi-num">{String(k + 1).padStart(2, "0")}</span>
-                      <span className="vi-when">{when ?? "—"}</span>
                     </th>
                     {COLS.map((c) => (
                       <td key={c} className={`vi-c-${c}`}>
@@ -151,7 +153,7 @@ export function RowsTable({ rows, onRows, onSubmit, busy, delay }: RowsTableProp
               <p className="vi-note">{full ? `The API takes at most ${ROW_LIMIT.toLocaleString()} rows.` : "Blank humidity or irradiance is filled from the neighbouring hours."}</p>
             </div>
             <Pill icon={ArrowRight} tone="volt" onClick={onSubmit} disabled={busy || bad > 0} className="vi-send">
-              {busy ? "Forecasting" : `Forecast ${n} ${n === 1 ? "hour" : "hours"}`}
+              {busy ? "Forecasting" : bad > 0 ? `Fix ${bad} ${bad === 1 ? "cell" : "cells"} first` : `Forecast ${n} ${n === 1 ? "hour" : "hours"}`}
             </Pill>
           </div>
         </>

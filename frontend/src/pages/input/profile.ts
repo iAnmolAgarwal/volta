@@ -26,6 +26,10 @@ export const cellId = (rowId: number, col: Col) => `vi-r${rowId}-${col}`;
 
 let nextId = 1;
 export const newId = () => nextId++;
+/** After restoring rows from the session, keep new ids above the restored ones. */
+export function bumpIds(rows: Row[]) {
+  for (const r of rows) if (r.id >= nextId) nextId = r.id + 1;
+}
 
 /* ── timestamps: the layouts the backend reads ───────────────────────────── */
 
@@ -140,14 +144,14 @@ export function toTelemetry(rows: Row[]): TelemetryRow[] {
 export type Shape = "single" | "profile";
 
 export interface GenSpec {
-  start: string; // datetime-local, "2015-06-17T00:00"
+  start: string; // any readable timestamp; shown and generated as ISO 24-hour, "2015-06-17 00:00"
   temp: { shape: Shape; value: string; low: string; high: string };
   hum: { shape: Shape; value: string; low: string; high: string };
   irr: { shape: Shape; value: string; peak: string; rise: string; set: string };
 }
 
 export const DEFAULT_SPEC: GenSpec = {
-  start: "2015-06-17T00:00",
+  start: "2015-06-17 00:00",
   temp: { shape: "profile", value: "32", low: "27", high: "38" },
   hum: { shape: "profile", value: "60", low: "42", high: "78" },
   irr: { shape: "profile", value: "200", peak: "850", rise: "6", set: "19" },
@@ -169,7 +173,7 @@ function inRange(s: string, lo: number, hi: number, unit: string, required = tru
 export function specErrors(s: GenSpec): SpecErrors {
   const e: SpecErrors = {};
   const set = (k: keyof SpecErrors, v: string | null) => { if (v) e[k] = v; };
-  set("start", s.start.trim() === "" ? "Pick the first hour" : readTimestamp(s.start.replace("T", " ")) ? null : "Unreadable date");
+  set("start", s.start.trim() === "" ? "Enter the first hour" : readTimestamp(s.start) ? null : "Unreadable; try 2015-06-17 00:00");
   if (s.temp.shape === "single") set("tempValue", inRange(s.temp.value, TEMP_MIN, TEMP_MAX, "°C"));
   else {
     set("tempLow", inRange(s.temp.low, TEMP_MIN, TEMP_MAX, "°C"));
@@ -196,7 +200,7 @@ const r1 = (n: number) => String(Math.round(n * 10) / 10);
 
 /** 24 hourly rows from a valid spec. */
 export function generate(s: GenSpec): Row[] {
-  const t0 = readTimestamp(s.start.replace("T", " "));
+  const t0 = readTimestamp(s.start);
   if (!t0) return [];
   const base = utc({ ...t0, mi: 0 });
   const wave = (h: number) => Math.cos((2 * Math.PI * (h - WARMEST_HOUR)) / 24); // 1 at 15:00, −1 at 03:00

@@ -264,6 +264,8 @@
 /* the plot is one slider over the focused hour (arrow keys); its ring is drawn round the plate */
 .vd-plot { position: absolute; inset: 0; border-radius: inherit; }
 .vd-plot:focus-visible { outline: none; }
+/* a tap can focus Recharts' own wrapper/svg layers, which then draw the browser outline; the plate's ring is the only focus mark */
+.vd-plot :focus, .vd-plot :focus-visible { outline: none; }
 .vd-chart .va-chart-plate:has(.vd-plot:focus-visible) { outline: 2px solid var(--focus-ring-dark); outline-offset: calc(3 * var(--u)); }
 /* the axes: every tick in faint ink, Lexend, at the 12 px floor (Recharts 3 draws
    tick labels as .recharts-cartesian-axis-tick-value in its own layer, with a

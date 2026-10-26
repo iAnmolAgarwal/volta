@@ -406,6 +406,7 @@
 .va-ring.is-discharging .va-ring-head { animation: va-breathe 2.4s var(--ease) infinite; }
 @keyframes va-breathe { 50% { opacity: 0.55; } }
 .va-ring-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(14 * var(--u)) calc(28 * var(--u)); margin: 0; }
+.va-ring-stats dl { margin: 0; }
 
 /* a side stat, in flow (Sylva's .stat: a faint mark, a soft label, a bold value) */
 .va-stat { display: flex; align-items: flex-start; gap: calc(9 * var(--u)); }

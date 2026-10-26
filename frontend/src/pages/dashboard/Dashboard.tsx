@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CloudCheck, CloudOff } from "lucide-react";
 import { ModeBadge } from "@/components/app/ModeBadge";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -49,6 +49,20 @@ export function Dashboard({ run }: { run: Run }) {
     if (i != null && performance.now() < quietUntil.current) return;
     setHovered(i);
   }, []);
+  // once the page scrolls, a frosted shelf rises behind the fixed dock, so data never shows under it (dashboard.css)
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const read = () => setScrolled(window.scrollY > 24);
+    read();
+    window.addEventListener("scroll", read, { passive: true });
+    return () => window.removeEventListener("scroll", read);
+  }, []);
+  const [announce, setAnnounce] = useState("");
+  /** After the banner is dismissed: focus moves on to the chart's range select, and the dismissal is announced. */
+  const afterDismiss = () => {
+    setAnnounce("Overload alert dismissed for this window");
+    requestAnimationFrame(() => chartRef.current?.querySelector<HTMLElement>(".va-range-item.is-on, .va-range-item")?.focus());
+  };
 
   const end = Math.min(windowStart + WINDOW, n);
   const focusIndex = Math.max(0, Math.min(n - 1, hovered ?? selected));
@@ -99,7 +113,8 @@ export function Dashboard({ run }: { run: Run }) {
   const span = `${dayMonth(run.summary.start)} – ${dayMonth(run.summary.end)}`;
 
   return (
-    <div className="va-page vd">
+    <div className="va-page vd" data-scrolled={scrolled || undefined}>
+      <p className="sr-only" aria-live="polite">{announce}</p>
       <div className="vd-hero">
         <PageHeader
           eyebrow={
@@ -130,7 +145,7 @@ export function Dashboard({ run }: { run: Run }) {
         <SideStats stats={stats} />
       </div>
 
-      <OverloadBanner key={windowStart} runs={runs} focus={focusIndex} onSelect={jump} delay={moved ? 0 : 560} />
+      <OverloadBanner key={windowStart} runs={runs} focus={focusIndex} onSelect={jump} onDismiss={afterDismiss} delay={moved ? 0 : 560} />
 
       <div className="vd-main">
         <div className="vd-chart-wrap" ref={chartRef}>

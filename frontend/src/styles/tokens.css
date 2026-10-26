@@ -22,8 +22,11 @@
 
   /* ── ink on dark (Sylva) ──────────────────────────────────────────────── */
   --ink: #ffffff;
-  --ink-soft: rgba(255, 255, 255, 0.62);
-  --ink-faint: rgba(255, 255, 255, 0.44);
+  /* Muted ink, raised from Sylva's 0.62 / 0.44 on 2026-10-27 to pass WCAG AA (4.5:1) for small
+     text. Lowest case, dock glass (0.04) over --bg-hero: 0.74 -> 5.5:1, 0.68 -> 4.6:1.
+     On --bg-hero alone: 6.0:1 and 5.0:1. */
+  --ink-soft: rgba(255, 255, 255, 0.74);
+  --ink-faint: rgba(255, 255, 255, 0.68);
   --ink-mark: rgba(255, 255, 255, 0.34);   /* stat icons */
   --rule: rgba(255, 255, 255, 0.055);      /* guides, ghost word */
 
@@ -31,7 +34,7 @@
      Named "paper" so shadcn's --card can mean the glass card below. */
   --paper: #f2f3ef;
   --paper-ink: #23261f;
-  --paper-label: #7c8177;
+  --paper-label: #676c62;  /* Sylva's #7c8177 is 3.6:1 on --paper; this is 4.8:1 (WCAG AA) */
   --paper-shadow: 0 calc(30 * var(--u)) calc(70 * var(--u)) rgba(16, 21, 13, 0.30);
 
   /* ── glass card: moss-green translucent panel (charts, dashboard) ────────

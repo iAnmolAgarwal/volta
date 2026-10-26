@@ -71,16 +71,17 @@ export function RingGauge({ socPct, batteryKw, pvKw, capacityKwh = CAPACITY_KWH,
           <span className="va-ring-kwh">{Math.round(kwh)} of {capacityKwh} kWh</span>
         </div>
       </div>
-      <dl className="va-ring-stats">
+      {/* each stat is its own <dl>: a <dl> may hold only dt/dd groups, not the icon */}
+      <div className="va-ring-stats" role="group" aria-label="Battery and solar">
         <div className="va-stat">
           <span className="va-stat-mark" aria-hidden="true"><StateIcon strokeWidth={1.4} aria-hidden /></span>
-          <div><dt>Battery</dt><dd>{stateText}</dd></div>
+          <dl><dt>Battery</dt><dd>{stateText}</dd></dl>
         </div>
         <div className="va-stat va-stat--solar">
           <span className="va-stat-mark" aria-hidden="true"><Sun strokeWidth={1.4} aria-hidden /></span>
-          <div><dt>Solar</dt><dd>{pvKw > 0.05 ? kw(pvKw) : "None this hour"}</dd></div>
+          <dl><dt>Solar</dt><dd>{pvKw > 0.05 ? kw(pvKw) : "None this hour"}</dd></dl>
         </div>
-      </dl>
+      </div>
     </figure>
   );
 }

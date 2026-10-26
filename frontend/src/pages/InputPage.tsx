@@ -1,99 +1,225 @@
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RotateCcw, Sparkles, X } from "lucide-react";
 import { DropZone } from "@/components/app/DropZone";
-import { Field } from "@/components/app/Field";
 import { GlassCard } from "@/components/app/GlassCard";
-import { LogItem } from "@/components/app/LogItem";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Pill } from "@/components/app/Pill";
 import { ErrorState } from "@/components/app/States";
-import { forecastCsv, forecastSample, MAX_ROWS, setLastRunId, type Run } from "@/lib/api";
+import { ApiError, forecastCsv, forecastRows, forecastSample, MAX_ROWS, setLastRunId, type Run } from "@/lib/api";
 import { WORDMARK } from "@/lib/brand";
+import { DayForm } from "./input/DayForm";
+import { describeError, subjectOf, type What } from "./input/errors";
+import { HeroStats } from "./input/HeroStats";
+import { BusyCard, CleaningReport, RunSummary } from "./input/Report";
+import { RowsTable } from "./input/RowsTable";
+import { loadDraft, loadLast, saveDraft, saveLast, type Last } from "./input/session";
+import { stashUnsaved, storageOf } from "./input/unsaved";
+import { cellId, csvRowCount, generate, toTelemetry, type Col, type GenSpec, type Row } from "./input/profile";
+import "@/styles/pages/input.css";
 
-/* PLACEHOLDER for the Input screen (M2): a live CSV upload and "Use sample
- * data" through the typed client, the cleaning report, and the Field look. The
- * Input screen builder replaces this page (with the 24-hour manual form). */
+/* /input: telemetry in. Three ways to start a forecast, all through the typed
+ * client: a day described by hand (generated into an editable 24-row table,
+ * checked in the browser, posted as rows), a CSV through the DropZone, or the
+ * bundled sample. The cleaning report and the run come back below the rows;
+ * a failed post shows where the busy card sat, and the last good report stays
+ * under it. The form, the rows and the last report survive a trip away. */
 
-type Post = { state: "idle" } | { state: "busy"; what: string } | { state: "error"; error: unknown } | { state: "done"; run: Run };
+/** The post in flight, or how the last one failed. The last good result is kept apart (`last`). */
+type Op =
+  | { state: "idle" }
+  | { state: "busy"; what: What; title: string; startedAt: number; cancel: () => void }
+  | { state: "error"; title: string; error: unknown; retry?: () => void };
+
+const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const scrollTo = (el: Element | null) => el?.scrollIntoView({ block: "start", behavior: reduced() ? "auto" : "smooth" });
+
+/** Which cell a rejection reason points at. */
+const colOf = (reason: string): Col => (/temperature|°C/i.test(reason) ? "temp" : "timestamp");
 
 export default function InputPage() {
-  const [post, setPost] = useState<Post>({ state: "idle" });
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [temp, setTemp] = useState("31.2");
-  const [start, setStart] = useState("2015-06-16T15:00");
+  const [draft] = useState(loadDraft);
+  const [spec, setSpec] = useState<GenSpec>(draft.spec);
+  const [rows, setRows] = useState<Row[]>(draft.rows);
+  const [fileName, setFileName] = useState<string | null>(draft.fileName);
+  const [op, setOp] = useState<Op>({ state: "idle" });
+  const [last, setLast] = useState<Last | null>(loadLast);
+  const [arrived, setArrived] = useState(0); // bumps when a fresh result lands, to move focus to it
+  const [savedHere, setSavedHere] = useState(0); // runs saved from this page, for the hero count
+  const resultRef = useRef<HTMLDivElement>(null);
+  const reportHead = useRef<HTMLSpanElement>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.title = `Forecast input · ${WORDMARK}`;
   }, []);
 
-  const send = async (what: string, go: () => Promise<Run>) => {
-    setPost({ state: "busy", what });
-    try {
-      const run = await go();
-      setLastRunId(run.run.id);
-      setPost({ state: "done", run });
-    } catch (error) {
-      setPost({ state: "error", error });
-    }
+  // keep the work for the session
+  useEffect(() => saveDraft({ spec, rows, fileName }), [spec, rows, fileName]);
+
+  // a post starting or failing brings the result slot into view; a fresh report takes focus
+  useEffect(() => {
+    if (op.state !== "idle") scrollTo(resultRef.current);
+  }, [op.state]);
+  useEffect(() => {
+    if (!arrived) return;
+    scrollTo(resultRef.current);
+    reportHead.current?.focus({ preventScroll: true });
+  }, [arrived]);
+
+  const busy = op.state === "busy";
+
+  const send = useCallback((what: What, subject: string, title: string, go: (signal: AbortSignal) => Promise<Run>, posted?: number[]) => {
+    const ctrl = new AbortController();
+    const retry = () => send(what, subject, title, go, posted);
+    setOp({ state: "busy", what, title, startedAt: Date.now(), cancel: () => ctrl.abort() });
+    go(ctrl.signal)
+      .then((run) => {
+        // a saved run is remembered by id; one that wasn't saved travels in sessionStorage
+        const st = storageOf(run);
+        if (st.saved && st.id) setLastRunId(st.id);
+        const stashed = st.saved ? true : stashUnsaved(run);
+        const next: Last = { what, run, posted, stashed };
+        saveLast(next);
+        setLast(next);
+        if (st.saved) setSavedHere((n) => n + 1);
+        setOp({ state: "idle" });
+        setArrived((n) => n + 1);
+      })
+      .catch((error) => {
+        if (ctrl.signal.aborted) {
+          setOp({ state: "idle" }); // cancelled: the last report, if any, stays as it was
+          return;
+        }
+        const copy = describeError(subject, error);
+        setOp({ state: "error", title: copy.title, error: copy.error, retry: copy.retryable ? retry : undefined });
+      });
+  }, []);
+
+  const sendRows = () => {
+    const n = rows.length;
+    if (n === 0) return;
+    const body = toTelemetry(rows);
+    const subject = subjectOf("manual", `Your ${n} ${n === 1 ? "hour" : "hours"}`);
+    send("manual", subject, `Forecasting ${n} manual ${n === 1 ? "hour" : "hours"}`, (signal) => forecastRows(body, { signal }), rows.map((r) => r.id));
   };
 
-  const t = Number(temp);
-  const tempError = temp.trim() === "" ? "Enter a temperature" : !Number.isFinite(t) ? "Not a number" : t < -60 || t > 60 ? "Must be between −60 and 60 °C" : null;
-  const busy = post.state === "busy";
-  const done = post.state === "done" ? post.run : null;
-  const fixes = done?.cleaning.fixes.filter((f) => f.count > 0) ?? [];
+  const fail = (subject: string, error: unknown) => {
+    const copy = describeError(subject, error);
+    setOp({ state: "error", title: copy.title, error: copy.error });
+  };
+
+  const sendFile = async (file: File) => {
+    setFileName(file.name);
+    let n: number;
+    try {
+      n = csvRowCount(await file.text());
+    } catch {
+      fail(file.name, new Error(`${file.name} couldn't be read from this device. Try saving it again, then drop it here.`));
+      return;
+    }
+    if (n > MAX_ROWS) {
+      // the API would answer 413; say so before uploading
+      fail(file.name, new ApiError("too_large", `${file.name} has ${n.toLocaleString()} rows and the limit is ${MAX_ROWS.toLocaleString()}. Nothing was sent; trim it and drop it again.`));
+      return;
+    }
+    send("csv", file.name, `Forecasting ${file.name} · ${n.toLocaleString()} ${n === 1 ? "row" : "rows"}`, (signal) => forecastCsv(file, { signal }));
+  };
+
+  const sendSample = () => send("sample", "The sample", "Forecasting the 1,000-hour sample", (signal) => forecastSample({ signal }));
+
+  const onGenerate = () => {
+    setRows(generate(spec));
+    window.requestAnimationFrame(() => scrollTo(rowsRef.current));
+  };
+
+  const goToRow = (row: number, reason: string) => {
+    const id = last?.posted?.[row - 1];
+    const el = id != null ? document.getElementById(cellId(id, colOf(reason))) : null;
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: reduced() ? "auto" : "smooth" });
+      (el as HTMLInputElement).focus({ preventScroll: true });
+    }
+  };
+  const manualRejected = last?.what === "manual" && last.posted
+    ? (row: number) => goToRow(row, last.run.cleaning.rejected.find((r) => r.row === row)?.reason ?? "")
+    : undefined;
+
+  const latest = last ? { peakKw: last.run.summary.peak_kw, at: last.run.summary.peak_timestamp } : null;
 
   return (
-    <div className="va-page">
+    <div className="va-page vi">
       <PageHeader
-        eyebrow="Forecast"
-        title="Telemetry in"
-        lede={`Upload hourly weather as a CSV, up to ${MAX_ROWS.toLocaleString()} rows, or start from the bundled sample. Every row is cleaned, forecast and saved.`}
+        eyebrow="Forecast · telemetry in"
+        title="Feed the forecast"
+        lede={`Describe a day by hand, drop a CSV of up to ${MAX_ROWS.toLocaleString()} hours, or start from the sample. Every row is cleaned, forecast by QuickML and saved as a run.`}
       />
-      <div className="va-input-grid">
-        <GlassCard label="CSV upload" title="Your telemetry" delay={380}>
-          <DropZone
-            fileName={fileName}
-            busy={busy && post.what === "csv"}
-            busyText="Cleaning and forecasting"
-            disabled={busy}
-            onFile={(file) => {
-              setFileName(file.name);
-              void send("csv", () => forecastCsv(file));
-            }}
-            onReject={(_, why) => setPost({ state: "error", error: new Error(why) })}
-          />
-        </GlassCard>
-        <GlassCard label="No file to hand?" title="Use the sample" delay={480}>
-          <p className="va-input-note">The bundled 1,000-hour sample: a hot June to July, cleaned, forecast by QuickML and run through the controller.</p>
-          <Pill icon={Sparkles} tone="volt" onClick={() => void send("sample", () => forecastSample())} disabled={busy}>
-            {busy && post.what === "sample" ? "Forecasting" : "Use sample data"}
-          </Pill>
-          <div className="va-input-fields">
-            <Field label="Start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} hint="The first hour of the window" />
-            <Field label="Temperature" inputMode="decimal" value={temp} onChange={(e) => setTemp(e.target.value)} suffix="°C" error={tempError} hint="−60 to 60" />
-          </div>
-        </GlassCard>
+      <HeroStats latest={latest} savedNow={savedHere} />
+
+      {/* reading order: the manual flow and its result first (so a phone keeps form → rows → report together), then the other ways in */}
+      <div className="vi-grid">
+        <DayForm spec={spec} onChange={setSpec} onGenerate={onGenerate} hasRows={rows.length > 0} disabled={busy} delay={380} />
+
+        <div className="vi-rows-slot" ref={rowsRef}>
+          <RowsTable rows={rows} onRows={setRows} onSubmit={sendRows} busy={busy} delay={460} />
+        </div>
+
+        <div className="vi-result" ref={resultRef}>
+          {op.state !== "idle" && (
+            <div className="vi-result-grid">
+              {op.state === "busy" && <BusyCard title={op.title} startedAt={op.startedAt} onCancel={op.cancel} />}
+              {op.state === "error" && (
+                <ErrorState
+                  title={op.title}
+                  error={op.error}
+                  className="vi-error"
+                  action={
+                    <>
+                      {op.retry && <Pill icon={RotateCcw} onClick={op.retry}>Try again</Pill>}
+                      <Pill icon={X} onClick={() => setOp({ state: "idle" })}>Dismiss</Pill>
+                    </>
+                  }
+                />
+              )}
+            </div>
+          )}
+          {last && (
+            <>
+              {op.state !== "idle" && <p className="vi-caps vi-last-cap">Last forecast</p>}
+              <div className="vi-result-grid">
+                <RunSummary run={last.run} headRef={reportHead} stashed={last.stashed} delay={120} />
+                <CleaningReport run={last.run} onRejected={manualRejected} delay={0} />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* the rail spans the form and the rows only, so the sticky column never rides over the report */}
+        <div className="vi-side-rail">
+          <aside className="vi-side" aria-label="Other ways in">
+            <GlassCard label="CSV upload" title="Drop a file" delay={540} className="vi-csv">
+              <DropZone
+                fileName={fileName}
+                busy={op.state === "busy" && op.what === "csv"}
+                busyText="Cleaning and forecasting"
+                disabled={busy}
+                hint={`or click to browse · up to ${MAX_ROWS.toLocaleString()} rows`}
+                onFile={(file) => void sendFile(file)}
+                onReject={(file, why) => fail(file.name, new Error(`${why}. Choose a .csv file.`))}
+              />
+              <p className="vi-note vi-cols">
+                Columns <code>timestamp</code> and <code>ambient_temp_c</code>; <code>humidity_pct</code> and <code>solar_irradiance_wm2</code> if you have them.
+              </p>
+            </GlassCard>
+
+            <GlassCard variant="paper" label="No file to hand?" title="Use the sample" delay={620} className="vi-sample">
+              <p className="vi-sample-text">1,000 hours of a hot June and July: the contest's own test input, cleaned, forecast and saved like any upload.</p>
+              <Pill icon={Sparkles} onClick={sendSample} disabled={busy} className="vi-ink">
+                {op.state === "busy" && op.what === "sample" ? "Forecasting the sample" : "Use sample data"}
+              </Pill>
+            </GlassCard>
+          </aside>
+        </div>
       </div>
-      {post.state === "error" && <ErrorState error={post.error} action={<Pill onClick={() => setPost({ state: "idle" })}>Dismiss</Pill>} />}
-      {done && (
-        <GlassCard
-          label={`Run ${done.run.id.slice(-6)} · ${done.run.saved ? "saved" : "not saved"}`}
-          title={`${done.cleaning.rows_out.toLocaleString()} of ${done.cleaning.rows_in.toLocaleString()} rows kept`}
-          aside={<Pill icon={ArrowUpRight} tone="volt" to={`/dashboard?run=${done.run.id}`}>Open on dashboard</Pill>}
-          delay={0}
-        >
-          <ol className="va-input-report">
-            {fixes.length === 0 && <li><LogItem label="Cleaning" title="Nothing needed fixing" /></li>}
-            {fixes.map((f) => (
-              <li key={f.code}><LogItem kind={f.code.startsWith("rejected") ? "overload" : "info"} label={f.code.replace(/_/g, " ")} title={f.label} meta={f.count.toLocaleString()} /></li>
-            ))}
-            {done.cleaning.rejected.slice(0, 5).map((r) => (
-              <li key={`r${r.row}`}><LogItem kind="overload" label={`Rejected · row ${r.row}`} title={r.reason} /></li>
-            ))}
-          </ol>
-        </GlassCard>
-      )}
     </div>
   );
 }

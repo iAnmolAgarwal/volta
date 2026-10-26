@@ -45,7 +45,8 @@
      the cards (layout.ts NARROW), and fades out over the page before card 1,
      as the live land does (NARROW.fadeFrom / fadeTo) */
   .volta-scene__poster {
-    left: calc(-204.1 * var(--u));
+    /* x: NARROW.x - NARROW.vx * k - 160 * k, with k = NARROW.k */
+    left: calc(-105.1 * var(--u));
     top: calc(524.2 * var(--u));
     width: calc(1267.2 * var(--u));
   }

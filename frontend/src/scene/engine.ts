@@ -176,9 +176,9 @@ export class GridEngine {
     }
     this.renderer.setClearColor(0x000000, 0);
 
-    // desktop up to 2x, phones and touch screens up to 1.5x
-    const small = this.mqNarrow.matches || matchMedia("(pointer: coarse)").matches;
-    this.level = this.maxLevel = small ? 2 : 3;
+    // every screen starts at the top level, up to 2x (phones too: developer-notes R3.1);
+    // the monitor steps down 2 -> 1.5 -> 1 if the frame rate stays low
+    this.level = this.maxLevel = QUALITY.length - 1;
     this.ready = this.build();
   }
 
@@ -457,9 +457,12 @@ export class GridEngine {
     this.glowMat.uniforms.uMinPx.value = 3.6 * dpr * q.glow * Math.min(1, Math.max(0.55, this.frame.k));
     this.sparks.material.uniforms.uPx.value = dpr;
     // one column: the land fades out just above card 1, over the page; the hero
-    // line's wires are not clipped, so they cross card 1 and run on behind card 2
+    // line's wires cross card 1, dim over its chart plate, and end on its foot
     const narrow = this.frame.narrow, u = this.frame.u;
     shared.uClip.value.set(NARROW.fadeFrom * u * dpr, NARROW.fadeTo * u * dpr, narrow ? 1 : 0);
+    const s = u * dpr, [px0, py0, px1, py1] = NARROW.plate;
+    flow.uWirePlate.value.set(px0 * s, py0 * s, px1 * s, py1 * s);
+    flow.uWireEnd.value.set(NARROW.wireEnd[0] * s, NARROW.wireEnd[1] * s, 5 * s, narrow ? NARROW.plateAlpha : 0);
     this.publish();
   }
 

@@ -18,12 +18,21 @@ export interface Frame {
 
 /**
  * Below 900 px: artboard point NARROW.vx/vy lands on page units NARROW.x/y, scaled
- * by NARROW.k. The land fades out between fadeFrom and fadeTo (page units), over
- * the page just above card 1. The hero line's wires are not clipped: they cross
- * card 1 (which sits under the canvas), as Sylva's root does, and run on behind
- * card 2 (which sits above it).
+ * by NARROW.k. The crop's left edge sits just left of the solar field, so the
+ * solar field and the battery bank (two of the controller's three sources) are
+ * whole, at the same scale as before; the big pylon stands at the right edge.
+ * The land fades out between fadeFrom and fadeTo (page units), over the page just
+ * above card 1. The hero line's wires are not clipped there: they cross card 1
+ * (which sits under the canvas), as Sylva's root does, drop to 30% over card 1's
+ * chart plate (`plate`: x0, y0, x1, y1), and fade out over card 1's foot
+ * (`wireEnd`), so none ends dead at card 2's top edge (card 2 is at 1324).
  */
-export const NARROW = { k: 0.66, vx: 725, vy: 330, x: 380, y: 610, fadeFrom: 990, fadeTo: 1042 };
+export const NARROW = {
+  k: 0.66, vx: 575, vy: 330, x: 380, y: 610, fadeFrom: 990, fadeTo: 1042,
+  plate: [486, 1066, 710, 1284] as const,
+  plateAlpha: 0.3,
+  wireEnd: [1246, 1298] as const,
+};
 
 export function computeFrame(W: number, H: number, u: number, narrow: boolean): Frame {
   if (!narrow) {

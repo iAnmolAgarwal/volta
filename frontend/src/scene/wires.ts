@@ -11,6 +11,7 @@ import {
   OneFactor,
   OneMinusSrcAlphaFactor,
   ShaderMaterial,
+  Vector4,
 } from "three";
 import { LIGHT_GLSL, shared } from "./glsl";
 import type { Polyline } from "./network";
@@ -31,7 +32,27 @@ export const flow = {
   uWireCol: { value: new Color() },
   uDensity: { value: 1 },
   uPulse: { value: 1 }, // 0 draws the lines energised but with no pulses (the neutral poster)
+  /** one column only: card 1's chart plate, buffer px (x0, y0, x1, y1; rows from the top) */
+  uWirePlate: { value: new Vector4() },
+  /** one column only: rows where the wires fade out, edge softness (px), and the plate's alpha (0 = off) */
+  uWireEnd: { value: new Vector4() },
 };
+
+/**
+ * How much of a wire shows at this pixel. Off (exactly 1) on desktop; in the one-column
+ * layout the wires dim over card 1's chart plate and fade out before card 2.
+ */
+const WIRE_MASK = /* glsl */ `
+  uniform vec4 uWirePlate, uWireEnd;
+  float wireMask() {
+    if (uWireEnd.w <= 0.0) return 1.0;
+    vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+    float e = uWireEnd.z;
+    vec2 a = smoothstep(uWirePlate.xy - e, uWirePlate.xy + e, p);
+    vec2 b = 1.0 - smoothstep(uWirePlate.zw - e, uWirePlate.zw + e, p);
+    return mix(1.0, uWireEnd.w, a.x * a.y * b.x * b.y) * (1.0 - smoothstep(uWireEnd.x, uWireEnd.y, p.y));
+  }
+`;
 
 export function buildWireGeometry(lines: Polyline[]): BufferGeometry {
   let verts = 0, quads = 0;
@@ -141,6 +162,7 @@ export function buildWireMaterials(lineGeo: BufferGeometry) {
     vertexShader: VERT,
     fragmentShader: /* glsl */ `
       ${LIGHT_GLSL}
+      ${WIRE_MASK}
       uniform vec3 uWireCol, uHot;
       uniform float uDensity, uPulse;
       varying float vS, vX, vLevel, vFront, vSpacing, vCover, vDist, vPowered, vV;
@@ -154,7 +176,7 @@ export function buildWireMaterials(lineGeo: BufferGeometry) {
         col += vCol * (0.035 * vLevel * e * haze + 3.4 * p + 1.8 * frontSpark() * vPowered);
         col += uHot * smoothstep(0.55, 1.0, p) * 0.9;
         float alpha = vCover * (0.9 - 0.5 * smoothstep(2500.0, 6000.0, vDist)) * (1.0 - smoothstep(0.55, 1.0, abs(vV)) * 0.4);
-        alpha *= landAlpha(vDist) * mix(0.5, 1.0, vPowered);
+        alpha *= landAlpha(vDist) * mix(0.5, 1.0, vPowered) * wireMask();
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
         gl_FragColor.rgb *= alpha;
@@ -174,6 +196,7 @@ export function buildWireMaterials(lineGeo: BufferGeometry) {
     vertexShader: VERT,
     fragmentShader: /* glsl */ `
       ${LIGHT_GLSL}
+      ${WIRE_MASK}
       uniform float uDensity, uPulse;
       varying float vS, vX, vLevel, vFront, vSpacing, vCover, vDist, vPowered, vV;
       varying vec3 vCol;
@@ -184,7 +207,7 @@ export function buildWireMaterials(lineGeo: BufferGeometry) {
         float p = pulseAt(vX * uDensity) * pow(vLevel, 1.4) * e * uPulse;
         float across = exp(-vV * vV * 3.6);
         float far = 1.0 - 0.92 * smoothstep(uFog.x, uFog.y, vDist);
-        vec3 g = vCol * across * far * landAlpha(vDist) * (0.018 * vLevel * e + 0.8 * p + 0.9 * frontSpark());
+        vec3 g = vCol * across * far * landAlpha(vDist) * wireMask() * (0.018 * vLevel * e + 0.8 * p + 0.9 * frontSpark());
         gl_FragColor = vec4(g, 1.0);
         #include <colorspace_fragment>
         // light only: it brightens what is behind it and never greys the paper card

@@ -137,7 +137,19 @@ What the hour fields mean:
 
 ### Saving
 
-`run.saved` is true once the run and its hours are in the Data Store. The upload, CSV uploads only, goes to Stratus at `run.csv_key`. If saving fails, the forecast is still returned, with `saved: false` (or `csv_key: null`) and the reason in `run.errors`.
+The forecast is always returned. Saving is a separate step whose result is in `run`:
+
+```json
+"run": {"saved": true, "id": "r20261027013000-1a2b3c", "created": "2026-10-27T01:30:00+00:00",
+        "csv_key": "uploads/2026/10/27/013000-4ba92c62-sample_test_input.csv", "errors": [],
+        "storage": {"stratus": true, "datastore": false,
+                    "reason": "Data Store free-tier insert quota used up for this month"}}
+```
+
+- `saved` is true once the run is in Stratus. That is the run store; see [Persistence](#persistence).
+- `storage.datastore` says whether the run's metadata row also reached the Data Store, and `storage.reason` says why not.
+- If saving fails, `saved` is false and the reason is in `run.errors` and `storage.reason`. A CSV that couldn't be uploaded leaves `csv_key: null`.
+- Past the daily save limit (40 runs a UTC day), the reason is "daily save limit reached".
 
 If QuickML fails, the response is a `502` (endpoint error) or `503` (not configured). There is never a made-up forecast.
 
@@ -148,6 +160,8 @@ If QuickML fails, the response is a `502` (endpoint error) or `503` (not configu
 The window is up to 24 hours long. An out-of-range value is a `400`.
 
 ## GET /api/runs
+
+Runs from Stratus and runs from the Data Store are merged, newest first, each listed once. Every run has a `storage` object. Runs saved before 2026-10-27 have Data Store ROWIDs as their ids and `storage.stratus: false`.
 
 ```json
 {"runs": [
@@ -162,22 +176,46 @@ The window is up to 24 hours long. An out-of-range value is a `400`.
 
 ## GET /api/runs/{id}
 
-`GET /api/runs/93853000000030001?window_start=2015-06-23 12:00` returns the same keys as `/api/forecast`: `run`, `cleaning`, `summary`, `window`, `hours`, `switch_events`, `overload_alerts`. They are rebuilt from the stored hours. An unknown id is a `404`.
+`GET /api/runs/r20261027013000-1a2b3c?window_start=2015-06-23 12:00` returns the same keys as `/api/forecast`: `run`, `cleaning`, `summary`, `window`, `hours`, `switch_events`, `overload_alerts`. They are rebuilt from the stored hours. Ids starting with `r` are read from Stratus. All-digit ids are the older Data Store runs, read from `runs` and `run_hours`. An unknown or malformed id is a `404`.
+
+## Persistence
+
+Runs are stored in a hybrid way, because of the Catalyst free tier.
+
+**Why.** The free tier is account-wide and per calendar month, shared by Development and Production. It allows 5,000 Data Store inserts, 2,000 Stratus uploads and 10,000 Stratus downloads. Runs used to be saved as one `runs` row plus one `run_hours` row per hour. Inserts appear to be counted per row, so each 1,000-hour run cost about 1,001 of them, and a handful of runs used up the month's allowance on 2026-10-27. Inserts then failed with `FREE_USAGE_LIMIT_REACHED` until the next month.
+
+**Now:**
+
+| Where | What | Cost per run |
+|---|---|---|
+| Stratus `runs/<id>.json` | the run summary, the cleaning report and all its hours, as one object | 1 upload |
+| Stratus `runs/index.json` | the latest 20 run summaries, and the count of runs saved today (UTC) | 1 download, 1 upload |
+| Stratus `uploads/...` | the uploaded CSV (CSV uploads only) | 1 upload |
+| Data Store `runs` | one metadata row (source, file, peak, counts, cleaning report), best effort | 1 insert |
+
+- Stratus is the run store. The Data Store row is kept so that run metadata is queryable with ZCQL. When an insert is refused, for example by the free-tier quota, the run is still saved and `storage.datastore` is false.
+- Hourly rows are no longer written to `run_hours`. The table is read only for the runs saved before 2026-10-27.
+- Run ids are made by the API: `r` + the UTC time to the second + 6 random hex digits. They sort by time, and don't depend on Data Store ROWIDs.
+- **Daily save limit: 40 runs per UTC day.** That is at most 120 of the 2,000 monthly uploads, so no visitor or bot can use them all up in a day. Past it, forecasts still work, unsaved.
+- **Limitations.** The index is read, changed and written back with no lock, so two runs saved in the same second can drop one from the 20-run list. Both runs are still stored and can be opened by id.
 
 ## Storage
 
-**Data Store (Development):**
+**Data Store (Development).** `run_hours` holds only the runs saved before 2026-10-27:
 
 | Table | Columns |
 |---|---|
 | `runs` | `ROWID` (the run id), `CREATEDTIME`, `source_type`, `file_name`, `rows_in`, `n_rows`, `peak_kw`, `peak_at`, `overload_count`, `storage_hours`, `switch_count`, `start_at`, `end_at`, `csv_key`, `cleaning_json` |
 | `run_hours` | `run_id` → `runs.ROWID` (cascade delete), `idx`, `ts`, `temp_c`, `humidity_pct`, `solar_wm2`, `prediction_kw`, `grid_mode`, `is_overload`, `soc_pct`, `pv_kw`, `battery_kw`, `grid_kw`, `reason` |
 
-**Stratus:** uploaded CSVs go to the protected bucket `microgrid-uploads` (`UPLOAD_BUCKET` overrides the name). Keys look like `uploads/2026/10/26/153012-1a2b3c4d-name.csv`.
+**Stratus:** everything goes to the protected bucket `microgrid-uploads` (`UPLOAD_BUCKET` overrides the name).
+- Runs are at `runs/<id>.json`, and the index at `runs/index.json`.
+- Uploaded CSVs are at keys like `uploads/2026/10/26/153012-1a2b3c4d-name.csv`.
 
-**Free-tier cost per 1,000-hour run:**
-- 6 Data Store inserts (1 run row, plus hours in batches of 200), out of 5,000 a month;
-- 1 Stratus upload, out of 2,000 a month;
+**Free-tier cost per run:**
+- 2 Stratus uploads, plus 1 more for a CSV;
+- 1 Stratus download;
+- 1 Data Store insert, when the quota allows;
 - at most 1 QuickML call (rows already cached cost nothing), out of 500 a month.
 
-Reading a run back costs 5 ZCQL queries.
+Reading a run back costs 1 Stratus download, or 5 ZCQL queries for an older Data Store run. Listing runs costs 1 download plus 1 ZCQL query.

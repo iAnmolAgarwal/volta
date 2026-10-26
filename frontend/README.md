@@ -1,54 +1,20 @@
-# React + TypeScript + Vite
+# VOLTA frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The web app for the HackSphere 3.0 smart energy microgrid. It uses Vite, React 19, TypeScript, Three.js, Tailwind 4 and shadcn/ui (Recharts).
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```bash
+npm install
+npm run dev      # http://127.0.0.1:5173/ (proxies /api to the AppSail API)
+npm run build    # dist/, deployable to Catalyst Slate (framework react-vite)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- **Design tokens:** `src/styles/tokens.css`. Every screen uses them.
+- **shadcn variables:** `src/index.css` maps them to the tokens.
+- **Screen specs, rubrics and review notes:** `../design-notes/`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Credits
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+- The design is based on **[Sylva by MengTo](https://github.com/MengTo/sylva)**, used with the author's permission. Our code is our own: the palette, type scale, layout and motion follow Sylva, and the power-grid scene replaces its moss landscape.
+- [Lexend](https://www.lexend.com/), SIL Open Font License 1.1, via `@fontsource-variable/lexend`.
+- [Three.js](https://threejs.org/), MIT.
+- [shadcn/ui](https://ui.shadcn.com/), MIT. The chart structure follows its "Area Chart - Interactive" example.

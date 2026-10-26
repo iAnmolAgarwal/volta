@@ -145,6 +145,7 @@ export default function DashboardPage() {
         <PageHeader eyebrow={`Run ${runId}`} title="Controller" lede="The dashboard could not open this run." />
         <ErrorState
           error={load.error}
+          title={isApiError(load.error) && load.error.kind === "not_found" ? `We couldn't find run ${runId}` : undefined}
           action={
             <>
               <Pill icon={RotateCw} onClick={() => setAttempt((a) => a + 1)}>Retry</Pill>

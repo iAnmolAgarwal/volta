@@ -165,13 +165,16 @@ class CatalystRunStore:
         found = _unwrap(self._query("reading the run", f"SELECT * FROM {RUNS_TABLE} WHERE ROWID = {run_id}"), RUNS_TABLE)
         if not found:
             return None
-        hours, offset = [], 0
+        # Keyset paging on idx: ZCQL's LIMIT offset counts from 1, so offset paging
+        # repeats the last row of each page (seen live: 1,001 rows for a 1,000-hour run).
+        hours, last = [], -1
         while True:
             page = _unwrap(self._query("reading the hourly rows",
-                                       f"SELECT * FROM {HOURS_TABLE} WHERE run_id = {run_id} ORDER BY idx LIMIT {offset}, {SELECT_PAGE}"),
+                                       f"SELECT * FROM {HOURS_TABLE} WHERE run_id = {run_id} AND idx > {last} "
+                                       f"ORDER BY idx LIMIT 0, {SELECT_PAGE}"),
                            HOURS_TABLE)
             hours.extend(hour_from_row(r) for r in page)
             if len(page) < SELECT_PAGE:
                 break
-            offset += SELECT_PAGE
+            last = hours[-1]["index"]
         return run_from_row(found[0]), hours

@@ -42,15 +42,18 @@ class FakeZcql:
 
     def execute_query(self, query):
         self.db.queries.append(query)
-        m = re.match(r"SELECT (.+) FROM (\w+)(?: WHERE (\w+) = (\d+))?(?: ORDER BY (\w+)( DESC)?)? LIMIT (\d+), (\d+)$", query) \
-            or re.match(r"SELECT (.+) FROM (\w+) WHERE (\w+) = (\d+)()()()()$", query)
-        cols, table, where_col, where_val, order, desc, offset, count = m.groups()
+        m = re.match(r"SELECT (.+) FROM (\w+)(?: WHERE (\w+) = (\d+)(?: AND idx > (-?\d+))?)?"
+                     r"(?: ORDER BY (\w+)( DESC)?)?(?: LIMIT (\d+), (\d+))?$", query)
+        cols, table, where_col, where_val, after, order, desc, offset, count = m.groups()
         rows = [r for r in self.db.tables[table] if not where_col or r.get(where_col) == where_val]
+        if after is not None:
+            rows = [r for r in rows if int(r["idx"]) > int(after)]
         if order:
             key = (lambda r: int(r[order])) if order == "idx" else (lambda r: int(r["ROWID"]))
             rows = sorted(rows, key=key, reverse=bool(desc))
-        if offset:
-            rows = rows[int(offset):int(offset) + int(count)]
+        if offset is not None:
+            start = max(int(offset) - 1, 0)  # like Catalyst: the offset counts from 1, and 0 acts as 1
+            rows = rows[start:start + int(count)]
         if cols != "*":
             rows = [{c: r.get(c) for c in cols.split(", ")} for r in rows]
         return [{table: r} for r in rows]

@@ -1,0 +1,985 @@
+/* The app routes (/dashboard, /input, /history): the shell and the shared
+ * components in src/components/app/.
+ *
+ * Every piece is Sylva's vocabulary (https://mengto.github.io/sylva/) at
+ * Sylva's sizes, on its 1600-unit artboard (--u; 760 units below 900px):
+ * glass pills like the dock, paper and moss-glass cards, side-stat marks,
+ * spaced-caps labels, light Lexend headlines, faint guides, mask-wipe
+ * entrances. Every colour is a token. Written for VOLTA; no Sylva code copied.
+ */
+
+/* ── the type scale, floored on phones (Sylva's max() idiom) ─────────────── */
+.va {
+  --a-caps: var(--t-dock);                        /* dock captions: 11, spaced caps */
+  --a-small: var(--t-stat);                       /* side-stat text: 13.5 */
+  --a-body: var(--t-card-label);                  /* card label: 15.5 */
+  --a-lede: var(--t-lede);                        /* lede: 16.5 / 22 */
+  --a-lede-lh: var(--t-lede-lh);
+  --a-title: var(--t-card-title);                 /* card title: 26.2 / 27 */
+  --a-title-lh: var(--t-card-title-lh);
+  --a-display: var(--t-display);                  /* headline: 63 / 65 */
+  --a-display-lh: var(--t-display-lh);
+  --a-gap: calc(24 * var(--u));                   /* between cards (card 2 sits 17 off card 1's corner; a touch more for data) */
+  --a-pad: calc(38 * var(--u));                   /* card padding: the card label's 38 inset */
+  --a-rail: calc(46 * var(--u));                  /* the headline's left rail */
+  --a-top: calc((38 + 46 + 74) * var(--u));       /* dock top + dock height + the headline's clearance */
+}
+
+/* ── the field: Sylva's hero olive and light pool, fixed behind the page ─── */
+.va {
+  position: relative;
+  min-height: 100svh;
+  isolation: isolate;
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: var(--w-light);
+}
+/* it spans the whole page, so the guides run its length and the ghost word
+   signs its foot, as Sylva's signs the hero's */
+.va-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(64% 52% at 27% 84%, var(--hero-pool) 0%, var(--floor-light-none) 72%),
+    radial-gradient(70% 60% at 92% 8%, var(--hero-shade) 0%, transparent 68%),
+    var(--bg-hero);
+}
+/* the floor of light, faint: there is no landscape to stand in it here */
+.va-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--floor-light-none) 62%, var(--floor-light-low) 86%, var(--floor-light-edge) 100%);
+}
+.va-frame {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: calc(1600 * var(--u));
+  margin-left: calc(-800 * var(--u));
+}
+.va-guides { position: absolute; inset: 0; animation: va-fade var(--dur-reveal) var(--ease) 600ms backwards; }
+.va-guides i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, var(--rule-none) 0%, var(--rule) 14%, var(--rule) 80%, var(--rule-none) 100%);
+}
+.va-guides i:nth-child(1) { left: calc(405 * var(--u)); }
+.va-guides i:nth-child(2) { left: calc(748 * var(--u)); }
+.va-guides i:nth-child(3) { left: calc(1091 * var(--u)); }
+.va-ghost {
+  position: absolute;
+  left: calc(6 * var(--u));
+  bottom: calc(-64 * var(--u));
+  font-size: var(--t-ghost);
+  line-height: 0.78;
+  font-weight: var(--w-regular);
+  letter-spacing: var(--track-ghost);
+  color: var(--rule);
+  white-space: nowrap;
+  user-select: none;
+  animation: va-ghost var(--dur-reveal) var(--ease) 400ms backwards;
+}
+@keyframes va-ghost { from { color: var(--rule-ghost-start); } }
+
+/* ── the dock: the landing's, fixed at the top ───────────────────────────── */
+.va .vl-dock-wrap { position: fixed; }
+/* there is no live canvas under it here, so it can frost what scrolls beneath */
+.va .vl-dock { backdrop-filter: blur(calc(14 * var(--u))) saturate(1.1); -webkit-backdrop-filter: blur(calc(14 * var(--u))) saturate(1.1); }
+.va .vl-dock { animation: va-fade var(--dur) var(--ease) 80ms backwards; }
+.va .vl-dock-item { animation: va-drop 0.9s var(--ease-out) var(--d, 0ms) backwards; }
+@keyframes va-drop { from { clip-path: inset(0 0 105% 0); } to { clip-path: inset(0 0 -30% 0); } }
+
+.va-skip {
+  position: fixed;
+  z-index: calc(var(--z-dock) + 1);
+  left: var(--a-rail);
+  top: calc(38 * var(--u));
+  padding: calc(10 * var(--u)) calc(16 * var(--u));
+  border-radius: var(--r-dock);
+  background: var(--paper);
+  color: var(--paper-ink);
+  font-size: max(var(--t-min), var(--a-caps));
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  text-decoration: none;
+  opacity: 0;
+  pointer-events: none;
+}
+.va-skip:focus-visible { opacity: 1; pointer-events: auto; }
+
+/* ── the page column ─────────────────────────────────────────────────────── */
+.va-main { display: block; outline: none; }
+.va-page {
+  width: calc(1600 * var(--u));
+  margin: 0 auto;
+  padding: var(--a-top) var(--a-rail) calc(140 * var(--u));
+  display: flex;
+  flex-direction: column;
+  gap: var(--a-gap);
+}
+
+/* ── page header: Sylva's headline, lede and actions ─────────────────────── */
+.va-head {
+  display: grid;
+  /* the headline on the rail, the lede between the first and second guides
+     (Sylva's lede at x 520), the actions out to the right edge */
+  grid-template-columns: calc(474 * var(--u)) calc(228 * var(--u)) 1fr;
+  align-items: start;
+  margin-bottom: calc(26 * var(--u));
+}
+.va-head-titles { grid-column: 1; min-width: 0; }
+.va-eyebrow {
+  margin: 0 0 calc(14 * var(--u));
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.va-display {
+  margin: 0;
+  font-size: var(--a-display);
+  line-height: var(--a-display-lh);
+  font-weight: var(--w-light);
+  letter-spacing: var(--track-display);
+  color: var(--ink);
+}
+.va-lede {
+  grid-column: 2;
+  margin: calc(-6 * var(--u)) 0 0; /* Sylva's lede tops out 6 above the headline */
+  font-size: var(--a-lede);
+  line-height: var(--a-lede-lh);
+  font-weight: var(--w-light);
+  color: var(--ink-soft);
+}
+.va-head-titles:has(.va-eyebrow) ~ .va-lede { margin-top: calc(26 * var(--u)); }
+.va-head-actions {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  padding-top: calc(4 * var(--u));
+}
+
+/* ── GlassCard ───────────────────────────────────────────────────────────── */
+.va-card {
+  --mr: var(--r-card);
+  position: relative;
+  min-width: 0;
+  padding: var(--a-pad);
+  border-radius: var(--r-card);
+  transition: box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.va-card--paper {
+  background: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: var(--paper-shadow);
+}
+.va-card--paper:hover { box-shadow: var(--paper-shadow-hover); }
+.va-card--glass {
+  background: linear-gradient(180deg, var(--plate-sheen-low), transparent 40%), var(--glass-card);
+  color: var(--glass-card-ink);
+  box-shadow: inset 0 0 0 1px var(--glass-card-edge), var(--glass-shadow);
+  backdrop-filter: blur(calc(18 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(18 * var(--u)));
+}
+.va-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(16 * var(--u));
+  margin-bottom: calc(20 * var(--u));
+}
+.va-card-heading { min-width: 0; }
+.va-card-label {
+  margin: 0 0 calc(6 * var(--u)); /* Sylva: label at 152, title at 177 (25 apart, a 15.5 line) */
+  font-size: var(--a-body);
+  font-weight: var(--w-light);
+  color: var(--ink-soft);
+}
+.va-card--paper .va-card-label { color: var(--paper-label); }
+.va-card-title {
+  margin: 0;
+  font-size: var(--a-title);
+  line-height: var(--a-title-lh);
+  font-weight: var(--w-regular);
+  letter-spacing: var(--track-card);
+}
+.va-card-aside { flex: none; display: flex; align-items: center; gap: calc(8 * var(--u)); }
+.va-card.has-knob { padding-bottom: calc(var(--a-pad) + 40 * var(--u)); }
+
+/* Sylva's knob: the white disc on the card's lower-right corner */
+.va-knob {
+  --knob-size: calc(54 * var(--u));
+  position: absolute;
+  right: calc(26 * var(--u));
+  bottom: calc(26 * var(--u));
+  display: grid;
+  place-items: center;
+  width: var(--knob-size);
+  height: var(--knob-size);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-round);
+  background: none;
+  cursor: pointer;
+}
+.va-knob-disc {
+  display: grid;
+  place-items: center;
+  width: var(--knob-size);
+  height: var(--knob-size);
+  border-radius: var(--r-round);
+  background: var(--knob);
+  color: var(--knob-ink);
+  box-shadow: var(--knob-shadow);
+  transition: transform 0.5s var(--ease-out), background 0.4s var(--ease);
+}
+.va-knob svg { width: calc(19 * var(--u)); height: calc(19 * var(--u)); display: block; }
+.va-knob:hover .va-knob-disc { transform: scale(1.1) rotate(8deg); background: var(--knob-hover); }
+.va-card--glass .va-knob-disc { background: var(--paper); }
+
+/* the dark moss plate a chart sits in (the landing cards' figure) */
+.va-plate {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--r-portal);
+  background: linear-gradient(var(--glass-card), var(--glass-card)), var(--bg-deep);
+  box-shadow: inset 0 0 0 1px var(--glass-card-edge);
+}
+.va-plate-media { position: absolute; inset: 0; }
+/* the white scan that rides the plate as its chart draws in */
+.va-plate::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  width: 26%;
+  left: -13%;
+  filter: blur(calc(2 * var(--u)));
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--portal-scan) 42%, var(--portal-scan-hot) 54%, transparent);
+}
+
+/* ── Pill ────────────────────────────────────────────────────────────────── */
+.va-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8 * var(--u));
+  height: calc(36 * var(--u));            /* a dock item */
+  padding: 0 calc(14 * var(--u));
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass);
+  color: var(--ink-soft);
+  font-family: var(--font);
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.18s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.5s var(--ease-out);
+}
+.va-pill--sm { height: calc(28 * var(--u)); padding: 0 calc(11 * var(--u)); gap: calc(6 * var(--u)); }
+.va-pill b { font-weight: var(--w-semibold); color: var(--ink); }
+.va-pill-glyph { width: calc(14 * var(--u)); height: calc(14 * var(--u)); flex: none; opacity: 0.72; }
+.va-pill-glyph svg { display: block; width: 100%; height: 100%; }
+.va-pill-label { transform: translateY(calc(0.5 * var(--u))); font-variant-numeric: tabular-nums; }
+.va-pill.is-action { cursor: pointer; }
+.va-pill.is-action:hover { color: var(--ink); border-color: var(--glass-rim); background: var(--dock-near-bg); box-shadow: 0 calc(7 * var(--u)) calc(16 * var(--u)) var(--dock-shadow); }
+.va-pill.is-action:hover .va-pill-glyph { opacity: 1; }
+.va-pill.is-action:active { transform: translateY(calc(1 * var(--u))); transition-duration: 0.1s; }
+.va-pill:disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+.va-pill--volt { color: var(--volt); border-color: var(--volt-soft); background: var(--volt-glow); }
+.va-pill--volt .va-pill-glyph { opacity: 1; }
+.va-pill--overload { color: var(--ink); border-color: var(--overload-soft); background: var(--overload-glow); }
+.va-pill--overload.is-action:hover { border-color: var(--overload); background: var(--overload-soft); }
+/* pressed / current: the cards' paper, as the active dock item */
+.va-pill.is-on,
+.va-pill.is-on:hover {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) var(--dock-active-shadow);
+}
+.va-pill.is-on b { color: var(--paper-ink); }
+.va-pill--overload.is-on { box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) var(--dock-active-shadow), inset 0 0 0 1px var(--overload); }
+.va-card--paper .va-pill { color: var(--paper-label); border-color: var(--paper-label); background: transparent; }
+.va-card--paper .va-pill b { color: var(--paper-ink); }
+
+/* the overload flag (the landing's, on dark glass) */
+.va-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  height: calc(22 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  border-radius: 999px;
+  background: var(--overload-soft);
+  color: var(--ink);
+  font-size: calc(11 * var(--u));
+  font-weight: var(--w-medium);
+  letter-spacing: calc(0.8 * var(--u));
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.va-flag i { width: calc(6 * var(--u)); height: calc(6 * var(--u)); border-radius: var(--r-round); background: var(--overload); flex: none; }
+
+/* ── ModeBadge: a dock-style glass pill ──────────────────────────────────── */
+.va-mode { display: flex; flex-direction: column; align-items: flex-start; gap: calc(12 * var(--u)); min-width: 0; }
+.va-mode-pill {
+  --tile: calc(36 * var(--u));
+  display: inline-flex;
+  align-items: center;
+  gap: calc(12 * var(--u));
+  padding: calc(5 * var(--u)) calc(16 * var(--u)) calc(5 * var(--u)) calc(5 * var(--u));
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-dock);
+  background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg);
+  box-shadow: 0 calc(8 * var(--u)) calc(22 * var(--u)) var(--dock-shadow), inset 0 1px var(--dock-inset);
+}
+.va-mode-tile {
+  display: grid;
+  place-items: center;
+  width: var(--tile);
+  height: var(--tile);
+  flex: none;
+  border-radius: var(--r-dock-item);
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
+  color: var(--mode-grid);
+  transition: color 0.4s var(--ease), background 0.4s var(--ease), border-color 0.4s var(--ease), box-shadow 0.4s var(--ease);
+}
+.va-mode-tile svg { width: 46%; height: 46%; display: block; }
+.va-mode.is-storage .va-mode-tile { color: var(--mode-storage); border-color: var(--volt-soft); background: var(--volt-glow); box-shadow: 0 0 calc(18 * var(--u)) var(--volt-glow); }
+.va-mode-text { display: flex; flex-direction: column; gap: calc(3 * var(--u)); min-width: 0; }
+.va-mode-eyebrow { display: flex; align-items: center; gap: calc(8 * var(--u)); font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--ink-faint); line-height: 1; }
+.va-mode-name { font-size: calc(17 * var(--u)); font-weight: var(--w-regular); letter-spacing: var(--track-card); color: var(--ink); line-height: 1.1; white-space: nowrap; }
+.va-mode.is-storage .va-mode-eyebrow { color: var(--mode-storage); }
+.va-mode .va-flag { height: calc(18 * var(--u)); padding: 0 calc(8 * var(--u)); font-size: calc(9.5 * var(--u)); color: var(--ink); }
+.va-mode-reason { margin: 0; max-width: calc(380 * var(--u)); font-size: var(--a-small); line-height: 1.5; color: var(--ink-soft); }
+.va-mode--lg .va-mode-pill { --tile: calc(46 * var(--u)); padding-right: calc(20 * var(--u)); border-radius: calc(18 * var(--u)); }
+.va-mode--lg .va-mode-tile { border-radius: var(--r-dock); }
+.va-mode--lg .va-mode-name { font-size: calc(22 * var(--u)); }
+
+/* ── RingGauge: the side-stat ring, grown ────────────────────────────────── */
+.va-ring { --ring: calc(232 * var(--u)); margin: 0; display: flex; flex-direction: column; align-items: center; gap: calc(18 * var(--u)); }
+.va-ring-label { align-self: stretch; font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--ink-faint); }
+.va-ring-dial { position: relative; width: var(--ring); height: var(--ring); }
+.va-ring-dial svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.va-ring-track { fill: none; stroke: var(--ink-mark); stroke-width: 1.4; stroke-linecap: round; stroke-dasharray: 0.1 6.3; }
+.va-ring-inner { fill: none; stroke: var(--rule); stroke-width: 1; }
+.va-ring-arc {
+  fill: none;
+  stroke: var(--volt);
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 calc(5 * var(--u)) var(--volt-soft));
+  transition: stroke-dashoffset var(--dur) var(--ease-out), stroke 0.4s var(--ease);
+}
+.va-ring-head { fill: var(--paper); stroke: var(--bg-deep); stroke-width: 1.5; filter: drop-shadow(0 0 calc(6 * var(--u)) var(--volt-soft)); }
+.va-ring-reserve { stroke: var(--ink-faint); stroke-width: 1.2; stroke-linecap: round; }
+.va-ring.at-reserve .va-ring-arc { stroke: var(--flow-battery); }
+.va-ring-centre { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(4 * var(--u)); }
+.va-ring-pct { font-size: calc(54 * var(--u)); line-height: 1; font-weight: var(--w-light); letter-spacing: var(--track-display); font-variant-numeric: tabular-nums; }
+.va-ring-pct small { font-size: 0.42em; margin-left: calc(2 * var(--u)); color: var(--ink-soft); letter-spacing: 0; }
+.va-ring-kwh { font-size: var(--a-small); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.va-ring-head { transition: cx var(--dur) var(--ease-out), cy var(--dur) var(--ease-out); }
+.va-ring.is-charging .va-ring-head,
+.va-ring.is-discharging .va-ring-head { animation: va-breathe 2.4s var(--ease) infinite; }
+@keyframes va-breathe { 50% { opacity: 0.55; } }
+.va-ring-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(14 * var(--u)) calc(28 * var(--u)); margin: 0; }
+
+/* a side stat, in flow (Sylva's .stat: a faint mark, a soft label, a bold value) */
+.va-stat { display: flex; align-items: flex-start; gap: calc(9 * var(--u)); }
+.va-stat-mark {
+  display: grid;
+  place-items: center;
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  flex: none;
+  margin-top: calc(2 * var(--u));
+  border-radius: var(--r-round);
+  border: 1px dotted var(--ink-mark);
+  color: var(--ink-soft);
+}
+.va-stat-mark svg { width: 46%; height: 46%; display: block; }
+.va-stat--solar .va-stat-mark { color: var(--flow-solar); }
+.va-stat dt,
+.va-stat dd { margin: 0; white-space: nowrap; }
+.va-stat dt { font-size: var(--a-small); font-weight: var(--w-light); color: var(--ink-soft); line-height: calc(19 * var(--u)); }
+.va-stat dd { font-size: var(--a-small); font-weight: var(--w-semibold); color: var(--ink); line-height: calc(21 * var(--u)); font-variant-numeric: tabular-nums; }
+
+/* ── AlertBanner: a full-width glass pill in --overload ──────────────────── */
+.va-alert {
+  --mr: var(--r-pill);
+  display: flex;
+  align-items: center;
+  gap: calc(16 * var(--u));
+  min-width: 0;
+  padding: calc(9 * var(--u)) calc(10 * var(--u)) calc(9 * var(--u)) calc(9 * var(--u));
+  border: 1px solid var(--overload-soft);
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--overload-glow), transparent 46%), linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg);
+  box-shadow: 0 calc(8 * var(--u)) calc(22 * var(--u)) var(--dock-shadow), inset 0 1px var(--dock-inset);
+  backdrop-filter: blur(calc(14 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(14 * var(--u)));
+}
+.va-alert-icon {
+  display: grid;
+  place-items: center;
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  flex: none;
+  border-radius: var(--r-round);
+  background: var(--overload-soft);
+  color: var(--ink);
+  box-shadow: 0 0 calc(22 * var(--u)) var(--overload-glow);
+}
+.va-alert-icon svg { width: 44%; height: 44%; display: block; }
+.va-alert-text { flex: none; min-width: 0; }
+.va-alert-eyebrow { margin: 0 0 calc(3 * var(--u)); font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--overload); line-height: 1.2; }
+.va-alert-title { margin: 0; font-size: var(--a-body); font-weight: var(--w-regular); color: var(--ink); white-space: nowrap; }
+.va-num { font-variant-numeric: tabular-nums; }
+.va-alert-chips {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: calc(6 * var(--u));
+  margin: 0;
+  padding: calc(4 * var(--u)) calc(14 * var(--u));
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 calc(14 * var(--u)), #000 calc(100% - 22 * var(--u)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 calc(14 * var(--u)), #000 calc(100% - 22 * var(--u)), transparent);
+}
+.va-alert-chips::-webkit-scrollbar { display: none; }
+.va-alert-chips li { flex: none; }
+.va-alert-close {
+  display: grid;
+  place-items: center;
+  width: calc(36 * var(--u));
+  height: calc(36 * var(--u));
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-round);
+  background: var(--glass);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: color 0.18s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.va-alert-close:hover { color: var(--ink); background: var(--glass-hover); border-color: var(--glass-rim); }
+.va-alert-close svg { width: 44%; height: 44%; display: block; }
+
+/* ── LogItem: a Field Note ───────────────────────────────────────────────── */
+.va-log {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(14 * var(--u));
+  width: 100%;
+  padding: calc(14 * var(--u)) calc(18 * var(--u)) calc(14 * var(--u)) calc(14 * var(--u));
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius);
+  background: var(--glass);
+  color: var(--ink);
+  font-family: var(--font);
+  text-align: left;
+  text-decoration: none;
+  transition: background 0.25s var(--ease), border-color 0.25s var(--ease), color 0.25s var(--ease), box-shadow 0.35s var(--ease), transform 0.5s var(--ease-out);
+}
+.va-log.is-action { cursor: pointer; }
+.va-log.is-action:hover { background: var(--glass-hover); border-color: var(--glass-rim); }
+.va-log-mark {
+  display: grid;
+  place-items: center;
+  width: calc(34 * var(--u));
+  height: calc(34 * var(--u));
+  border-radius: var(--r-round);
+  border: 1px dotted var(--ink-mark);
+  color: var(--ink-soft);
+}
+.va-log-mark svg { width: 44%; height: 44%; display: block; }
+.va-log--overload .va-log-mark { border-style: solid; border-color: var(--overload-soft); background: var(--overload-glow); color: var(--ink); }
+.va-log--switch .va-log-mark { color: var(--volt); border-color: var(--volt-soft); }
+.va-log-text { display: flex; flex-direction: column; gap: calc(4 * var(--u)); min-width: 0; }
+.va-log-label { font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--ink-faint); line-height: 1.2; }
+.va-log--overload .va-log-label { color: var(--overload); }
+.va-log-title { font-size: var(--a-body); font-weight: var(--w-regular); line-height: 1.3; letter-spacing: calc(-0.2 * var(--u)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.va-log-meta { font-size: var(--a-small); font-weight: var(--w-medium); color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* active: the cards' paper */
+.va-log.is-active,
+.va-log.is-active:hover {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: 0 calc(10 * var(--u)) calc(24 * var(--u)) var(--dock-active-shadow);
+}
+.va-log.is-active .va-log-label { color: var(--paper-label); }
+.va-log.is-active .va-log-meta { color: var(--paper-ink); }
+.va-log.is-active .va-log-mark { border-color: var(--paper-label); color: var(--paper-ink); background: transparent; }
+.va-log--overload.is-active .va-log-mark { background: var(--overload-soft); border-color: var(--overload); }
+
+/* ── MainChart ───────────────────────────────────────────────────────────── */
+.va-chart-card { --chart-h: calc(360 * var(--u)); }
+.va-chart-card .va-card-head { margin-bottom: calc(4 * var(--u)); }
+.va-chart-desc { margin: 0 0 calc(18 * var(--u)); font-size: var(--a-small); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.va-chart-plate { height: var(--chart-h); margin: 0 calc(-24 * var(--u)); }
+.va-axis-unit {
+  position: absolute;
+  z-index: 1;
+  left: calc(14 * var(--u));
+  top: calc(10 * var(--u));
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+.va-chart { font-family: var(--font); }
+.va-chart .recharts-cartesian-axis-tick text { fill: var(--ink-faint); font-size: max(var(--t-min), var(--a-caps)); font-weight: var(--w-light); font-variant-numeric: tabular-nums; }
+.va-chart .recharts-cartesian-grid line { stroke: var(--chart-grid-line); }
+.va-chart .recharts-area-curve { filter: drop-shadow(0 0 calc(4 * var(--u)) var(--area-glow, var(--flow-grid-glow))); }
+.va-area--grid { --area-glow: var(--flow-grid-glow); }
+.va-area--battery { --area-glow: var(--flow-battery-glow); }
+.va-area--pv { --area-glow: var(--flow-solar-glow); }
+.va-overload-dot { fill: var(--flow-overload); stroke: var(--bg-deep); stroke-width: 1.2; }
+.va-focus-dot { filter: drop-shadow(0 0 calc(6 * var(--u)) var(--volt-soft)); }
+.va-ref-label { fill: var(--ink-faint); font-size: max(var(--t-min), var(--a-caps)); font-weight: var(--w-regular); letter-spacing: calc(0.4 * var(--u)); }
+.va-ref-label--overload { fill: var(--overload); }
+.va-band-label { fill: var(--volt); opacity: 0.7; font-size: max(var(--t-min), var(--a-caps)); font-weight: var(--w-medium); letter-spacing: var(--track-dock); }
+.va-chart .recharts-surface:focus { outline: none; }
+.va-chart .recharts-wrapper:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: calc(-4 * var(--u)); border-radius: var(--r-portal); }
+
+/* the range select: a small dock of its own */
+.va-range {
+  display: inline-flex;
+  gap: calc(3 * var(--u));
+  padding: calc(4 * var(--u));
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-dock);
+  background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg);
+  box-shadow: inset 0 1px var(--dock-inset);
+}
+.va-range-item {
+  height: calc(30 * var(--u));
+  padding: 0 calc(12 * var(--u));
+  border: 1px solid transparent;
+  border-radius: var(--r-dock-item);
+  background: transparent;
+  color: var(--ink-faint);
+  font-family: var(--font);
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.18s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.va-range-item:hover { color: var(--ink); background: var(--glass); }
+.va-range-item.is-on { background: var(--paper); border-color: var(--paper); color: var(--paper-ink); box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) var(--dock-active-shadow); }
+
+/* the tooltip: a small glass panel in Lexend */
+.va-tip {
+  display: grid;
+  gap: calc(7 * var(--u));
+  width: calc(236 * var(--u));
+  padding: calc(11 * var(--u)) calc(13 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: 1px solid var(--glass-edge);
+  background: var(--popover);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: max(var(--t-min), calc(11.5 * var(--u)));
+  font-weight: var(--w-light);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(calc(10 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(10 * var(--u)));
+}
+.va-tip-head { display: flex; align-items: center; justify-content: space-between; gap: calc(8 * var(--u)); color: var(--ink-soft); }
+.va-tip-time b { color: var(--ink); font-weight: var(--w-semibold); font-variant-numeric: tabular-nums; }
+.va-tip .va-flag { height: calc(18 * var(--u)); padding: 0 calc(8 * var(--u)); font-size: max(var(--t-min), calc(9.5 * var(--u))); }
+.va-tip-kw { font-size: calc(22 * var(--u)); font-weight: var(--w-light); letter-spacing: var(--track-card); line-height: 1; }
+.va-tip-kw small { font-size: max(var(--t-min), var(--a-caps)); color: var(--ink-faint); letter-spacing: 0; margin-left: calc(2 * var(--u)); }
+.va-tip-mode { display: flex; align-items: center; gap: calc(6 * var(--u)); font-weight: var(--w-medium); color: var(--mode-grid); }
+.va-tip-mode.is-storage { color: var(--mode-storage); }
+.va-tip-mode svg { width: calc(14 * var(--u)); height: calc(14 * var(--u)); flex: none; }
+.va-tip-rows { display: grid; gap: calc(5 * var(--u)); padding-top: calc(7 * var(--u)); border-top: 1px solid var(--glass-edge); }
+.va-tip-row { display: flex; align-items: center; gap: calc(7 * var(--u)); }
+.va-tip-row i { width: calc(7 * var(--u)); height: calc(7 * var(--u)); border-radius: var(--r-round); flex: none; box-shadow: 0 0 calc(6 * var(--u)) currentColor; }
+.va-tip-row i.is-hollow { box-shadow: none; border: 1px solid var(--ink-faint); }
+.va-tip-row span { color: var(--ink-soft); }
+.va-tip-row b { margin-left: auto; font-weight: var(--w-medium); font-variant-numeric: tabular-nums; }
+.va-tip-reason { margin: 0; padding-top: calc(7 * var(--u)); border-top: 1px solid var(--glass-edge); color: var(--ink-soft); line-height: 1.45; }
+
+/* the legend: the swatches the plate uses, in faint Lexend */
+.va-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(8 * var(--u)) calc(22 * var(--u));
+  margin: calc(18 * var(--u)) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--a-small);
+  color: var(--ink-soft);
+}
+.va-legend li { display: inline-flex; align-items: center; gap: calc(8 * var(--u)); white-space: nowrap; }
+.va-legend-swatch { width: calc(9 * var(--u)); height: calc(9 * var(--u)); border-radius: var(--r-round); background: var(--sw); box-shadow: 0 0 calc(7 * var(--u)) var(--sw); }
+.va-legend-line { width: calc(16 * var(--u)); height: 1.5px; background: var(--ink); opacity: 0.8; }
+.va-legend-dash { width: calc(16 * var(--u)); border-top: 1.5px dashed var(--chart-ref-line); }
+.va-legend-dash--overload { border-top-color: var(--overload-soft); }
+.va-legend-band { width: calc(14 * var(--u)); height: calc(12 * var(--u)); border-radius: calc(3 * var(--u)); background: var(--volt-glow); box-shadow: inset 0 0 0 1px var(--volt-glow); }
+
+/* ── DropZone ────────────────────────────────────────────────────────────── */
+.va-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8 * var(--u));
+  min-height: calc(230 * var(--u));
+  padding: calc(34 * var(--u));
+  overflow: hidden;
+  border: 1.5px dashed var(--glass-rim);
+  border-radius: var(--r-portal);
+  background: var(--glass);
+  color: var(--ink);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease), background 0.25s var(--ease), box-shadow 0.35s var(--ease);
+}
+.va-drop:hover { background: var(--glass-hover); border-color: var(--ink-faint); }
+.va-drop.is-over { border-color: var(--volt); border-style: solid; background: var(--volt-glow); box-shadow: inset 0 0 calc(40 * var(--u)) var(--volt-glow); }
+.va-drop:focus-within { outline: 2px solid var(--focus-ring); outline-offset: calc(4 * var(--u)); }
+.va-drop.is-busy,
+.va-drop.is-disabled { cursor: default; }
+.va-drop.is-disabled { opacity: 0.5; }
+.va-drop-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip-path: inset(50%); }
+.va-drop-mark {
+  display: grid;
+  place-items: center;
+  width: calc(58 * var(--u));
+  height: calc(58 * var(--u));
+  margin-bottom: calc(8 * var(--u));
+  border-radius: var(--r-round);
+  border: 1px dotted var(--ink-mark);
+  color: var(--ink-soft);
+  transition: color 0.25s var(--ease), border-color 0.25s var(--ease), transform 0.5s var(--ease-out);
+}
+.va-drop-mark svg { width: 38%; height: 38%; display: block; }
+.va-drop:hover .va-drop-mark { color: var(--ink); transform: translateY(calc(-2 * var(--u))); }
+.va-drop.is-over .va-drop-mark { color: var(--volt); border-color: var(--volt-soft); transform: translateY(calc(-4 * var(--u))) scale(1.06); }
+.va-drop-title { font-size: calc(19 * var(--u)); font-weight: var(--w-regular); letter-spacing: var(--track-card); }
+.va-drop-hint { max-width: calc(380 * var(--u)); font-size: var(--a-small); line-height: 1.5; color: var(--ink-faint); }
+.va-drop-file { margin-top: calc(10 * var(--u)); text-transform: none; letter-spacing: 0; }
+
+/* ── Field ───────────────────────────────────────────────────────────────── */
+.va-field { display: flex; flex-direction: column; gap: calc(8 * var(--u)); min-width: 0; }
+.va-field-label { font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--ink-faint); }
+.va-field-box {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(46 * var(--u));              /* the dock's height */
+  padding: 0 calc(16 * var(--u));
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-dock);
+  background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg);
+  box-shadow: inset 0 1px var(--dock-inset);
+  transition: border-color 0.2s var(--ease), box-shadow 0.25s var(--ease), background 0.2s var(--ease);
+}
+.va-field-box:hover { border-color: var(--glass-rim); }
+.va-field-box:focus-within { border-color: var(--glass-rim); box-shadow: inset 0 1px var(--dock-inset), 0 0 0 calc(3 * var(--u)) var(--volt-glow); }
+.va-field-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--a-body);
+  font-weight: var(--w-regular);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+.va-field-input::placeholder { color: var(--ink-faint); }
+.va-field-input::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; cursor: pointer; }
+.va-field-suffix { font-size: var(--a-small); color: var(--ink-faint); }
+.va-field-hint,
+.va-field-error { display: flex; align-items: center; gap: calc(6 * var(--u)); margin: 0; font-size: var(--a-small); line-height: 1.4; color: var(--ink-faint); }
+.va-field-error { color: var(--overload); }
+.va-field-error svg { width: calc(14 * var(--u)); height: calc(14 * var(--u)); flex: none; }
+.va-field.is-invalid .va-field-box { border-color: var(--overload-soft); box-shadow: inset 0 1px var(--dock-inset), 0 0 0 calc(3 * var(--u)) var(--overload-glow); }
+.va-field.is-disabled { opacity: 0.5; }
+
+/* ── states: loading, empty, error ───────────────────────────────────────── */
+.va-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, var(--glass-hover) 50%, transparent 70%);
+  background-size: 250% 100%;
+  animation: va-shimmer 1.6s var(--ease) infinite;
+}
+@keyframes va-shimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+.va-shimmer-box {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--glass-card);
+  box-shadow: inset 0 0 0 1px var(--glass-card-edge);
+}
+.va-shimmer-box--overlay { position: absolute; inset: 0; border-radius: inherit; background: transparent; box-shadow: none; }
+.va-shimmer-box--card { min-height: calc(260 * var(--u)); }
+.va-shimmer-box--chart { min-height: calc(500 * var(--u)); }
+.va-shimmer-text { display: grid; gap: calc(12 * var(--u)); }
+.va-shimmer-line { position: relative; display: block; height: calc(16 * var(--u)); overflow: hidden; border-radius: 999px; background: var(--glass-hover); }
+.va-shimmer-line:first-child { width: 62%; height: calc(40 * var(--u)); }
+.va-shimmer-line:nth-child(2) { width: 84%; }
+.va-shimmer-line:nth-child(3) { width: 48%; }
+
+.va-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  padding: calc(56 * var(--u)) calc(34 * var(--u));
+  text-align: center;
+}
+.va-state--card {
+  border-radius: var(--r-card);
+  background: var(--glass-card);
+  box-shadow: inset 0 0 0 1px var(--glass-card-edge), var(--glass-shadow);
+  animation: va-wipe 1.05s var(--ease-out) 200ms backwards;
+}
+.va-state-mark {
+  display: grid;
+  place-items: center;
+  width: calc(76 * var(--u));
+  height: calc(76 * var(--u));
+  margin-bottom: calc(10 * var(--u));
+  border-radius: var(--r-round);
+  border: 1px dotted var(--ink-mark);
+  color: var(--ink-soft);
+  box-shadow: 0 0 0 calc(10 * var(--u)) var(--glass), 0 0 0 calc(11 * var(--u)) var(--rule);
+}
+.va-state-mark svg { width: 36%; height: 36%; display: block; }
+.va-state--error .va-state-mark { color: var(--ink); border: 1px solid var(--overload-soft); background: var(--overload-glow); box-shadow: 0 0 0 calc(10 * var(--u)) var(--overload-glow), 0 0 0 calc(11 * var(--u)) var(--rule); }
+.va-state-title { margin: 0; font-size: var(--a-title); line-height: var(--a-title-lh); font-weight: var(--w-light); letter-spacing: var(--track-card); }
+.va-state-body { margin: 0; max-width: calc(440 * var(--u)); font-size: var(--a-body); line-height: 1.5; color: var(--ink-soft); }
+.va-state-code { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.va-state-details { margin: calc(4 * var(--u)) 0 0; padding: 0; list-style: none; display: grid; gap: calc(4 * var(--u)); font-size: var(--a-small); color: var(--ink-faint); }
+.va-state-action { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(8 * var(--u)); margin-top: calc(14 * var(--u)); }
+
+/* ── focus ───────────────────────────────────────────────────────────────── */
+.va a:focus-visible,
+.va button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: calc(4 * var(--u));
+}
+.va .vl-dock-item:focus-visible { border-radius: var(--r-dock-item); }
+.va .va-pill:focus-visible { border-radius: 999px; }
+.va .va-card--paper a:focus-visible,
+.va .va-card--paper button:focus-visible,
+.va .va-log.is-active:focus-visible { outline-color: var(--focus-ring-dark); }
+.va .va-card--paper .va-knob:focus-visible,
+.va .va-card--glass .va-knob:focus-visible { border-radius: var(--r-round); }
+
+/* ── entrances: mask wipes and rises, run once on mount ──────────────────── */
+/* fill-mode backwards: once a wipe ends no clip lingers (shadows and knobs
+   would be cut), as Sylva drops its clips after the intro */
+.va-reveal { animation: va-wipe 1.05s var(--ease-out) var(--d, 0ms) backwards; }
+.va-rise { animation: va-fade 1.05s var(--ease) var(--d, 0ms) backwards, va-rise 1.25s var(--ease-out) var(--d, 0ms) backwards; }
+.va-plate-media { animation: va-draw 1.6s var(--ease-out) var(--draw-d, 0.5s) backwards; }
+.va-plate::after { animation: va-scan 1.6s var(--ease-out) var(--draw-d, 0.5s) backwards; }
+@keyframes va-wipe {
+  from { clip-path: inset(100% 0 0 0 round var(--mr, 0px)); }
+  to { clip-path: inset(0 0 0 0 round var(--mr, 0px)); }
+}
+@keyframes va-fade { from { opacity: 0; } }
+@keyframes va-rise { from { transform: translateY(calc(16 * var(--u))); } }
+@keyframes va-draw {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes va-scan {
+  0% { left: -13%; opacity: 0; }
+  10% { opacity: 0.75; }
+  85% { opacity: 0.5; }
+  100% { left: 87%; opacity: 0; }
+}
+
+/* ── reduced motion: a still page ────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .va *,
+  .va *::after { animation: none !important; transition-duration: 0.01ms !important; }
+  .va-plate::after { display: none; }
+  .va-shimmer { opacity: 0.5; }
+}
+
+/* ── one column below 900px, on Sylva's 760-unit scale ───────────────────── */
+@media (max-width: 900px) {
+  .va {
+    --a-caps: max(var(--t-min), calc(11 * var(--u)));
+    --a-small: max(var(--t-min), calc(16 * var(--u)));          /* Sylva phone .stat dt */
+    --a-body: max(var(--t-body-min), calc(17 * var(--u)));
+    --a-lede: max(var(--t-body-min), calc(19 * var(--u)));       /* Sylva phone lede */
+    --a-lede-lh: 1.45;
+    --a-title: calc(32 * var(--u));                              /* Sylva phone card title */
+    --a-title-lh: calc(36 * var(--u));
+    --a-display: calc(62 * var(--u));                            /* Sylva phone headline */
+    --a-display-lh: calc(66 * var(--u));
+    --a-gap: calc(26 * var(--u));
+    --a-pad: calc(30 * var(--u));
+    --a-rail: calc(34 * var(--u));                               /* Sylva phone left rail */
+    --a-top: calc(30 * var(--u) + max(56px, 58 * var(--u)) + 52 * var(--u));
+  }
+  .va-page { width: 100%; padding-bottom: calc(120 * var(--u)); }
+  .va-frame { width: 100%; left: 0; margin-left: 0; }
+  .va-guides i:nth-child(3) { display: none; }
+  .va-guides i:nth-child(1) { left: calc(253 * var(--u)); }
+  .va-guides i:nth-child(2) { left: calc(506 * var(--u)); }
+  .va-ghost { font-size: calc(184 * var(--u)); letter-spacing: calc(14 * var(--u)); bottom: calc(-36 * var(--u)); left: calc(-10 * var(--u)); }
+
+  /* the landing's phone dock (glyphs only, 44px targets), fixed */
+  .va .vl-dock-wrap { top: calc(30 * var(--u)); }
+
+  .va-head { grid-template-columns: 1fr; gap: calc(18 * var(--u)); margin-bottom: calc(10 * var(--u)); }
+  .va-lede { grid-column: 1; margin: 0; max-width: calc(520 * var(--u)); }
+  .va-head-titles:has(.va-eyebrow) ~ .va-lede { margin-top: 0; }
+  .va-head-actions { grid-column: 1; justify-self: start; justify-content: flex-start; padding-top: calc(6 * var(--u)); }
+
+  .va-card { --mr: calc(40 * var(--u)); border-radius: calc(40 * var(--u)); }
+  .va-card-head { flex-wrap: wrap; gap: calc(14 * var(--u)); }
+  .va-card-label { font-size: max(var(--t-min), calc(15.5 * var(--u))); }
+  .va-card.has-knob { padding-bottom: calc(var(--a-pad) + max(var(--tap-min), 54 * var(--u))); }
+  .va-knob { --knob-size: max(var(--tap-min), calc(54 * var(--u))); right: calc(24 * var(--u)); bottom: calc(24 * var(--u)); }
+  .va-knob-disc { width: calc(58 * var(--u)); height: calc(58 * var(--u)); }
+  .va-knob svg { width: max(15px, calc(19 * var(--u))); height: max(15px, calc(19 * var(--u))); }
+
+  .va-pill { height: max(32px, calc(46 * var(--u))); padding: 0 max(12px, calc(18 * var(--u))); gap: max(6px, calc(8 * var(--u))); }
+  .va-pill.is-action { min-height: var(--tap-min); }
+  .va-pill--sm { height: max(28px, calc(40 * var(--u))); }
+  .va-pill-glyph { width: max(14px, calc(18 * var(--u))); height: max(14px, calc(18 * var(--u))); }
+  .va-flag { gap: calc(var(--t-min) / 3); height: max(calc(22 * var(--u)), calc(var(--t-min) * 4 / 3)); padding: 0 max(calc(10 * var(--u)), calc(var(--t-min) * 0.6)); font-size: max(var(--t-min), calc(11 * var(--u))); letter-spacing: 0.07em; }
+  .va-flag i { width: calc(var(--t-min) / 2); height: calc(var(--t-min) / 2); }
+  .va-mode .va-flag,
+  .va-tip .va-flag { height: calc(var(--t-min) * 4 / 3); font-size: var(--t-min); }
+
+  .va-mode-pill { --tile: max(36px, calc(56 * var(--u))); gap: max(10px, calc(14 * var(--u))); padding: max(4px, calc(6 * var(--u))) max(14px, calc(20 * var(--u))) max(4px, calc(6 * var(--u))) max(4px, calc(6 * var(--u))); border-radius: max(14px, calc(18 * var(--u))); }
+  .va-mode-tile { border-radius: max(10px, calc(13 * var(--u))); }
+  .va-mode-name { font-size: max(16px, calc(26 * var(--u))); }
+  .va-mode--lg .va-mode-pill { --tile: max(44px, calc(70 * var(--u))); }
+  .va-mode--lg .va-mode-name { font-size: max(18px, calc(32 * var(--u))); }
+  .va-mode-reason { max-width: none; }
+
+  .va-ring { --ring: min(calc(440 * var(--u)), 62vw); }
+  .va-ring-pct { font-size: calc(96 * var(--u)); }
+  .va-stat-mark { width: max(28px, calc(44 * var(--u))); height: max(28px, calc(44 * var(--u))); }
+  .va-stat dt { line-height: 1.4; }
+  .va-stat dd { line-height: 1.4; }
+
+  .va-alert { flex-wrap: wrap; gap: calc(16 * var(--u)); padding: calc(16 * var(--u)); border-radius: calc(40 * var(--u)); --mr: calc(40 * var(--u)); }
+  .va-alert-icon { width: max(36px, calc(60 * var(--u))); height: max(36px, calc(60 * var(--u))); }
+  .va-alert-text { flex: 1; }
+  .va-alert-title { white-space: normal; }
+  .va-alert-close { width: var(--tap-min); height: var(--tap-min); }
+  .va-alert-chips { order: 3; flex: 1 0 100%; padding: calc(4 * var(--u)) 0; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40 * var(--u)), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 40 * var(--u)), transparent); }
+
+  .va-log { gap: calc(20 * var(--u)); padding: calc(22 * var(--u)) calc(26 * var(--u)) calc(22 * var(--u)) calc(20 * var(--u)); border-radius: calc(30 * var(--u)); min-height: var(--tap-min); }
+  .va-log-mark { width: max(30px, calc(48 * var(--u))); height: max(30px, calc(48 * var(--u))); }
+  .va-log-title { white-space: normal; }
+
+  .va-chart-card { --chart-h: max(240px, calc(560 * var(--u))); }
+  .va-chart-plate { margin: 0 calc(-14 * var(--u)); border-radius: calc(30 * var(--u)); }
+  .va-chart-card .va-card-aside { flex: 1 0 100%; }
+  .va-range { width: 100%; padding: max(4px, calc(6 * var(--u))); border-radius: max(14px, calc(18 * var(--u))); }
+  .va-range-item { flex: 1; height: var(--tap-min); padding: 0 calc(10 * var(--u)); border-radius: max(10px, calc(13 * var(--u))); }
+  .va-tip { width: min(calc(520 * var(--u)), 66vw); padding: max(10px, calc(18 * var(--u))); border-radius: max(12px, calc(22 * var(--u))); }
+  .va-tip-kw { font-size: max(18px, calc(36 * var(--u))); }
+  .va-tip-row i { width: max(6px, calc(10 * var(--u))); height: max(6px, calc(10 * var(--u))); }
+  .va-tip-mode svg { width: max(13px, calc(20 * var(--u))); height: max(13px, calc(20 * var(--u))); }
+  .va-legend { gap: calc(12 * var(--u)) calc(30 * var(--u)); }
+  .va-legend-swatch { width: max(8px, calc(14 * var(--u))); height: max(8px, calc(14 * var(--u))); }
+  .va-legend-line,
+  .va-legend-dash { width: max(14px, calc(24 * var(--u))); }
+  .va-legend-band { width: max(12px, calc(22 * var(--u))); height: max(10px, calc(18 * var(--u))); }
+
+  .va-drop { min-height: calc(380 * var(--u)); padding: calc(40 * var(--u)) calc(30 * var(--u)); border-radius: calc(36 * var(--u)); }
+  .va-drop-mark { width: max(48px, calc(88 * var(--u))); height: max(48px, calc(88 * var(--u))); }
+  .va-drop-title { font-size: max(17px, calc(32 * var(--u))); }
+  .va-drop-hint { max-width: none; }
+
+  .va-field-box { height: max(var(--tap-min), calc(92 * var(--u))); padding: 0 max(14px, calc(24 * var(--u))); border-radius: max(14px, calc(22 * var(--u))); }
+  .va-field-input { font-size: max(var(--t-input-min), calc(17 * var(--u))); }
+  .va-field-error svg { width: max(13px, calc(20 * var(--u))); height: max(13px, calc(20 * var(--u))); }
+
+  .va-shimmer-box { border-radius: calc(40 * var(--u)); }
+  .va-shimmer-box--card { min-height: calc(420 * var(--u)); }
+  .va-shimmer-box--chart { min-height: calc(760 * var(--u)); }
+  .va-shimmer-line { height: max(12px, calc(22 * var(--u))); }
+  .va-shimmer-line:first-child { height: calc(62 * var(--u)); }
+  .va-state { padding: calc(80 * var(--u)) calc(34 * var(--u)); }
+  .va-state--card { border-radius: calc(40 * var(--u)); }
+  .va-state-mark { width: max(56px, calc(116 * var(--u))); height: max(56px, calc(116 * var(--u))); }
+  .va-state-body { max-width: none; }
+  .va-skip { left: var(--a-rail); top: calc(110 * var(--u)); }
+}
+
+/* ── placeholder pages (src/pages/*; the screen builders replace these) ──── */
+.va-boot-title { max-width: calc(560 * var(--u)); margin-bottom: calc(40 * var(--u)); }
+.va-dash-grid { display: grid; grid-template-columns: minmax(0, 1fr) calc(400 * var(--u)); gap: var(--a-gap); align-items: start; }
+.va-dash-focus { display: flex; flex-direction: column; gap: calc(28 * var(--u)); }
+.va-dash-focus .va-card-head { margin-bottom: 0; }
+.va-dash-ring { margin-top: calc(6 * var(--u)); }
+.va-dash-log,
+.va-input-report { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(10 * var(--u)); margin: 0; padding: 0; list-style: none; }
+.va-input-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--a-gap); align-items: start; }
+.va-input-note { margin: 0 0 calc(18 * var(--u)); font-size: var(--a-body); line-height: 1.5; color: var(--ink-soft); }
+.va-input-fields { display: grid; grid-template-columns: 1fr 1fr; gap: calc(16 * var(--u)); margin-top: calc(30 * var(--u)); padding-top: calc(26 * var(--u)); border-top: 1px solid var(--glass-edge); }
+.va-history-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--a-gap); margin: 0; padding: 0; list-style: none; }
+.va-history-card .va-card-title { overflow-wrap: break-word; }
+.va-history-card .va-pill { margin-top: calc(16 * var(--u)); }
+.va-history-stats { display: flex; gap: calc(28 * var(--u)); margin: 0; }
+.va-history-stats dt { font-size: var(--a-small); color: var(--paper-label); }
+.va-history-stats dd { margin: calc(2 * var(--u)) 0 0; font-size: calc(19 * var(--u)); font-weight: var(--w-regular); font-variant-numeric: tabular-nums; }
+.va-history-span { margin: calc(18 * var(--u)) 0 0; font-size: var(--a-small); color: var(--paper-label); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 900px) {
+  .va-dash-grid,
+  .va-input-grid,
+  .va-input-fields,
+  .va-history-grid,
+  .va-dash-log,
+  .va-input-report { grid-template-columns: minmax(0, 1fr); }
+  .va-history-stats dd { font-size: max(var(--t-body-min), calc(30 * var(--u))); }
+  .va-boot-title { max-width: none; }
+}

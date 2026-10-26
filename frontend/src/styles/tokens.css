@@ -202,3 +202,15 @@
   /* the headline's clearance under the phone dock (feedback-02 fix 10) */
   --dock-clear: 8px;
 }
+
+/* ── app routes (M2 shell) ───────────────────────────────────────────────
+   Added by the shell builder; only what Sylva's values above don't cover. */
+:root {
+  /* the overload wash behind the alert pill: --overload at the same 16% as --volt-glow */
+  --overload-glow: rgba(255, 91, 74, 0.16);
+  /* body text on a phone's data screens: Sylva's max() floor idiom (--t-min is
+     for captions); 14px keeps a 24-row table and the log readable at 390px */
+  --t-body-min: 14px;
+  /* phone inputs: iOS Safari zooms into a focused field set below 16px (platform rule, not Sylva) */
+  --t-input-min: 16px;
+}

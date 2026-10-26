@@ -1,0 +1,59 @@
+/* The 3D scene's own box. Low specificity (:where) so the page's className wins.
+   It fills its positioned parent (the hero), above card 1 and below the rest of
+   the UI, and never takes the pointer: sparks listen on window instead. */
+:where(.volta-scene) {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-scene);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.volta-scene__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.volta-scene__canvas.is-on { opacity: 1; }
+
+/* measures the page's --u for the scene's framing */
+.volta-scene__probe {
+  position: absolute;
+  width: calc(1000 * var(--u));
+  height: 0;
+  visibility: hidden;
+}
+
+/* No WebGL: a poster rendered from the scene, of artboard x -160..1760 and
+   y 200..1120, placed where the live scene would draw it (layout.ts). */
+.volta-scene__poster {
+  position: absolute;
+  left: calc(50% - 960 * var(--u));
+  top: calc(50% - 240 * var(--u));
+  width: calc(1920 * var(--u));
+  max-width: none; /* the base styles cap images at their container */
+  height: auto;
+  user-select: none;
+}
+
+@media (max-width: 900px) {
+  /* one column: the artboard is cropped into the band between the stats and
+     the cards (layout.ts NARROW), and fades out before the cards */
+  .volta-scene__poster {
+    left: calc(-204.1 * var(--u));
+    top: calc(524.2 * var(--u));
+    width: calc(1267.2 * var(--u));
+  }
+  .volta-scene.is-fallback {
+    -webkit-mask-image: linear-gradient(to bottom, black calc(1000 * var(--u)), transparent calc(1080 * var(--u)));
+    mask-image: linear-gradient(to bottom, black calc(1000 * var(--u)), transparent calc(1080 * var(--u)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .volta-scene__canvas { transition: none; }
+}

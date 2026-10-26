@@ -1,0 +1,345 @@
+/* History (/history): its layout and its page-local pieces.
+ *
+ * Composed on the dashboard's hero, which is Sylva's (https://mengto.github.io/sylva/)
+ * at Sylva's sizes on its 1600-unit artboard (--u; 760 units below 900px):
+ * the headline on the 46 rail with the viewer's last run under it, the lede
+ * at x 520 with the source dock under it (where Sylva's pill sits), the side
+ * stats stepped down Sylva's diagonal (x 1250 → 1346 → 1432, +110 a step).
+ * The runs are Sylva's Field Note cards: label, headline, then the moss plate
+ * inset 14 at the foot, with the knob on its corner. Every value is a token
+ * from tokens.css or a unit of --u; no Sylva code is copied. */
+
+/* ── the hero band ───────────────────────────────────────────────────────── */
+.vh-hero {
+  position: relative;
+  display: grid;
+  /* the same columns as .va-head: the rail, the lede's column at x 520, the rest */
+  grid-template-columns: calc(474 * var(--u)) calc(228 * var(--u)) minmax(0, 1fr);
+  align-items: start;
+  min-height: calc(262 * var(--u)); /* the third stat's step, plus its height */
+  margin-bottom: calc(14 * var(--u));
+}
+.vh-hero.is-bare { min-height: 0; margin-bottom: 0; }
+.vh-hero > .va-head { grid-column: 1 / -1; margin-bottom: calc(22 * var(--u)); }
+.vh-hero > .va-head .va-lede { max-width: calc(250 * var(--u)); }
+.vh-hero .va-eyebrow { white-space: nowrap; }
+
+/* the viewer's last run, a Field Note row under the headline (the dashboard's badge slot) */
+.vh-resume { grid-column: 1; min-width: 0; padding-right: calc(40 * var(--u)); }
+.vh-resume .va-log { width: auto; max-width: 100%; }
+.vh-resume .va-log-meta {
+  font-size: var(--a-caps);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  transition: color 0.2s var(--ease);
+}
+.vh-resume .va-log:hover .va-log-meta { color: var(--ink); }
+
+/* ── the source filter: a small dock, Sylva's ────────────────────────────── */
+.vh-filter { grid-column: 2 / 4; justify-self: start; --mr: var(--r-dock); }
+.vh-dock {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: calc(3 * var(--u));
+  height: calc(46 * var(--u));
+  padding: calc(5 * var(--u));
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-dock);
+  background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg);
+  box-shadow: 0 calc(8 * var(--u)) calc(22 * var(--u)) var(--dock-shadow), inset 0 1px var(--dock-inset);
+  backdrop-filter: blur(calc(14 * var(--u))) saturate(1.1);
+  -webkit-backdrop-filter: blur(calc(14 * var(--u))) saturate(1.1);
+  isolation: isolate;
+}
+.vh-dock-item {
+  position: relative;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  height: calc(36 * var(--u));
+  gap: calc(8 * var(--u));
+  padding: 0 calc(13 * var(--u));
+  border: 1px solid transparent;
+  border-radius: var(--r-dock-item);
+  background: var(--glass);
+  color: var(--ink-faint);
+  font-family: var(--font);
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  will-change: width, height, transform;
+  animation: va-drop 0.9s var(--ease-out) var(--d, 0ms) backwards; /* the dock items' drop-in */
+  transition: color 0.18s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.vh-dock-item:hover { color: var(--ink); }
+.vh-dock-item[data-near="true"] {
+  z-index: 7;
+  color: var(--ink);
+  border-color: var(--glass-rim);
+  background: var(--dock-near-bg);
+  box-shadow: 0 calc(7 * var(--u)) calc(16 * var(--u)) var(--dock-shadow);
+}
+.vh-dock-glyph { width: calc(14 * var(--u)); height: calc(14 * var(--u)); flex: none; opacity: 0.66; transition: opacity 0.18s var(--ease); }
+.vh-dock-glyph svg { display: block; width: 100%; height: 100%; }
+.vh-dock-item[data-near="true"] .vh-dock-glyph { opacity: 1; }
+.vh-dock-label { transform: translateY(calc(0.5 * var(--u))); }
+.vh-dock-count {
+  min-width: calc(18 * var(--u));
+  transform: translateY(calc(0.5 * var(--u)));
+  color: var(--ink-faint);
+  font-weight: var(--w-semibold);
+  letter-spacing: 0;
+  text-align: right;
+  transition: color 0.18s var(--ease);
+}
+.vh-dock-item[data-near="true"] .vh-dock-count { color: var(--ink-soft); }
+/* the chosen source wears the cards' paper, as the active dock item does */
+.vh-dock-item.is-on,
+.vh-dock-item.is-on[data-near="true"] {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) var(--dock-active-shadow);
+}
+.vh-dock-item.is-on .vh-dock-glyph { opacity: 0.8; }
+.vh-dock-item.is-on .vh-dock-count { color: var(--paper-label); }
+.va .vh-dock-item:focus-visible { border-radius: var(--r-dock-item); }
+.va .vh-dock-item.is-on:focus-visible { outline-color: var(--focus-ring); }
+
+/* ── side stats: Sylva's .stat, on its diagonal ──────────────────────────── */
+.vh-stats { position: absolute; inset: 0; pointer-events: none; }
+.vh-stat { position: absolute; display: flex; align-items: flex-start; gap: calc(9 * var(--u)); pointer-events: auto; }
+/* the hero starts on the 46 rail, so Sylva's x 1250 is 1204 in here (as the dashboard's) */
+.vh-stat--a { left: calc(1204 * var(--u)); top: calc(2 * var(--u)); }
+.vh-stat--b { left: calc(1300 * var(--u)); top: calc(112 * var(--u)); }
+.vh-stat--c { left: calc(1386 * var(--u)); top: calc(214 * var(--u)); }
+.vh-mark { width: calc(32 * var(--u)); height: calc(32 * var(--u)); flex: none; margin-top: calc(2 * var(--u)); color: var(--ink-mark); }
+.vh-mark svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 calc(2 * var(--u)) calc(10 * var(--u)) var(--stat-shadow)); }
+.vh-stat dl { margin: 0; }
+.vh-stat dt,
+.vh-stat dd { margin: 0; white-space: nowrap; text-shadow: 0 calc(2 * var(--u)) calc(16 * var(--u)) var(--stat-shadow); }
+.vh-stat dt { font-size: var(--a-small); font-weight: var(--w-light); color: var(--ink-soft); line-height: calc(19 * var(--u)); }
+.vh-stat dd { font-size: var(--a-small); font-weight: var(--w-semibold); color: var(--ink); line-height: calc(21 * var(--u)); }
+
+/* ── the runs: Sylva's Field Notes ───────────────────────────────────────── */
+.vh-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--a-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.vh-grid > li { display: grid; min-width: 0; }
+
+.vh-run {
+  display: flex;
+  flex-direction: column;
+  /* the plate is inset 14 from the card's edges, as Sylva's photograph is */
+  --inset: calc(14 * var(--u));
+  padding-bottom: var(--inset);
+}
+.vh-run .va-card-head { margin-bottom: 0; }
+.vh-run .va-card-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(6 * var(--u)) calc(10 * var(--u));
+  font-variant-numeric: tabular-nums;
+}
+.vh-run .va-card-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* the headline is the card's one link, stretched over the whole card */
+.vh-run-link { color: inherit; text-decoration: none; outline: none; }
+.vh-run-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--mr);
+  cursor: pointer;
+}
+.va .vh-run .vh-run-link:focus-visible { outline: none; }
+.vh-run:has(.vh-run-link:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: calc(5 * var(--u)); }
+
+.vh-run-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(8 * var(--u)) calc(12 * var(--u));
+  margin: calc(10 * var(--u)) 0 calc(22 * var(--u));
+}
+.vh-run-meta {
+  margin: 0;
+  font-size: var(--a-small);
+  font-weight: var(--w-light);
+  color: var(--paper-label);
+}
+
+/* the "Saved" chip: quiet, on the paper */
+.vh-saved .va-pill { height: calc(26 * var(--u)); padding: 0 calc(10 * var(--u)); gap: calc(5 * var(--u)); }
+.va-card--paper .vh-saved .va-pill { border-color: var(--glass-rim); background: var(--paper); box-shadow: inset 0 0 0 1px var(--glass-edge); }
+.vh-saved .va-pill-glyph { opacity: 0.9; }
+
+/* "Last opened": the landing's card flag, in volt */
+.vh-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  height: calc(22 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  border-radius: 999px;
+  background: var(--volt-soft);
+  color: var(--paper-ink);
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: calc(0.8 * var(--u));
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.vh-flag i { width: calc(6 * var(--u)); height: calc(6 * var(--u)); border-radius: var(--r-round); background: var(--paper-ink); flex: none; }
+
+/* the moss plate at the foot: the run's data in side-stat form */
+.vh-plate {
+  margin: auto calc(var(--inset) - var(--a-pad)) 0;
+  color: var(--ink);
+  transition: box-shadow var(--dur) var(--ease);
+}
+.vh-run.is-last .vh-plate { box-shadow: inset 0 0 0 1px var(--volt-soft); }
+.vh-plate-body {
+  position: relative;
+  display: grid;
+  gap: calc(18 * var(--u));
+  padding: calc(22 * var(--u)) calc(24 * var(--u)) calc(24 * var(--u));
+  /* the plate's data draws in left to right as the scan crosses it (the landing's plate draw) */
+  animation: va-draw 1.6s var(--ease-out) var(--draw-d, 0.5s) backwards;
+}
+.vh-span,
+.vh-reading { display: flex; align-items: flex-start; gap: calc(10 * var(--u)); min-width: 0; }
+.vh-readings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(16 * var(--u));
+  padding-top: calc(16 * var(--u));
+  /* the knob sits on the plate's lower-right corner */
+  padding-right: calc(66 * var(--u));
+  border-top: 1px solid var(--glass-edge);
+}
+.vh-pmark { width: calc(30 * var(--u)); height: calc(30 * var(--u)); flex: none; color: var(--ink-mark); }
+.vh-pmark svg { display: block; width: 100%; height: 100%; }
+.vh-mark-arc { stroke: var(--overload); stroke-width: 1.8; filter: drop-shadow(0 0 calc(3 * var(--u)) var(--overload-soft)); }
+.vh-reading.is-overload .vh-pmark { color: var(--ink-soft); }
+.vh-plate dl { margin: 0; min-width: 0; }
+.vh-plate dt,
+.vh-plate dd { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vh-plate dt { font-size: var(--a-small); font-weight: var(--w-light); color: var(--ink-soft); line-height: calc(19 * var(--u)); }
+.vh-plate dd { font-size: var(--a-body); font-weight: var(--w-semibold); color: var(--ink); line-height: calc(23 * var(--u)); letter-spacing: calc(-0.1 * var(--u)); }
+.vh-span dd { font-weight: var(--w-regular); }
+.vh-plate .vh-sub { font-size: var(--a-small); font-weight: var(--w-light); color: var(--ink-soft); line-height: calc(19 * var(--u)); letter-spacing: 0; }
+.vh-dt-note { color: var(--ink-faint); }
+
+/* the knob: a picture of the card's link, on the plate's corner */
+.vh-knob { z-index: 2; pointer-events: none; }
+.vh-run:hover .va-knob-disc,
+.vh-run:has(.vh-run-link:focus-visible) .va-knob-disc { transform: scale(1.1) rotate(8deg); background: var(--knob-hover); }
+.vh-run:hover .vh-plate { box-shadow: inset 0 0 0 1px var(--glass-rim); }
+.vh-run.is-last:hover .vh-plate { box-shadow: inset 0 0 0 1px var(--volt); }
+
+/* ── states ──────────────────────────────────────────────────────────────── */
+.vh-empty { padding-top: calc(72 * var(--u)); padding-bottom: calc(72 * var(--u)); }
+.vh-skel-resume { width: calc(360 * var(--u)); }
+.vh-skel-resume .va-shimmer-line:first-child { width: 100%; height: calc(64 * var(--u)); border-radius: var(--radius); background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge); }
+.vh-skel-dock {
+  position: relative;
+  grid-column: 2 / 4;
+  width: calc(372 * var(--u));
+  height: calc(46 * var(--u));
+  overflow: hidden;
+  border-radius: var(--r-dock);
+  background: var(--dock-bg);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+}
+.vh-skel-card { min-height: calc(318 * var(--u)); }
+/* the Field Note's plate, held in place at the card's foot */
+.vh-skel-card::before {
+  content: "";
+  position: absolute;
+  left: calc(14 * var(--u));
+  right: calc(14 * var(--u));
+  bottom: calc(14 * var(--u));
+  height: 56%;
+  border-radius: var(--r-portal);
+  background: var(--bg-deep);
+  opacity: 0.4;
+}
+
+/* ── one column below 900px, on Sylva's 760-unit scale ───────────────────── */
+@media (max-width: 900px) {
+  .vh-hero { grid-template-columns: minmax(0, 1fr); min-height: 0; row-gap: calc(30 * var(--u)); margin-bottom: 0; }
+  .vh-hero > .va-head { margin-bottom: 0; }
+  .vh-hero > .va-head .va-lede { max-width: calc(560 * var(--u)); }
+  .vh-hero .va-eyebrow { white-space: normal; }
+  .vh-resume { padding-right: 0; }
+  .vh-resume .va-log { width: 100%; }
+
+  .vh-filter { grid-column: 1; justify-self: stretch; --mr: max(16px, calc(18 * var(--u))); }
+  .vh-dock {
+    display: flex;
+    width: 100%;
+    height: auto;
+    padding: max(5px, calc(6 * var(--u)));
+    gap: max(3px, calc(4 * var(--u)));
+    border-radius: max(16px, calc(18 * var(--u)));
+  }
+  .vh-dock-item {
+    flex: 1 1 0;
+    min-width: 0;
+    height: var(--tap-min);
+    padding: 0 calc(8 * var(--u));
+    gap: max(5px, calc(8 * var(--u)));
+    border-radius: max(12px, calc(13 * var(--u)));
+  }
+  .vh-dock-glyph { display: none; }
+  .vh-dock-count { min-width: 0; }
+
+  /* Sylva's phone stats: one row, as the landing's and the dashboard's */
+  .vh-stats { position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(14 * var(--u)); pointer-events: auto; }
+  .vh-stat { position: static; gap: calc(11 * var(--u)); min-width: 0; }
+  .vh-mark { width: max(24px, calc(36 * var(--u))); height: max(24px, calc(36 * var(--u))); }
+  .vh-stat dt { font-size: max(var(--t-min), calc(16 * var(--u))); line-height: 1.35; white-space: normal; }
+  .vh-stat dd { font-size: max(var(--t-min), calc(16.5 * var(--u))); line-height: 1.35; white-space: normal; }
+
+  .vh-grid { grid-template-columns: minmax(0, 1fr); }
+  .vh-run { --inset: calc(16 * var(--u)); }
+  .vh-run .va-card-head { flex-wrap: wrap; gap: calc(14 * var(--u)); }
+  .vh-run .va-card-title { white-space: normal; overflow-wrap: anywhere; }
+  .vh-saved .va-pill { height: max(28px, calc(40 * var(--u))); padding: 0 max(10px, calc(16 * var(--u))); gap: max(5px, calc(8 * var(--u))); }
+  .vh-flag { height: max(calc(22 * var(--u)), calc(var(--t-min) * 4 / 3)); padding: 0 max(calc(10 * var(--u)), calc(var(--t-min) * 0.6)); font-size: max(var(--t-min), calc(11 * var(--u))); letter-spacing: 0.07em; gap: calc(var(--t-min) / 3); }
+  .vh-flag i { width: calc(var(--t-min) / 2); height: calc(var(--t-min) / 2); }
+  .vh-run-row { margin: calc(14 * var(--u)) 0 calc(26 * var(--u)); gap: calc(12 * var(--u)); }
+
+  .vh-plate { border-radius: calc(30 * var(--u)); }
+  .vh-plate-body { gap: calc(24 * var(--u)); padding: calc(26 * var(--u)) calc(26 * var(--u)) calc(28 * var(--u)); }
+  .vh-readings { gap: calc(18 * var(--u)); padding-top: calc(22 * var(--u)); padding-right: calc(84 * var(--u)); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .vh-pmark { width: max(22px, calc(36 * var(--u))); height: max(22px, calc(36 * var(--u))); }
+  .vh-plate dt { font-size: var(--a-small); line-height: 1.35; white-space: normal; }
+  .vh-plate dd { font-size: var(--a-body); line-height: 1.35; white-space: normal; }
+  .vh-plate .vh-sub { line-height: 1.35; }
+
+  .vh-empty { padding-top: calc(90 * var(--u)); padding-bottom: calc(90 * var(--u)); }
+  .vh-skel-resume { width: 100%; }
+  .vh-skel-resume .va-shimmer-line:first-child { height: calc(110 * var(--u)); border-radius: calc(30 * var(--u)); }
+  .vh-skel-dock { grid-column: 1; width: 100%; height: calc(var(--tap-min) + 2 * max(5px, calc(6 * var(--u)))); border-radius: max(16px, calc(18 * var(--u))); }
+  .vh-skel-card { min-height: calc(560 * var(--u)); }
+  .vh-skel-card::before { left: calc(16 * var(--u)); right: calc(16 * var(--u)); bottom: calc(16 * var(--u)); border-radius: calc(30 * var(--u)); }
+  .vh-stat-src { display: none; }
+  .vh-dt-note { display: block; }
+}

@@ -104,7 +104,7 @@ class Http:
                     url, json=json, data=data, headers=headers() if headers else None, timeout=self.timeout
                 )
             except (requests.ConnectionError, requests.Timeout) as e:
-                problem = f"{type(e).__name__}"
+                problem = f"{type(e).__name__}: {str(e)[:300]}"
             else:
                 if 200 <= resp.status_code < 300:
                     try:

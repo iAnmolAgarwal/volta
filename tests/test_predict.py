@@ -199,3 +199,73 @@ def test_cli_without_arguments_previews_the_sample(use_proxy, monkeypatch, capsy
     monkeypatch.chdir(ROOT)
     assert predict.main([]) == 0
     assert "Generated 1000 predictions" in capsys.readouterr().out
+
+
+# --- robustness: missing values, extra columns, unsorted input ----------------------
+
+
+@pytest.fixture
+def capture(monkeypatch, no_endpoint_env):
+    """Fake proxy via requests.post: records the rows sent and answers fake predictions."""
+    sent = []
+
+    def fake_post(url, json, timeout):
+        sent.append(json["rows"])
+        return FakeResponse(200, {"predictions": fake_predictions(json["rows"])})
+
+    monkeypatch.setenv("PREDICT_PROXY_URL", "https://proxy.example")
+    monkeypatch.setattr(predict.requests, "post", fake_post)
+    return sent
+
+
+def frame(stamps, temps, hums=None):
+    return pd.DataFrame({"timestamp": stamps, "ambient_temp_c": temps,
+                         "humidity_pct": hums if hums is not None else [50.0] * len(stamps),
+                         "solar_irradiance_wm2": [0.0] * len(stamps)})
+
+
+def test_gaps_are_interpolated_in_time(capture):
+    df = frame(["2015-07-01 00:00:00", "2015-07-01 01:00:00", "2015-07-01 03:00:00"], [20.0, np.nan, 32.0])
+    predict.predict(df)
+    assert [r["ambient_temp_c"] for r in capture[0]] == [20.0, 24.0, 32.0]  # 1 h of a 3 h gap
+
+
+def test_edges_are_back_and_forward_filled(capture):
+    df = frame([f"2015-07-01 0{h}:00:00" for h in range(4)], [np.nan, 25.0, 27.0, np.nan],
+               hums=[np.nan, np.nan, 40.0, np.nan])
+    predict.predict(df)
+    assert [r["ambient_temp_c"] for r in capture[0]] == [25.0, 25.0, 27.0, 27.0]
+    assert [r["humidity_pct"] for r in capture[0]] == [40.0, 40.0, 40.0, 40.0]
+
+
+def test_unsorted_input_interpolates_by_time_and_keeps_row_order(capture):
+    df = frame(["2015-07-01 02:00:00", "2015-07-01 00:00:00", "2015-07-01 01:00:00"], [30.0, 20.0, np.nan])
+    preds = predict.predict(df)
+    assert [r["timestamp"] for r in capture[0]] == df["timestamp"].tolist()
+    assert [r["ambient_temp_c"] for r in capture[0]] == [30.0, 20.0, 25.0]
+    np.testing.assert_allclose(preds, fake_predictions(capture[0]))
+
+
+def test_a_column_with_no_values_stays_null(capture):
+    df = frame(["2015-07-01 00:00:00", "2015-07-01 01:00:00"], [np.nan, np.nan])
+    predict.predict(df)
+    assert [r["ambient_temp_c"] for r in capture[0]] == [None, None]
+
+
+def test_extra_columns_and_any_column_order(capture):
+    df = load_test().head(48)
+    df["timestamp"] = df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+    base = predict.predict(df)
+    messy = df.assign(site="A", target_demand_kw=999.0)[
+        ["solar_irradiance_wm2", "site", "humidity_pct", "timestamp", "target_demand_kw", "ambient_temp_c"]]
+    np.testing.assert_allclose(predict.predict(messy), base)
+    assert set(capture[1][0]) == set(predict.INPUT_COLUMNS)  # extra columns are not sent
+
+
+def test_unsorted_input_with_gaps_matches_the_sorted_answer(capture):
+    df = load_test().head(72)
+    df["timestamp"] = df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+    df.loc[df.index[5:9], "ambient_temp_c"] = np.nan
+    sorted_preds = predict.predict(df)
+    shuffled = df.sample(frac=1, random_state=3)
+    np.testing.assert_allclose(predict.predict(shuffled), pd.Series(sorted_preds, index=df.index)[shuffled.index])

@@ -257,7 +257,7 @@
 
 /* the chart card: the landing's paper card, its moss plate inset 14 at the top,
    then the label, title and range under it (the "Next-24h peak" card) */
-.vd-chart { --chart-h: calc(372 * var(--u)); display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
+.vd-chart { --chart-h: calc(391 * var(--u)); /* 372, plus the mode track and its gap, so the plot keeps its height */ display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
 .vd-chart .va-chart-plate { margin: 0; flex: none; }
 .vd-chart:has(.recharts-surface:focus-visible) .va-chart-plate,
 .vd-chart:has(.recharts-wrapper:focus-visible) .va-chart-plate { outline: 2px solid var(--focus-ring-dark); outline-offset: calc(3 * var(--u)); }
@@ -297,6 +297,45 @@
 }
 .vd-ref-label.is-overload { fill: var(--overload); }
 .vd-ref-word { fill-opacity: 0.72; font-weight: var(--w-regular); }
+/* ── the mode track under the plot (ModeTrack.tsx): the stepper's two tile
+   tones in the mode tokens, the chart's red overload dot ──────────────── */
+.vd-track-tile rect { transition: fill-opacity 0.2s var(--ease), stroke-opacity 0.2s var(--ease); stroke: var(--ink); stroke-opacity: 0; stroke-width: 1.2; }
+.vd-track-tile.is-grid rect { fill: var(--mode-grid); fill-opacity: 0.3; }
+.vd-track-tile.is-storage rect { fill: var(--mode-storage); fill-opacity: 0.72; }
+.vd-track-tile.is-focus rect { fill-opacity: 1; stroke-opacity: 1; }
+.vd-track-tile.is-grid.is-focus rect { fill-opacity: 0.62; }
+.vd-track-dot { fill: var(--mode-overload); stroke: var(--bg-deep); stroke-width: 1; }
+.vd-track-hit { fill: transparent; cursor: pointer; touch-action: pan-y; }
+.vd-track:has(.vd-track-hit:hover) .vd-track-tile:not(.is-focus) rect { fill-opacity: 0.5; }
+.vd-track:has(.vd-track-hit:hover) .vd-track-tile.is-storage:not(.is-focus) rect { fill-opacity: 0.86; }
+/* right-aligned with the y ticks, so it reads as the strip's row label; a
+   tighter tracking than the dock's keeps the word inside the 40 px gutter */
+.vd-track-label {
+  fill: var(--ink-faint);
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: calc(0.5 * var(--u));
+}
+
+/* its legend: a caption in spaced caps, then each mode as a key (a tile on a
+   chip of the plate's moss), its icon and its name */
+.vd-chart .vd-track-legend { padding-top: calc(12 * var(--u)); border-top: 1px solid color-mix(in oklab, var(--paper-label) 22%, transparent); }
+.vd-track-cap { font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--paper-label); }
+.vd-key {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: calc(26 * var(--u));
+  height: calc(14 * var(--u));
+  border-radius: calc(5 * var(--u));
+  background: var(--portal-bg);
+}
+.vd-key i { width: calc(18 * var(--u)); height: calc(6 * var(--u)); border-radius: 999px; }
+.vd-key i.is-grid { background: color-mix(in oklab, var(--mode-grid) 30%, var(--portal-bg)); }
+.vd-key i.is-storage { background: color-mix(in oklab, var(--mode-storage) 72%, var(--portal-bg)); }
+.vd-key b { position: absolute; width: calc(5 * var(--u)); height: calc(5 * var(--u)); border-radius: var(--r-round); background: var(--mode-overload); }
+.vd-key-icon { width: calc(14 * var(--u)); height: calc(14 * var(--u)); flex: none; margin-right: calc(-2 * var(--u)); color: var(--paper-ink); }
+
 .vd-legend-charging {
   width: calc(16 * var(--u));
   height: calc(9 * var(--u));
@@ -438,7 +477,7 @@
   .vd { --vd-dock-end: calc(30 * var(--u) + max(56px, 58 * var(--u))); }
   .vd::before { height: calc(var(--vd-dock-end) + 22px); }
   .vd-state .va-mode-pill { min-width: 0; }
-  .vd-chart { --chart-h: max(260px, calc(600 * var(--u))); padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(30 * var(--u)); }
+  .vd-chart { --chart-h: max(274px, calc(600 * var(--u) + 14px)); padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(30 * var(--u)); }
   .vd-chart .va-chart-plate { margin: 0; }
   .vd-chart-foot { grid-template-columns: minmax(0, 1fr); padding: calc(26 * var(--u)) calc(16 * var(--u)) 0; gap: calc(20 * var(--u)); }
   .vd-chart-range .va-range { width: 100%; }
@@ -446,6 +485,12 @@
   .vd-legend-band { width: max(12px, calc(22 * var(--u))); height: max(10px, calc(16 * var(--u))); }
   .vd-legend-dot { width: max(8px, calc(14 * var(--u))); height: max(8px, calc(14 * var(--u))); }
   .vd-legend-charging { width: max(14px, calc(24 * var(--u))); height: max(8px, calc(13 * var(--u))); }
+  .vd-chart .vd-track-legend { padding-top: calc(18 * var(--u)); }
+  .vd-track-cap { flex-basis: 100%; }
+  .vd-key { width: max(22px, calc(40 * var(--u))); height: max(12px, calc(22 * var(--u))); border-radius: max(4px, calc(7 * var(--u))); }
+  .vd-key i { width: max(15px, calc(28 * var(--u))); height: max(5px, calc(9 * var(--u))); }
+  .vd-key b { width: max(4px, calc(8 * var(--u))); height: max(4px, calc(8 * var(--u))); }
+  .vd-key-icon { width: max(14px, calc(22 * var(--u))); height: max(14px, calc(22 * var(--u))); }
   .vd-source { height: max(24px, calc(40 * var(--u))); padding: 0 max(10px, calc(16 * var(--u))); font-size: var(--a-caps); }
   .vd-focus { gap: calc(26 * var(--u)); }
   .vd-why { padding-top: calc(22 * var(--u)); min-height: calc(2 * 1.5em + 22 * var(--u)); }

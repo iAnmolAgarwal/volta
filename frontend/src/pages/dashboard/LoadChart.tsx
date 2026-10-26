@@ -1,11 +1,12 @@
 import { useId, useMemo, useState, type CSSProperties } from "react";
 import { clsx } from "clsx";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts";
-import { BatteryCharging, UtilityPole } from "lucide-react";
+import { BatteryCharging, TriangleAlert, UtilityPole } from "lucide-react";
 import { GlassCard } from "@/components/app/GlassCard";
 import { NARROW, useMedia } from "@/components/landing/useMedia";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { dayMonth, hhmm, isStorage, OVERLOAD_AT_KW, PEAK_HOURS, shortMode, STORAGE_ABOVE_KW, type ModeName, type RunHour } from "@/lib/api";
+import { ModeTrack, type TrackUnit } from "./ModeTrack";
 import { chargeSource, supplyOf } from "./supply";
 
 /* The dashboard's load chart, as the landing's chart cards are built: a paper
@@ -24,6 +25,9 @@ import { chargeSource, supplyOf } from "./supply";
  *
  * The 160 and 200 kW lines are labelled past the plot's right end, in spaced
  * caps; a faint band marks each 18–22 evening window (hourly ranges).
+ * Under the plot runs the mode track (ModeTrack.tsx): Main Grid against
+ * Renewable Storage on the chart's own x scale, per hour or per day, with the
+ * overload hours dotted; the axis ticks sit under it.
  * MainChart stacks the backend's net fields, whose top overshoots the demand
  * in charging hours, hence this page-local chart
  * (design-notes/m2/dashboard-requests.md). */
@@ -304,6 +308,14 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
     return days.filter((_, k) => k % step === 0).map((d) => d.d);
   }, [daily, rows, span, days, narrow]);
   const bands = useMemo(() => (daily ? [] : peakBands(rows)), [daily, rows]);
+  const units = useMemo<TrackUnit[]>(
+    () =>
+      daily
+        ? days.map((d) => ({ x: d.d, storage: d.storageHours * 2 > d.hours, overload: d.overloadHours > 0, focusAt: d.peakIndex }))
+        : rows.map((r) => ({ x: r.i, storage: isStorage(r.mode), overload: r.overload, focusAt: r.i })),
+    [daily, days, rows],
+  );
+  const track = narrow ? { h: 8, gap: 6 } : { h: 10, gap: 7 };
 
   const xFirst = daily ? (days[0]?.d ?? 0) : (rows[0]?.i ?? 0);
   const xLast = daily ? (days[days.length - 1]?.d ?? 0) : (rows[rows.length - 1]?.i ?? 0);
@@ -335,6 +347,10 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
       : daily
         ? `${dayMonth(rows[0].ts)} – ${dayMonth(rows[n - 1].ts)} · ${n.toLocaleString()} h, by day: low to peak and the mean`
         : `${hhmm(rows[0].ts)} ${dayMonth(rows[0].ts)} – ${hhmm(rows[n - 1].ts)} ${dayMonth(rows[n - 1].ts)} · ${n.toLocaleString()} h`;
+
+  const storageN = rows.filter((r) => isStorage(r.mode)).length;
+  const overloadN = rows.filter((r) => r.overload).length;
+  const trackSummary = `Mode track: ${storageN} of ${n} hours on Renewable Storage, ${n - storageN} on Main Grid, ${overloadN} at critical overload.`;
 
   /** The hour a chart event lands on: the hour itself, or the day's peak hour. */
   const hourAt = (k: unknown): number | undefined => {
@@ -392,7 +408,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                 </linearGradient>
               </defs>
               <CartesianGrid vertical={false} stroke="var(--chart-grid-line)" />
-              <XAxis dataKey={daily ? "d" : "i"} type="number" domain={[xFirst, xLast]} ticks={ticks} tickFormatter={fmtTick} tickLine={false} axisLine={false} tickMargin={10} interval="preserveStartEnd" />
+              <XAxis dataKey={daily ? "d" : "i"} type="number" domain={[xFirst, xLast]} ticks={ticks} tickFormatter={fmtTick} tickLine={false} axisLine={false} tickMargin={10 + track.gap + track.h} height={30 + track.gap + track.h} interval="preserveStartEnd" />
               <YAxis domain={[yMin, yMax]} ticks={yTicks} interval={0} tickLine={false} axisLine={false} width={40} tickMargin={6} tickFormatter={axisNum} />
               {bands.map(([a, b], k) => (
                 <ReferenceArea
@@ -492,6 +508,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
               {focusRow && focusX != null && (
                 <ReferenceDot x={focusX} y={focusRow.demand} r={4.5} fill={focusRow.overload ? "var(--flow-overload)" : "var(--vd-grid)"} stroke="var(--bg-deep)" strokeWidth={2} className="va-focus-dot" />
               )}
+              <ModeTrack units={units} xFirst={xFirst} xLast={xLast} focusX={focusX} height={track.h} gap={track.gap} label={!narrow} onHover={onFocusHour} onPick={onPick} />
             </ComposedChart>
           </ChartContainer>
         </div>
@@ -502,6 +519,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
           <p className="va-card-label">Load forecast</p>
           <h2 className="va-card-title" id="vd-chart-title">Predicted load and supply</h2>
           <p className="va-chart-desc">{desc}</p>
+          <p className="sr-only">{trackSummary}</p>
         </div>
         <div className="vd-chart-range">{rangeControl}</div>
         <ul className="va-legend" aria-label="Legend">
@@ -523,6 +541,12 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
           <li><i className="va-legend-dash" aria-hidden="true" />{STORAGE_ABOVE_KW} kW storage</li>
           <li><i className="va-legend-dash va-legend-dash--overload" aria-hidden="true" />{OVERLOAD_AT_KW} kW overload</li>
           {!daily && <li><i className="va-legend-band" aria-hidden="true" />18–22 evening window</li>}
+        </ul>
+        <ul className="va-legend vd-track-legend" aria-label="Mode track legend">
+          <li className="vd-track-cap">{daily ? "Mode track · each day's majority" : "Mode track"}</li>
+          <li><span className="vd-key" aria-hidden="true"><i className="is-grid" /></span><UtilityPole className="vd-key-icon" strokeWidth={1.5} aria-hidden />Main Grid</li>
+          <li><span className="vd-key" aria-hidden="true"><i className="is-storage" /></span><BatteryCharging className="vd-key-icon" strokeWidth={1.5} aria-hidden />Renewable Storage</li>
+          <li><span className="vd-key" aria-hidden="true"><i className="is-grid" /><b /></span><TriangleAlert className="vd-key-icon" strokeWidth={1.5} aria-hidden />{daily ? "A day with overload hours" : "Overload hour"}</li>
         </ul>
       </div>
     </GlassCard>

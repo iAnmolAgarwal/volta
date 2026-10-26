@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 from zcatalyst_sdk.exceptions import CatalystAPIError
 
-from backend.store import (HOURS_TABLE, INSERT_BATCH, RUNS_TABLE, SELECT_PAGE, CatalystRunStore, StoreError,
+from backend.store import (CLEANING_MAX_CHARS, HOURS_TABLE, INSERT_BATCH, RUNS_TABLE, SELECT_PAGE, CatalystRunStore, StoreError,
                            created_iso, hour_from_row, hour_to_row, run_from_row, run_to_row, upload_key)
 
 
@@ -194,3 +194,10 @@ def test_run_row_mapping():
     back = run_from_row({**{k: str(v) for k, v in row.items() if k != "cleaning_json"},
                          "cleaning_json": row["cleaning_json"], "ROWID": "9", "CREATEDTIME": "2026-10-26 10:00:00:000"})
     assert back["id"] == "9" and back["overload_count"] == 1 and back["cleaning"] == RECORD["cleaning"]
+
+
+def test_oversized_cleaning_report_drops_the_row_list_but_keeps_the_count():
+    rejected = [{"row": i, "reason": "x" * 300} for i in range(50)]
+    row = run_to_row({**RECORD, "cleaning": {"rejected_count": 900, "rejected": rejected}})
+    assert len(row["cleaning_json"]) <= CLEANING_MAX_CHARS
+    assert '"rejected_count": 900' in row["cleaning_json"] and '"rejected": []' in row["cleaning_json"]

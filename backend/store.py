@@ -21,6 +21,7 @@ DEFAULT_BUCKET = "microgrid-uploads"  # UPLOAD_BUCKET overrides
 PROJECT_UTC_OFFSET = "+05:30"  # CREATEDTIME is in the project's time zone (Asia/Kolkata), without an offset
 INSERT_BATCH = 200  # Data Store bulk-insert limit
 SELECT_PAGE = 300  # ZCQL row limit per query
+CLEANING_MAX_CHARS = 10_000  # limit of the Data Store text column runs.cleaning_json
 
 RUN_FIELDS = {  # run record key -> runs column
     "source": "source_type", "filename": "file_name", "rows_in": "rows_in", "n_rows": "n_rows",
@@ -63,7 +64,11 @@ def _value(key: str, raw):
 
 def run_to_row(record: dict) -> dict:
     row = {col: record.get(key) for key, col in RUN_FIELDS.items() if record.get(key) is not None}
-    row["cleaning_json"] = json.dumps(record.get("cleaning") or {}, ensure_ascii=False)
+    report = record.get("cleaning") or {}
+    text = json.dumps(report, ensure_ascii=False)
+    if len(text) > CLEANING_MAX_CHARS:  # the rejected-row list is the only open-ended part; its count stays
+        text = json.dumps({**report, "rejected": []}, ensure_ascii=False)
+    row["cleaning_json"] = text
     return row
 
 

@@ -10,6 +10,22 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%234a4d44'/%3E%3Cpath fill='%23eef1e7' d='M13.2 3.5 6 13.4h5.2L10.4 20.5 18 10.4h-5.3z'/%3E%3C/svg%3E" />
     <!-- the wordmark lives in src/lib/brand.ts, which sets this title at runtime; keep the two in step -->
     <title>VOLTA · Smart Energy Microgrid</title>
+    <!-- Slate serves this page with a one-year cache header we can't change. If a stale copy asks
+         for a bundle that is gone, reload once (a reload revalidates the page itself). -->
+    <script>
+      (function () {
+        var KEY = "volta:asset-reload", failed = false;
+        addEventListener("error", function (e) {
+          var el = e.target, url = el && (el.href || el.src);
+          if (!url || !/\/assets\//.test(url) || !/^(LINK|SCRIPT)$/.test(el.tagName)) return;
+          failed = true;
+          try { if (sessionStorage.getItem(KEY)) return; sessionStorage.setItem(KEY, "1"); } catch (_) { return; }
+          location.reload();
+        }, true);
+        // a clean load re-arms the guard for the next deploy; a failed one never loops
+        addEventListener("load", function () { if (!failed) try { sessionStorage.removeItem(KEY); } catch (_) {} });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

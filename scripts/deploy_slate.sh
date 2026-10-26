@@ -8,6 +8,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 NAME="${SLATE_APP:-volta}"
 cd "$ROOT/frontend"
 npm run build
+# Slate caches index.html for a year (see below), so a browser may keep an old page that asks
+# for an old bundle. Never drop a hashed asset: every build's assets/ go into an archive
+# (gitignored) and the whole archive ships with each deploy. Hashed names never collide.
+ARCHIVE="$ROOT/.slate-assets"
+mkdir -p "$ARCHIVE"
+cp -n dist/assets/* "$ARCHIVE"/
+cp -n "$ARCHIVE"/* dist/assets/
 mkdir -p dist/.catalyst
 # SPA fallback: deep links (/dashboard, /input, /history) serve index.html; _redirects alone was not honoured
 printf 'framework = "static"\ndeployment_name = "default"\n\n[[redirects]]\nfrom = "/*"\nto = "/index.html"\nstatus = 200\n' > dist/.catalyst/slate-config.toml

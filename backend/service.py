@@ -14,7 +14,7 @@ from dataclasses import asdict
 import numpy as np
 import pandas as pd
 
-from backend.battery import BatteryParams, simulate
+from backend.battery import BatteryParams, BatteryStep, simulate
 from backend.controller import decide
 from model.data import INPUT_COLUMNS
 from model.features import QUICKML_FEATURES, build_features
@@ -151,16 +151,19 @@ class Forecaster:
             known.update(new)
         return np.array([known[k] for k in keys], dtype=float)
 
-    def forecast(self, payload, request=None) -> dict:
-        """`request` is the incoming HTTP request; the SDK path authenticates from its headers."""
-        raw = parse_rows(payload)
-        preds = self.predict_features(build_features(raw)[QUICKML_FEATURES], request)
-        stamps = pd.to_datetime(raw["timestamp"], format="ISO8601")
+    def schedule(self, stamps, preds) -> tuple[list[dict], list[BatteryStep]]:
+        """Controller decisions and battery steps for predictions in time order."""
         try:
             decisions = [decide(ts, p) for ts, p in zip(stamps, preds)]
         except ValueError as e:  # e.g. a negative prediction from the model
             raise PredictionError(f"unusable prediction from QuickML: {e}") from None
-        steps = simulate(((d["mode"], p) for d, p in zip(decisions, preds)), self.battery)
+        return decisions, simulate(((d["mode"], p) for d, p in zip(decisions, preds)), self.battery)
+
+    def forecast(self, payload, request=None) -> dict:
+        """`request` is the incoming HTTP request; the SDK path authenticates from its headers."""
+        raw = parse_rows(payload)
+        preds = self.predict_features(build_features(raw)[QUICKML_FEATURES], request)
+        decisions, steps = self.schedule(pd.to_datetime(raw["timestamp"], format="ISO8601"), preds)
         originals = raw["timestamp"].tolist()
         return {
             "predictions": preds.tolist(),

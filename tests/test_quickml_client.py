@@ -25,7 +25,7 @@ def indexed_rows(n: int) -> pd.DataFrame:
 
 
 def echo_index(call) -> FakeResponse:
-    return FakeResponse(200, {"predictions": [float(r["i"]) for r in call["json"]["data"]]})
+    return FakeResponse(200, {"result": [float(r["i"]) for r in call["json"]["data"]]})
 
 
 def with_tokens(answer):
@@ -50,7 +50,8 @@ def client(answer, extra: dict | None = None, sleeps: list | None = None, clock=
     kwargs = {"session": session, "sleep": (sleeps.append if sleeps is not None else lambda s: None)}
     if clock is not None:
         kwargs["clock"] = clock
-    return QuickMLClient.from_env({**(DIRECT if env is None else env), **(extra or {})}, **kwargs), session
+    base = {**(DIRECT if env is None else env), "QUICKML_BATCH_SIZE": "1"}  # one request per row unless overridden
+    return QuickMLClient.from_env({**base, **(extra or {})}, **kwargs), session
 
 
 def predict_calls(session):
@@ -61,8 +62,8 @@ def predict_calls(session):
 
 
 def test_defaults():
-    c, _ = client(echo_index)
-    assert (c.batch_size, c.concurrency) == (1, 8)
+    c = QuickMLClient.from_env(DIRECT, session=FakeSession(echo_index))
+    assert (c.batch_size, c.concurrency) == (1000, 8)
 
 
 def test_missing_variables_are_named():
@@ -90,7 +91,7 @@ def test_bad_settings_raise(extra):
 # --- chunking, concurrency and order ----------------------------------------
 
 
-@pytest.mark.parametrize("batch, sizes", [(1, [1] * 10), (3, [3, 3, 3, 1]), (10, [10]), (50, [10])])
+@pytest.mark.parametrize("batch, sizes", [(1, [1] * 10), (3, [3, 3, 3, 1]), (10, [10]), (1000, [10])])
 @pytest.mark.parametrize("concurrency", ["1", "4"])
 def test_chunks_reassemble_in_order(batch, sizes, concurrency):
     c, session = client(echo_index, {"QUICKML_BATCH_SIZE": str(batch), "QUICKML_CONCURRENCY": concurrency})
@@ -126,18 +127,19 @@ def test_empty_input_makes_no_requests():
     assert c.predict(indexed_rows(0)).tolist() == [] and session.calls == []
 
 
-def test_quickml_sample_response_shape_is_accepted():
-    c, _ = client(lambda call: FakeResponse(200, {"status": "success", "result": [123.4]}))
-    assert c.predict(indexed_rows(1)).tolist() == [123.4]
+def test_verified_quickml_contract():
+    c, session = client(lambda call: FakeResponse(200, {"result": [123.4, 99.5]}), {"QUICKML_BATCH_SIZE": "1000"})
+    assert c.predict(indexed_rows(2)).tolist() == [123.4, 99.5]
+    assert predict_calls(session)[0]["json"] == {"data": [{"i": 0}, {"i": 1}]}
 
 
 @pytest.mark.parametrize(
     "body, message",
     [
-        ({"predictions": [1.0, 2.0]}, "expected 1 predictions, got 2 values"),
-        ({"prediction": 1.0}, "response keys"),
-        ({"predictions": ["abc"]}, "non-numeric"),
-        ({"predictions": [float("nan")]}, "NaN or infinite"),
+        ({"result": [1.0, 2.0]}, "expected 1 predictions, got 2 values"),
+        ({"predictions": [1.0]}, "response keys"),
+        ({"result": ["abc"]}, "non-numeric"),
+        ({"result": [float("nan")]}, "NaN or infinite"),
         ({"status": "failure", "result": [1.0]}, "status 'failure'"),
         ([1.0], "expected a JSON object"),
     ],
@@ -151,7 +153,7 @@ def test_unusable_responses_raise(body, message):
 def test_error_names_the_failing_rows():
     def fail_third_batch(call):
         if call["json"]["data"][0]["i"] == 4:
-            return FakeResponse(200, {"predictions": []})
+            return FakeResponse(200, {"result": []})
         return echo_index(call)
 
     c, _ = client(fail_third_batch, {"QUICKML_BATCH_SIZE": "2", "QUICKML_CONCURRENCY": "3"})

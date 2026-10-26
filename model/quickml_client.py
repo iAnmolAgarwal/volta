@@ -5,7 +5,7 @@ QUICKML_ENDPOINT_URL, QUICKML_ENDPOINT_KEY, ZOHO_ORG_ID and a Zoho OAuth
 refresh token (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN).
 Access tokens are cached until shortly before they expire.
 
-Rows go out QUICKML_BATCH_SIZE at a time (default 1), up to
+Rows go out QUICKML_BATCH_SIZE at a time (default 1000), up to
 QUICKML_CONCURRENCY requests in parallel (default 8), each with a timeout
 (QUICKML_TIMEOUT seconds) and retries with exponential backoff
 (QUICKML_RETRIES). Every failure raises, and error messages never contain
@@ -56,17 +56,15 @@ class Unauthorized(PredictionError):
 def exchange(post: Callable[[dict], dict], rows: list[dict]) -> list[float]:
     """Send rows and return one float per row: the only code that knows the wire schema.
 
-    Request:  {"data": [{feature: value, ...}, ...]}
-    Response: {"predictions": [...]}, or QuickML's sample shape
-              {"status": "success", "result": [...]}
-    The real QuickML body is not documented yet; when it is, change only this.
+    QuickML contract (verified live): request {"data": [{feature: value, ...}, ...]},
+    response {"result": [float, ...]} in input order.
     """
     body = post({"data": rows})
     if not isinstance(body, dict):
         raise PredictionError(f"expected a JSON object, got {type(body).__name__}")
     if body.get("status", "success") != "success":
         raise PredictionError(f"endpoint reported status {body['status']!r}")
-    values = body.get("predictions", body.get("result"))
+    values = body.get("result")
     if not isinstance(values, list) or len(values) != len(rows):
         got = f"{len(values)} values" if isinstance(values, list) else repr(type(values).__name__)
         raise PredictionError(f"expected {len(rows)} predictions, got {got} (response keys: {sorted(body)})")
@@ -227,10 +225,7 @@ class QuickMLClient:
         def get(name: str) -> str:
             return (env.get(name) or "").strip()
 
-        batch_size = _number(get("QUICKML_BATCH_SIZE"), "QUICKML_BATCH_SIZE", 1, int, minimum=1)
-        concurrency = _number(get("QUICKML_CONCURRENCY"), "QUICKML_CONCURRENCY", 8, int, minimum=1)
-        timeout = _number(get("QUICKML_TIMEOUT"), "QUICKML_TIMEOUT", 15.0, float, minimum=0.1)
-        retries = _number(get("QUICKML_RETRIES"), "QUICKML_RETRIES", 3, int, minimum=0)
+        batch_size, concurrency, timeout, retries = settings(env)
 
         missing = [name for name in DIRECT_VARS if not get(name)]
         if missing:
@@ -247,6 +242,21 @@ class QuickMLClient:
             http,
         )
         return cls(transport, batch_size, concurrency)
+
+
+def settings(env: Mapping[str, str] | None = None) -> tuple[int, int, float, int]:
+    """(batch_size, concurrency, timeout_s, retries) from the environment, with defaults."""
+    env = os.environ if env is None else env
+
+    def get(name: str) -> str:
+        return (env.get(name) or "").strip()
+
+    return (
+        _number(get("QUICKML_BATCH_SIZE"), "QUICKML_BATCH_SIZE", 1000, int, minimum=1),
+        _number(get("QUICKML_CONCURRENCY"), "QUICKML_CONCURRENCY", 8, int, minimum=1),
+        _number(get("QUICKML_TIMEOUT"), "QUICKML_TIMEOUT", 15.0, float, minimum=0.1),
+        _number(get("QUICKML_RETRIES"), "QUICKML_RETRIES", 3, int, minimum=0),
+    )
 
 
 def is_configured(env: Mapping[str, str] | None = None) -> bool:

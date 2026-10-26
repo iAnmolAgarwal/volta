@@ -349,11 +349,13 @@
   margin-left: calc(3 * var(--u)); /* optical centre of the triangle */
   fill: currentColor;
 }
+/* above the ring, over the clear sky between the headline and the disc (Sylva
+   keeps all hero text over sky; below the ring it fell on the solar field) */
 .vl-play-caption {
   position: absolute;
   left: 50%;
-  top: calc(100% + 18 * var(--u));
-  transform: translate(-50%, calc(-6 * var(--u)));
+  bottom: calc(100% + 16 * var(--u));
+  transform: translate(-50%, calc(6 * var(--u)));
   font-size: var(--t-dock);
   font-weight: var(--w-medium);
   letter-spacing: var(--track-dock);
@@ -628,6 +630,9 @@
 .vl-tip-row i { width: calc(7 * var(--u)); height: calc(7 * var(--u)); border-radius: var(--r-round); flex: none; box-shadow: 0 0 calc(6 * var(--u)) currentColor; }
 .vl-tip-row span { color: var(--ink-soft); }
 .vl-tip-row b { margin-left: auto; font-weight: var(--w-medium); font-variant-numeric: tabular-nums; }
+/* card 1's tooltip: the hour, with card 2's Overload flag on hours at 200 kW or more */
+.vl-tip-label { display: flex; align-items: center; justify-content: space-between; gap: calc(10 * var(--u)); }
+.vl-tip .vl-flag { height: calc(18 * var(--u)); padding: 0 calc(8 * var(--u)); color: var(--ink); font-size: calc(9.5 * var(--u)); }
 
 /* ── headline review switcher (temporary) ─────────────────────────────────
    A review control, not part of the composition: on the headline's rail
@@ -675,7 +680,10 @@
   outline-offset: calc(4 * var(--u));
 }
 .vl-dock-item:focus-visible { border-radius: var(--r-dock-item); }
-.vl-knob:focus-visible { outline-color: var(--focus-ring-dark); }
+/* card 1's knob sits on the paper: a dark ring; card 2's sits on its dark
+   plate and keeps the light one (beats .vl a:focus-visible on specificity) */
+.vl .vl-knob:focus-visible { outline-color: var(--focus-ring-dark); }
+.vl .vl-card--mode .vl-knob:focus-visible { outline-color: var(--focus-ring); }
 .vl-pill:focus-visible { outline-offset: calc(6 * var(--u)); border-radius: 999px; }
 .vl-play-btn:focus-visible { border-radius: var(--r-round); }
 
@@ -775,7 +783,17 @@
 
 /* ── one column below 900px, on Sylva's 760-unit scale ───────────────────── */
 @media (max-width: 900px) {
-  .vl { height: auto; min-height: 100svh; }
+  .vl {
+    height: auto;
+    min-height: 100svh;
+    /* Text is floored at --t-min. The column drops just enough for the headline
+       to clear the dock by --dock-clear (zero from ~620px up), then the pill,
+       chips and stats drop again by what the floored lede's three lines gain.
+       The steps between the blocks stay Sylva's. */
+    --drop: max(0px, calc(30 * var(--u) + max(56px, 58 * var(--u)) + var(--dock-clear) - 128 * var(--u)));
+    --lede-lh: max(calc(27 * var(--u)), calc(var(--t-min) * 27 / 19));
+    --drop-2: calc(var(--drop) + 3 * (var(--lede-lh) - 27 * var(--u)));
+  }
   .vl-stage {
     position: relative;
     left: auto;
@@ -810,36 +828,73 @@
   .vl-dock-label { display: none; }
   .vl-glyph { width: max(19px, calc(20 * var(--u))); height: max(19px, calc(20 * var(--u))); }
 
-  .vl-headline { left: calc(34 * var(--u)); top: calc(128 * var(--u)); font-size: calc(62 * var(--u)); line-height: calc(66 * var(--u)); }
-  .vl-lede { left: calc(34 * var(--u)); top: calc(288 * var(--u)); width: calc(400 * var(--u)); font-size: calc(19 * var(--u)); line-height: calc(27 * var(--u)); }
+  .vl-headline { left: calc(34 * var(--u)); top: calc(128 * var(--u) + var(--drop)); font-size: calc(62 * var(--u)); line-height: calc(66 * var(--u)); }
+  /* the lede's box grows with its floored type, so it breaks into the same lines */
+  .vl-lede {
+    left: calc(34 * var(--u));
+    top: calc(288 * var(--u) + var(--drop));
+    width: max(calc(400 * var(--u)), calc(var(--t-min) * 400 / 19));
+    font-size: max(var(--t-min), calc(19 * var(--u)));
+    line-height: var(--lede-lh);
+  }
 
   /* the pill is re-anchored to the left rail, centred on y 430 */
-  .vl-pill-wrap { left: calc(34 * var(--u)); top: calc(430 * var(--u)); transform: translateY(-50%); }
-  .vl-pill { height: max(var(--tap-min), calc(74 * var(--u))); gap: calc(16 * var(--u)); padding: 0 calc(32 * var(--u)) 0 calc(26 * var(--u)); font-size: calc(20 * var(--u)); }
+  .vl-pill-wrap { left: calc(34 * var(--u)); top: calc(430 * var(--u) + var(--drop-2)); transform: translateY(-50%); }
+  .vl-pill { height: max(var(--tap-min), calc(74 * var(--u))); gap: calc(16 * var(--u)); padding: 0 calc(32 * var(--u)) 0 calc(26 * var(--u)); font-size: max(var(--t-min), calc(20 * var(--u))); }
   .vl-pill-icon { width: calc(21 * var(--u)); height: calc(21 * var(--u)); }
   .vl-pill-reveal { --mr: calc(37 * var(--u)); }
   .vl-play { display: none; }
 
   .vl-stat { gap: calc(11 * var(--u)); }
   .vl-mark { width: calc(36 * var(--u)); height: calc(36 * var(--u)); }
-  .vl-stat dt { font-size: calc(16 * var(--u)); line-height: calc(22 * var(--u)); }
-  .vl-stat dd { font-size: calc(16.5 * var(--u)); line-height: calc(24 * var(--u)); }
-  .vl-stat--a { left: calc(34 * var(--u)); top: calc(540 * var(--u)); }
-  .vl-stat--b { left: calc(274 * var(--u)); top: calc(540 * var(--u)); }
-  .vl-stat--c { left: calc(490 * var(--u)); top: calc(540 * var(--u)); }
+  .vl-stat dt { font-size: max(var(--t-min), calc(16 * var(--u))); line-height: max(calc(22 * var(--u)), calc(var(--t-min) * 22 / 16)); }
+  .vl-stat dd { font-size: max(var(--t-min), calc(16.5 * var(--u))); line-height: max(calc(24 * var(--u)), calc(var(--t-min) * 24 / 16.5)); }
+  .vl-stat--a { left: calc(34 * var(--u)); top: calc(540 * var(--u) + var(--drop-2)); }
+  .vl-stat--b { left: calc(274 * var(--u)); top: calc(540 * var(--u) + var(--drop-2)); }
+  .vl-stat--c { left: calc(490 * var(--u)); top: calc(540 * var(--u) + var(--drop-2)); }
 
   .vl-card { --mr: calc(40 * var(--u)); border-radius: calc(40 * var(--u)); }
   .vl-card--peak { left: calc(34 * var(--u)); top: calc(1050 * var(--u)); width: calc(692 * var(--u)); height: calc(250 * var(--u)); }
-  .vl-card--peak .vl-card-label { top: calc(96 * var(--u)); }
+  /* the floored labels grow upward, so each keeps its gap to the title below */
+  .vl-card { --label-grow: calc(max(var(--t-min), var(--t-card-label)) - var(--t-card-label)); }
+  .vl-card--peak .vl-card-label { top: calc(96 * var(--u) - var(--label-grow)); }
+  .vl-card--mode .vl-card-label { top: calc(45 * var(--u) - var(--label-grow)); }
   .vl-card--peak .vl-card-title { top: calc(124 * var(--u)); width: calc(400 * var(--u)); font-size: calc(32 * var(--u)); line-height: calc(36 * var(--u)); }
   .vl-card--mode { left: calc(34 * var(--u)); top: calc(1324 * var(--u)); width: calc(692 * var(--u)); height: calc(268 * var(--u)); }
   .vl-card--mode .vl-card-title { font-size: calc(32 * var(--u)); line-height: calc(36 * var(--u)); }
-  .vl-card--mode .vl-card-label { right: calc(340 * var(--u)); }
+  .vl-card-label { font-size: max(var(--t-min), var(--t-card-label)); }
+  /* the plate starts below the label row, so the label and its flag may run over its column */
+  .vl-card--mode .vl-card-label { right: calc(30 * var(--u)); }
+  /* small caps at the floor: a touch more tracking, the pill grown to fit */
+  .vl-flag {
+    gap: calc(var(--t-min) / 3);
+    height: max(calc(22 * var(--u)), calc(var(--t-min) * 4 / 3));
+    padding: 0 max(calc(10 * var(--u)), calc(var(--t-min) * 0.6));
+    font-size: max(var(--t-min), calc(11 * var(--u)));
+    letter-spacing: max(calc(0.8 * var(--u)), 0.07em);
+  }
+  .vl-flag i { width: max(calc(6 * var(--u)), calc(var(--t-min) / 2)); height: max(calc(6 * var(--u)), calc(var(--t-min) / 2)); }
+  .vl-chip {
+    height: max(calc(22 * var(--u)), calc(var(--t-min) * 1.75));
+    padding: 0 max(calc(10 * var(--u)), calc(var(--t-min) * 0.6));
+    font-size: max(var(--t-min), calc(10.5 * var(--u)));
+    letter-spacing: 0;
+  }
+  /* at the floor "Snapshot · offline" outgrows card 1's thumbnail plate (and
+     meets card 2's hour chip), so phones show "Offline"; the rest is kept for
+     screen readers */
+  .vl-chip--snapshot { text-transform: capitalize; }
+  .vl-chip-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .vl-tip.vl-tip { font-size: max(var(--t-min), calc(11 * var(--u))); }
+  .vl-tip .vl-flag { font-size: var(--t-min); }
   /* both plates become a thumbnail on the card's outer edge */
   .vl-card--peak .vl-plate { left: auto; right: calc(16 * var(--u)); top: calc(16 * var(--u)); width: calc(224 * var(--u)); height: calc(218 * var(--u)); }
   .vl-card--mode .vl-plate { left: auto; right: calc(16 * var(--u)); bottom: calc(16 * var(--u)); width: calc(300 * var(--u)); height: calc(150 * var(--u)); }
   .vl-card--mode .vl-knob { right: calc(30 * var(--u)); bottom: calc(30 * var(--u)); }
   .vl-knob { --knob-hit: max(var(--tap-min), var(--knob-size)); }
+  /* card 1's phone knob sits on its plate's corner, half on the dark plate and
+     half on the paper: a light band inside the dark ring reads on both */
+  .vl .vl-knob-float .vl-knob:focus-visible { box-shadow: 0 0 0 calc(4 * var(--u)) var(--focus-ring); }
   /* the plots fade around the knobs, which sit on the plates' corners */
   .vl-card--peak .vl-plate { --knob-fade: radial-gradient(circle at calc(100% - 37 * var(--u)) calc(100% - 37 * var(--u)), transparent calc(30 * var(--u)), #000 calc(48 * var(--u))); } /* knob centre (673, 1247) */
   .vl-card--mode .vl-plate { --knob-fade: radial-gradient(circle at calc(100% - 41 * var(--u)) calc(100% - 41 * var(--u)), transparent calc(28 * var(--u)), #000 calc(46 * var(--u))); } /* right 30 + 27, less 16 */
@@ -847,7 +902,7 @@
 
   .vl-ghost { font-size: calc(184 * var(--u)); letter-spacing: calc(14 * var(--u)); bottom: calc(660 * var(--u)); left: calc(-10 * var(--u)); }
   /* on the pill's row, right-aligned, each chip a full 44px target */
-  .vl-review { left: auto; right: calc(34 * var(--u)); top: calc(430 * var(--u) - var(--tap-min) / 2); gap: max(4px, calc(6 * var(--u))); }
+  .vl-review { left: auto; right: calc(34 * var(--u)); top: calc(430 * var(--u) + var(--drop-2) - var(--tap-min) / 2); gap: max(4px, calc(6 * var(--u))); }
   .vl-review-label { display: none; }
   .vl-review-chip {
     width: var(--tap-min);

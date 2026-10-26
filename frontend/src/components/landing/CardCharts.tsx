@@ -50,7 +50,7 @@ function TipRow({ color, name, value }: { color: string; name: string; value: st
 }
 
 const peakConfig = {
-  kw: { label: "Forecast", color: "var(--flow-grid)" },
+  kw: { label: "Demand", color: "var(--flow-grid)" },
 } satisfies ChartConfig;
 
 /** Card 1: the 24-hour prediction in lime; only the part of each hour above 200 kW is tinted red. */
@@ -86,11 +86,19 @@ export function PeakChart({ hours, playhead }: { hours: Hour[]; playhead: number
           content={
             <ChartTooltipContent
               className="vl-tip"
-              labelFormatter={(_, p) => (p?.[0]?.payload as Row | undefined)?.label}
-              formatter={(v, _n, item) => {
-                const r = item.payload as Row;
-                return <TipRow color={r.overload ? "var(--flow-overload)" : "var(--flow-grid)"} name={r.overload ? "Overload" : "Forecast"} value={kw(Number(v))} />;
+              labelClassName="vl-tip-label"
+              labelFormatter={(_, p) => {
+                const r = p?.[0]?.payload as Row | undefined;
+                if (!r) return null;
+                return (
+                  <>
+                    {r.label}
+                    {r.overload && <span className="vl-flag"><i aria-hidden="true" />Overload</span>}
+                  </>
+                );
               }}
+              // the series is the quantity, demand; the overload state is the flag above
+              formatter={(v) => <TipRow color="var(--flow-grid)" name="Demand" value={kw(Number(v))} />}
             />
           }
         />

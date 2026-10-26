@@ -37,6 +37,11 @@ export function Landing() {
   const [headline, setHeadline] = useState(readHeadlineParam);
   const [announce, setAnnounce] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
+  // pointer parallax on/off (fine hover and full motion); a flag of its own, so
+  // the entrance flags never write it out of the root's class list
+  const fineHover = useMedia(FINE_HOVER);
+  const reducedMotion = useMedia(REDUCED_MOTION);
+  const par = fineHover && !reducedMotion;
   const narrow = useMedia(NARROW);
   // the scene (three.js, its own chunk) mounts once the hero has painted and the page is idle
   const sceneOn = useAfterPaint();
@@ -86,7 +91,6 @@ export function Landing() {
     let lastY = NaN;
     const enabled = () => mqHover.matches && !mqReduced.matches;
     const apply = () => {
-      root.classList.toggle("is-par", enabled());
       if (!enabled()) { root.style.removeProperty("--px"); root.style.removeProperty("--py"); }
     };
     const frame = () => {
@@ -195,7 +199,7 @@ export function Landing() {
     <main
       ref={rootRef}
       id="top"
-      className={`vl${phase !== "pre" ? " is-ready" : ""}${phase === "done" ? " intro-done" : ""}`}
+      className={["vl", phase !== "pre" && "is-ready", phase === "done" && "intro-done", par && "is-par"].filter(Boolean).join(" ")}
     >
       {/* the scene fills the hero at z 3, aria-hidden and click-through; its sparks listen on window */}
       {sceneOn && <GridScene className="vl-scene" onReady={onSceneReady} />}

@@ -29,7 +29,8 @@ interface CardProps {
 
 function SnapshotChip({ show }: { show: boolean }) {
   if (!show) return null;
-  return <span className="vl-chip vl-chip--snapshot">Snapshot · offline</span>;
+  // phones show only "Offline" on the narrow plates; the full label stays for screen readers
+  return <span className="vl-chip vl-chip--snapshot"><span className="vl-chip-long">Snapshot · </span>offline</span>;
 }
 
 export function PeakCard({ forecast, index, loading, played, flash }: CardProps) {

@@ -17,3 +17,6 @@ predictions.csv
 .DS_Store
 .idea/
 .vscode/
+
+# AppSail bundle (scripts/build_appsail.sh)
+dist/

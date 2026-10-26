@@ -1,0 +1,472 @@
+/* /input: telemetry in. Only Sylva's vocabulary, at Sylva's sizes on its
+ * 1600-unit artboard (--u; 760 units below 900px), with every value a token:
+ * the moss-glass and paper cards, the dock's glass Fields and its small range
+ * dock, side-stat marks, spaced caps, light Lexend numerals, faint rules.
+ * Written for VOLTA; no Sylva code copied. Classes are prefixed vi-. */
+
+/* ── helpers ─────────────────────────────────────────────────────────────── */
+.vi-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.vi-caps {
+  margin: 0 0 calc(12 * var(--u));
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  line-height: 1.3;
+  color: var(--ink-faint);
+}
+.vi-caps--bad { color: var(--overload); }
+.vi-note { margin: 0; font-size: var(--a-small); line-height: 1.5; color: var(--ink-faint); }
+.vi-focus-target { outline: none; }
+
+/* ── the grid: the manual flow on the left, the other ways in on the right ─ */
+.vi-grid {
+  display: grid;
+  /* the right column is the landing card's width band (x 1091 guide to the rail) */
+  grid-template-columns: minmax(0, 1fr) calc(440 * var(--u));
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: "day side" "rows side" "result result";
+  gap: var(--a-gap);
+  align-items: start;
+}
+.vi-day { grid-area: day; }
+.vi-result { grid-area: result; min-width: 0; }
+.vi-rows-slot { grid-area: rows; min-width: 0; scroll-margin-top: calc(120 * var(--u)); }
+.vi-side-rail { grid-area: side; align-self: stretch; min-width: 0; }
+.vi-side {
+  position: sticky;
+  top: calc((38 + 46 + 24) * var(--u)); /* under the fixed dock */
+  display: flex;
+  flex-direction: column;
+  gap: var(--a-gap);
+  min-width: 0;
+}
+
+/* ── "Describe the 24 hours": a spec sheet of lines ──────────────────────── */
+.vi-day .va-card-head { margin-bottom: calc(8 * var(--u)); }
+.vi-day-form { display: flex; flex-direction: column; }
+.vi-line {
+  display: grid;
+  grid-template-columns: calc(250 * var(--u)) calc(206 * var(--u)) minmax(0, 1fr);
+  gap: calc(20 * var(--u));
+  align-items: start;
+  padding: calc(20 * var(--u)) 0;
+  border-top: 1px solid var(--glass-edge);
+}
+.vi-line-head { display: flex; align-items: flex-start; gap: calc(12 * var(--u)); padding-top: calc(20 * var(--u)); min-width: 0; }
+.vi-line-mark { margin-top: 0; }
+.vi-line-name h3 { margin: 0; font-size: var(--a-body); font-weight: var(--w-regular); letter-spacing: calc(-0.2 * var(--u)); line-height: 1.3; }
+.vi-line-name p { margin: calc(3 * var(--u)) 0 0; font-size: var(--a-small); line-height: 1.4; color: var(--ink-faint); }
+/* the shape dock sits level with the field boxes (under their caps labels) */
+.vi-line-control { padding-top: calc(22 * var(--u)); }
+.vi-shape { display: flex; width: 100%; }
+.vi-shape .va-range-item { flex: 1; height: calc(36 * var(--u)); padding: 0 calc(8 * var(--u)); }
+.vi-shape .va-range-item:disabled { opacity: 0.5; cursor: default; }
+.vi-line-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(14 * var(--u)); min-width: 0; }
+.vi-line:not(:has(.vi-line-control)) .vi-line-fields { grid-column: 2 / -1; }
+.vi-wide { grid-column: span 2; }
+.vi-day-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(20 * var(--u));
+  padding-top: calc(22 * var(--u));
+  border-top: 1px solid var(--glass-edge);
+}
+
+/* ── the rows table ──────────────────────────────────────────────────────── */
+.vi-rows .va-card-head { margin-bottom: calc(14 * var(--u)); }
+.vi-ok .va-pill-glyph { color: var(--volt); opacity: 1; }
+.vi-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.vi-table thead th {
+  padding: 0 calc(6 * var(--u)) calc(10 * var(--u));
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--glass-edge);
+}
+.vi-unit { color: var(--ink-mark); }
+.vi-table th.vi-c-num { width: calc(64 * var(--u)); }
+.vi-table th.vi-c-timestamp { width: 30%; }
+.vi-table th.vi-c-del { width: calc(52 * var(--u)); }
+.vi-table tbody th,
+.vi-table tbody td {
+  padding: calc(6 * var(--u)) calc(6 * var(--u));
+  vertical-align: top;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+}
+.vi-table tbody tr:first-child > * { padding-top: calc(12 * var(--u)); }
+.vi-table tbody tr:last-child > * { border-bottom: 0; }
+/* the hour: a tabular index and its clock time, like a log label */
+.vi-table tbody th.vi-c-num { font-weight: var(--w-regular); padding-left: 0; }
+.vi-c-num .vi-num { display: block; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vi-num { font-size: var(--a-body); color: var(--ink); line-height: calc(20 * var(--u)); margin-top: calc(1 * var(--u)); }
+.vi-table tr.is-bad .vi-num { color: var(--overload); }
+/* cells: the dock-glass Field, a touch shorter in a table; units live in the head */
+.vi-table .va-field { gap: calc(5 * var(--u)); }
+.vi-table .va-field-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.vi-table .va-field-box { height: calc(40 * var(--u)); padding: 0 calc(12 * var(--u)); border-radius: var(--r-dock-item); }
+.vi-table .va-field-suffix { display: none; }
+.vi-table .va-field-input::placeholder { color: var(--ink-mark); }
+.vi-table .va-field-error { font-size: max(var(--t-min), var(--a-small)); }
+.vi-table tbody tr { transition: background 0.25s var(--ease); }
+.vi-table tbody tr:hover .vi-num { color: var(--volt-pale); }
+.vi-c-del { text-align: right; }
+.vi-del {
+  display: inline-grid;
+  place-items: center;
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-round);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color 0.18s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease), transform 0.5s var(--ease-out);
+}
+.vi-del svg { width: 40%; height: 40%; display: block; }
+.vi-del:hover { color: var(--ink); background: var(--glass-hover); border-color: var(--glass-rim); transform: rotate(8deg); }
+.vi-del:disabled { opacity: 0.4; pointer-events: none; }
+.va .vi-del:focus-visible { border-radius: var(--r-round); }
+/* the actions ride along as a small dock while the hours scroll past */
+.vi-rows-foot {
+  position: sticky;
+  z-index: 2;
+  bottom: calc(24 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(20 * var(--u));
+  margin: calc(18 * var(--u)) calc(-14 * var(--u)) 0;
+  padding: calc(8 * var(--u)) calc(8 * var(--u)) calc(8 * var(--u)) calc(14 * var(--u));
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-pill);
+  /* the dock's near-hover glass (0.94), so the hours scrolling under it don't read through */
+  background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-near-bg);
+  box-shadow: 0 calc(12 * var(--u)) calc(30 * var(--u)) var(--dock-shadow), inset 0 1px var(--dock-inset);
+  backdrop-filter: blur(calc(24 * var(--u))) saturate(1.1);
+  -webkit-backdrop-filter: blur(calc(24 * var(--u))) saturate(1.1);
+}
+.vi-rows-tools { display: flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--u)); min-width: 0; }
+.vi-rows-tools .vi-note { margin-left: calc(10 * var(--u)); }
+.vi-send { flex: none; }
+
+/* ── the other ways in ───────────────────────────────────────────────────── */
+.vi-csv .va-drop { min-height: calc(214 * var(--u)); }
+.vi-cols { margin-top: calc(16 * var(--u)); }
+.vi-cols code {
+  padding: calc(1 * var(--u)) calc(6 * var(--u));
+  border-radius: calc(6 * var(--u));
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  font-family: var(--font);
+  font-size: 0.94em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.vi-sample-text { margin: 0 0 calc(22 * var(--u)); font-size: var(--a-body); line-height: 1.5; color: var(--paper-label); }
+/* on paper the action is the dark ink chip: the active dock item, inverted */
+.va-card--paper .va-pill.vi-ink {
+  background: var(--paper-ink);
+  border-color: var(--paper-ink);
+  color: var(--paper);
+  box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) var(--dock-active-shadow);
+}
+.va-card--paper .va-pill.vi-ink .va-pill-glyph { opacity: 1; color: var(--volt); }
+.va-card--paper .va-pill.vi-ink.is-action:hover { background: var(--bg-deep); border-color: var(--bg-deep); color: var(--ink); box-shadow: var(--knob-shadow), 0 calc(10 * var(--u)) calc(22 * var(--u)) var(--dock-active-shadow); }
+.va .va-card--paper .va-pill.vi-ink:focus-visible { outline-color: var(--focus-ring-dark); }
+
+/* ── the result slot ─────────────────────────────────────────────────────── */
+.vi-result { scroll-margin-top: calc(120 * var(--u)); }
+.vi-result:empty { display: none; }
+.vi-result-grid { display: grid; grid-template-columns: minmax(0, 1fr) calc(440 * var(--u)); gap: var(--a-gap); align-items: start; }
+
+/* busy: the landing's sheen, and the route the rows take */
+.vi-busy-body { display: grid; gap: calc(18 * var(--u)); }
+.vi-busy-steps { display: flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--u)) calc(12 * var(--u)); margin: 0; font-size: var(--a-small); color: var(--ink-soft); }
+.vi-busy-steps svg { width: calc(14 * var(--u)); height: calc(14 * var(--u)); color: var(--ink-mark); flex: none; }
+.vi-busy-lines { max-width: calc(620 * var(--u)); }
+
+/* the cleaning report */
+.vi-clean-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: calc(20 * var(--u)) calc(32 * var(--u));
+  padding-bottom: calc(26 * var(--u));
+  border-bottom: 1px solid var(--glass-edge);
+}
+.vi-counts { display: flex; align-items: flex-end; gap: calc(26 * var(--u)); margin: 0; }
+.vi-count dt { margin-bottom: calc(6 * var(--u)); font-size: var(--a-caps); font-weight: var(--w-medium); letter-spacing: var(--track-dock); text-transform: uppercase; color: var(--ink-faint); }
+.vi-count dd { margin: 0; font-size: calc(46 * var(--u)); line-height: 1; font-weight: var(--w-light); letter-spacing: var(--track-display); color: var(--ink); }
+.vi-count.is-bad dt,
+.vi-count.is-bad dd { color: var(--overload); }
+.vi-counts-arrow { align-self: flex-end; padding-bottom: calc(10 * var(--u)); color: var(--ink-mark); }
+.vi-counts-arrow svg { width: calc(22 * var(--u)); height: calc(22 * var(--u)); display: block; }
+.vi-counts .vi-count:last-child { padding-left: calc(26 * var(--u)); border-left: 1px solid var(--glass-edge); }
+.vi-formats { min-width: 0; }
+.vi-formats .vi-caps { text-align: right; }
+.vi-formats ul { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: calc(6 * var(--u)); margin: 0; padding: 0; list-style: none; }
+.vi-formats .va-pill { text-transform: none; letter-spacing: 0; font-weight: var(--w-regular); }
+.vi-clean-part { margin-top: calc(26 * var(--u)); }
+.vi-loglist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(10 * var(--u)); margin: 0; padding: 0; list-style: none; }
+.vi-loglist .va-log-title { white-space: normal; }
+.vi-loglist + .vi-note { margin-top: calc(10 * var(--u)); }
+.vi-clear { columns: 3; column-gap: calc(28 * var(--u)); margin: 0; padding: 0; list-style: none; }
+.vi-clear li {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(8 * var(--u));
+  break-inside: avoid;
+  padding: calc(5 * var(--u)) 0;
+  font-size: var(--a-small);
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+.vi-clear svg { width: calc(14 * var(--u)); height: calc(14 * var(--u)); margin-top: calc(2 * var(--u)); flex: none; color: var(--volt); opacity: 0.8; }
+
+/* the run, on paper */
+.vi-run .va-card-title > span { display: flex; flex-direction: column; gap: calc(4 * var(--u)); }
+.vi-peak-at { font-size: var(--a-body); line-height: 1.3; color: var(--paper-label); letter-spacing: 0; }
+.vi-run-span { margin: calc(-6 * var(--u)) 0 0; font-size: var(--a-small); color: var(--paper-label); }
+.vi-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(18 * var(--u)) calc(16 * var(--u)); margin: calc(26 * var(--u)) 0 0; }
+.vi-stat { display: flex; align-items: flex-start; gap: calc(10 * var(--u)); min-width: 0; }
+.vi-stat-mark {
+  display: grid;
+  place-items: center;
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  flex: none;
+  border-radius: var(--r-round);
+  border: 1px dotted var(--paper-label);
+  color: var(--paper-ink);
+}
+.vi-stat-mark svg { width: 46%; height: 46%; display: block; }
+/* Renewable Storage: the dock's dark mark tile with the lime glyph; overload: the flag's red */
+.vi-stat.is-storage .vi-stat-mark { border: 0; background: var(--paper-ink); color: var(--volt); }
+.vi-stat.is-overload .vi-stat-mark { border: 1px solid var(--overload); background: var(--overload-soft); color: var(--paper-ink); }
+.vi-stat dt { font-size: var(--a-small); line-height: calc(19 * var(--u)); color: var(--paper-label); }
+.vi-stat dd { margin: 0; font-size: var(--a-body); line-height: calc(21 * var(--u)); font-weight: var(--w-medium); color: var(--paper-ink); }
+.vi-run-go { margin-top: calc(22 * var(--u)); }
+
+/* ── one column below 900px, on Sylva's 760-unit scale ───────────────────── */
+@media (max-width: 900px) {
+  .vi-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "day" "rows" "result" "side"; }
+  .vi-side { position: static; }
+  .vi-side-rail { align-self: start; }
+  .vi-rows-slot,
+  .vi-result { scroll-margin-top: calc(30 * var(--u) + max(56px, 58 * var(--u)) + 16px); }
+
+  .vi-line { grid-template-columns: minmax(0, 1fr); gap: calc(18 * var(--u)); padding: calc(30 * var(--u)) 0; }
+  .vi-line-head { padding-top: 0; gap: calc(16 * var(--u)); }
+  .vi-line-mark { width: max(28px, calc(44 * var(--u))); height: max(28px, calc(44 * var(--u))); }
+  .vi-line-control { padding-top: 0; }
+  .vi-shape .va-range-item { height: var(--tap-min); }
+  .vi-line-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(18 * var(--u)); }
+  .vi-line:not(:has(.vi-line-control)) .vi-line-fields { grid-column: auto; }
+  .vi-line-fields:has(> :nth-child(3)) > :first-child,
+  .vi-line-fields > :only-child,
+  .vi-wide { grid-column: 1 / -1; }
+  .vi-day-foot { flex-direction: column; align-items: stretch; gap: calc(18 * var(--u)); }
+  .vi-day-foot .va-pill { width: 100%; }
+  .vi-rows-foot { bottom: calc(14px + env(safe-area-inset-bottom)); gap: 8px; margin: calc(22 * var(--u)) calc(-12 * var(--u)) 0; padding: 6px; border-radius: max(28px, calc(40 * var(--u))); }
+  .vi-rows-tools { flex: none; }
+  .vi-rows-tools .vi-note { display: none; }
+  .vi-send { flex: 1; min-width: 0; padding: 0 12px; }
+  .vi-send .va-pill-label { overflow: hidden; text-overflow: ellipsis; }
+  .vi-wide-only { display: none; }
+
+  /* the table, stacked: each hour is a small group of the same Fields */
+  .vi-table,
+  .vi-table tbody { display: block; }
+  .vi-table caption,
+  .vi-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .vi-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-areas: "num ts ts ts ts del" "temp temp hum hum irr irr";
+    gap: calc(14 * var(--u)) calc(14 * var(--u));
+    padding: calc(22 * var(--u)) 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .vi-table tbody tr:first-child { padding-top: calc(10 * var(--u)); }
+  .vi-table tbody tr:last-child { border-bottom: 0; }
+  .vi-table tbody th,
+  .vi-table tbody td,
+  .vi-table tbody tr:first-child > * { display: block; padding: 0; border: 0; min-width: 0; }
+  .vi-table tbody th.vi-c-num { grid-area: num; align-self: center; }
+  .vi-table td.vi-c-timestamp { grid-area: ts; }
+  .vi-table td.vi-c-temp { grid-area: temp; }
+  .vi-table td.vi-c-hum { grid-area: hum; }
+  .vi-table td.vi-c-irr { grid-area: irr; }
+  .vi-table td.vi-c-del { grid-area: del; align-self: center; justify-self: end; }
+  .vi-num { font-size: max(var(--t-body-min), calc(22 * var(--u))); margin: 0; }
+  .vi-table .va-field-box { height: max(calc(var(--tap-min) + 2px), calc(88 * var(--u))); padding: 0 max(10px, calc(18 * var(--u))); border-radius: max(12px, calc(20 * var(--u))); gap: 4px; }
+  /* the unit rides inside each box on a phone, so every value reads alone */
+  .vi-table .va-field-suffix { display: block; font-size: var(--t-min); }
+  .vi-table .va-field-error { font-size: var(--t-min); }
+  .vi-del { width: var(--tap-min); height: var(--tap-min); border-color: var(--glass-edge); background: var(--glass); }
+
+  .vi-csv .va-drop { min-height: calc(320 * var(--u)); }
+  .vi-cols code { white-space: normal; font-size: 1em; }
+
+  .vi-result-grid { grid-template-columns: minmax(0, 1fr); }
+  .vi-clean-top { flex-direction: column; align-items: stretch; }
+  .vi-counts { gap: calc(24 * var(--u)); }
+  .vi-counts .vi-count:last-child { padding-left: calc(24 * var(--u)); }
+  .vi-count dd { font-size: calc(58 * var(--u)); }
+  .vi-counts-arrow svg { width: max(16px, calc(30 * var(--u))); height: max(16px, calc(30 * var(--u))); }
+  .vi-formats .vi-caps { text-align: left; }
+  .vi-formats ul { justify-content: flex-start; }
+  .vi-loglist { grid-template-columns: minmax(0, 1fr); }
+  .vi-clear { columns: 1; }
+  .vi-clear li { padding: calc(8 * var(--u)) 0; }
+  .vi-clear svg,
+  .vi-busy-steps svg { width: max(13px, calc(20 * var(--u))); height: max(13px, calc(20 * var(--u))); }
+  .vi-stats { gap: calc(26 * var(--u)) calc(20 * var(--u)); }
+  .vi-stat-mark { width: max(28px, calc(44 * var(--u))); height: max(28px, calc(44 * var(--u))); }
+  .vi-stat dt,
+  .vi-stat dd { line-height: 1.4; }
+  .vi-store svg { width: max(16px, calc(24 * var(--u))); height: max(16px, calc(24 * var(--u))); }
+  .vi-run-go .va-pill { width: 100%; }
+  .vi-sample .va-pill { width: 100%; }
+}
+
+/* ── round 1 additions ───────────────────────────────────────────────────── */
+.vi-tally { display: flex; flex-wrap: wrap; gap: calc(6 * var(--u)); margin: 0 0 calc(12 * var(--u)); padding: 0; list-style: none; }
+.vi-tally .va-pill,
+.vi-formats .va-pill { text-transform: none; letter-spacing: 0; font-weight: var(--w-regular); color: var(--ink); }
+/* the run sits first in reading order (on a phone it leads); on a desktop it keeps the right column */
+.vi-result-grid > .vi-run { grid-column: 2; grid-row: 1; }
+.vi-result-grid > .vi-clean { grid-column: 1; grid-row: 1; }
+@media (max-width: 900px) {
+  .vi-result-grid > .vi-run,
+  .vi-result-grid > .vi-clean { grid-column: auto; grid-row: auto; }
+}
+
+/* ── round 2 ─────────────────────────────────────────────────────────────── */
+
+/* the hero: the headline at the landing's height (its 202-unit top), and
+   Sylva's side stats on the diagonal at the landing's x 1250 / 1346 / 1432 */
+.vi { position: relative; }
+.vi > .va-head { padding-top: calc(68 * var(--u)); }
+.vi-hstats { position: absolute; inset: 0; pointer-events: none; }
+.vi-hstat { --mr: 0px; }
+.vi-hstat--a { left: calc(1250 * var(--u)); top: calc(216 * var(--u)); }
+.vi-hstat--b { left: calc(1346 * var(--u)); top: calc(290 * var(--u)); }
+.vi-hstat--c { left: calc(1432 * var(--u)); top: calc(364 * var(--u)); } /* a tighter step than the landing's, so the cards below keep their place */
+
+/* the table reads as a list, not a spreadsheet: a cell is quiet until it is hovered, focused or wrong */
+.vi-table .va-field-box { background: transparent; border-color: transparent; box-shadow: none; }
+.vi-table tbody tr:hover .va-field-box { border-color: var(--glass-edge); background: var(--glass); }
+.vi-table .va-field-box:hover { border-color: var(--glass-rim); background: var(--glass); }
+.vi-table .va-field-box:focus-within {
+  border-color: var(--glass-rim);
+  background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg);
+  box-shadow: inset 0 1px var(--dock-inset), 0 0 0 calc(3 * var(--u)) var(--volt-glow);
+}
+.vi-table .va-field.is-invalid .va-field-box { border-color: var(--overload-soft); background: var(--overload-glow); }
+
+/* the result slot: busy or error where the busy card sits, the last good report under it */
+.vi-result-grid + .vi-last-cap,
+.vi-result-grid + .vi-result-grid { margin-top: var(--a-gap); }
+.vi-last-cap { margin: var(--a-gap) 0 calc(12 * var(--u)) var(--a-pad); }
+.vi-result-grid > .vi-busy,
+.vi-result-grid > .vi-error { grid-column: 1; grid-row: 1; }
+
+/* busy: the steps advance; the current one wears the volt dot */
+.vi-steps { display: flex; flex-wrap: wrap; gap: calc(8 * var(--u)) calc(22 * var(--u)); margin: 0; padding: 0; list-style: none; font-size: var(--a-small); color: var(--ink-faint); }
+.vi-steps li { display: inline-flex; align-items: center; gap: calc(8 * var(--u)); transition: color 0.4s var(--ease); }
+.vi-step-dot {
+  display: grid;
+  place-items: center;
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+  flex: none;
+  border-radius: var(--r-round);
+  border: 1px dotted var(--ink-mark);
+  transition: border-color 0.4s var(--ease), background 0.4s var(--ease);
+}
+.vi-step-dot svg { width: 100%; height: 100%; display: block; }
+.vi-steps li.is-done { color: var(--ink-soft); }
+.vi-steps li.is-done .vi-step-dot { border: 0; color: var(--volt); }
+.vi-steps li.is-now { color: var(--ink); }
+.vi-steps li.is-now .vi-step-dot { border: 1px solid var(--volt-soft); background: var(--volt-glow); box-shadow: 0 0 calc(10 * var(--u)) var(--volt-glow); animation: va-breathe 1.6s var(--ease) infinite; }
+
+/* the report: why rows in and out differ, in one line; the passed checks behind a toggle */
+.vi-gap { margin: calc(12 * var(--u)) 0 0; font-size: var(--a-small); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.vi-passed-toggle { font-family: var(--font); }
+.vi-passed-toggle .va-pill-glyph { color: var(--volt); opacity: 1; }
+.vi-passed .vi-clear { margin-top: calc(14 * var(--u)); }
+.vi-clear li { color: var(--ink-soft); }
+
+/* the run's persistence, from run.storage: saved (check), a Data Store skip (muted, info), not saved (overload) */
+.vi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  height: calc(28 * var(--u));
+  padding: 0 calc(11 * var(--u));
+  border-radius: 999px;
+  font-size: var(--a-caps);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--track-dock);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.vi-chip svg { width: calc(13 * var(--u)); height: calc(13 * var(--u)); flex: none; }
+.vi-chip--ok { background: var(--paper-ink); color: var(--paper); }
+.vi-chip--ok svg { color: var(--volt); }
+.vi-chip--bad { background: var(--overload-soft); color: var(--paper-ink); box-shadow: inset 0 0 0 1px var(--overload); }
+.vi-store { display: grid; gap: calc(8 * var(--u)); margin: calc(24 * var(--u)) 0 0; padding: 0; list-style: none; font-size: var(--a-small); line-height: 1.45; }
+.vi-store li { display: flex; align-items: flex-start; gap: calc(8 * var(--u)); }
+.vi-store svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); margin-top: calc(1 * var(--u)); flex: none; }
+.vi-store .is-ok { color: var(--paper-ink); }
+.vi-store .is-ok svg { color: var(--paper-ink); }
+.vi-store .is-muted { color: var(--paper-label); }
+/* the overload glyph carries the alarm; the sentence stays in paper ink, readable on paper */
+.vi-store .is-bad,
+p.vi-store.is-bad { color: var(--paper-ink); }
+.vi-store .is-bad svg { color: var(--overload); }
+p.vi-store { display: block; margin: 0; }
+
+@media (max-width: 900px) {
+  .vi > .va-head { padding-top: 0; }
+  .vi-hstats { position: static; display: flex; flex-wrap: wrap; gap: calc(22 * var(--u)) calc(34 * var(--u)); pointer-events: auto; }
+  .vi-hstat { position: static; }
+  .vi-last-cap { margin-left: 0; }
+  .vi-steps { flex-direction: column; gap: calc(14 * var(--u)); }
+  .vi-step-dot { width: max(14px, calc(26 * var(--u))); height: max(14px, calc(26 * var(--u))); }
+  .vi-chip { height: max(28px, calc(44 * var(--u))); padding: 0 max(10px, calc(16 * var(--u))); gap: 6px; }
+  .vi-chip svg { width: max(13px, calc(20 * var(--u))); height: max(13px, calc(20 * var(--u))); }
+  /* on a phone the cells keep their boxes: a clear tap target matters more than quiet */
+  .vi-table .va-field-box { border-color: var(--glass-edge); background: linear-gradient(180deg, var(--dock-sheen), transparent 42%), var(--dock-bg); box-shadow: inset 0 1px var(--dock-inset); }
+}

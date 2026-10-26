@@ -98,16 +98,32 @@ export function Dashboard({ run }: { run: Run }) {
     setSelected(Math.min(next + offset, Math.min(next + WINDOW, n) - 1));
   };
 
-  /** A banner chip or a log entry: focus the hour, and bring the chart into view when none of it shows. */
+  /** A banner chip or a log entry: focus the hour, and bring the whole chart plate into
+   * view below the fixed dock, with the least scroll, so the change is seen where it lands.
+   * The stepper's buttons never come to rest under the dock (where a click would hit it). */
   const jump = (i: number) => {
     select(i);
     setHovered(null);
-    const el = chartRef.current;
-    if (!el) return;
-    const box = el.getBoundingClientRect();
-    if (box.bottom > 80 && box.top < window.innerHeight - 80) return;
+    const wrap = chartRef.current;
+    const plate = wrap?.querySelector(".va-chart-plate");
+    if (!wrap || !plate) return;
+    const below = parseFloat(getComputedStyle(wrap).scrollMarginTop) || 0; // the dock's end, plus a gap
+    const p = plate.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const inView = p.top >= below && p.bottom <= vh;
+    let dy = inView ? 0 : p.top < below || p.height > vh - below ? p.top - below : p.bottom - vh + 16;
+    const bar = document.querySelector(".vd-stepper-bar")?.getBoundingClientRect();
+    if (bar && bar.bottom - dy > 0 && bar.top - dy < below) {
+      // the bar would rest under the dock: scroll it fully out above, or stop with it just
+      // below the dock, whichever keeps the plate in view (else the nearer of the two)
+      const shows = (d: number) => p.top - d >= below && p.bottom - d <= vh;
+      const out = bar.bottom;
+      const clear = bar.top - below;
+      dy = shows(out) ? out : shows(clear) ? clear : Math.abs(out - dy) < Math.abs(clear - dy) ? out : clear;
+    }
+    if (Math.abs(dy) < 1) return;
     quietUntil.current = performance.now() + 1200;
-    el.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+    window.scrollBy({ top: dy, behavior: reducedMotion() ? "auto" : "smooth" });
   };
 
   const meta = run.run;

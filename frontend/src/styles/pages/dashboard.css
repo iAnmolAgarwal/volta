@@ -258,7 +258,8 @@
 
 /* the chart card: the landing's paper card, its moss plate inset 14 at the top,
    then the label, title and range under it (the "Next-24h peak" card) */
-.vd-chart { --chart-h: calc(391 * var(--u)); /* 372, plus the mode track and its gap, so the plot keeps its height */ display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
+/* 372, plus the mode track and its gap, plus the range select's row over the plot, so the plot keeps its height */
+.vd-chart { --chart-h: calc(429 * var(--u)); display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
 .vd-chart .va-chart-plate { margin: 0; flex: none; }
 /* the plot is one slider over the focused hour (arrow keys); its ring is drawn round the plate */
 .vd-plot { position: absolute; inset: 0; border-radius: inherit; }
@@ -286,6 +287,13 @@
 .vd-chart-heading .va-card-title { color: var(--paper-ink); }
 .vd-chart .va-chart-desc { margin: calc(8 * var(--u)) 0 0; color: var(--paper-label); }
 .vd-chart-range { padding-top: calc(4 * var(--u)); }
+/* the wide layout's range select: the dock-glass pill on the plate's top right, as
+   shadcn's "Area Chart - Interactive" puts it in the header, so it stays above the fold;
+   the kW unit sits on the same row, at the plate's left */
+.vd-plate-range { position: absolute; z-index: 2; top: var(--vd-plate-pad); right: var(--vd-plate-pad); }
+@media (min-width: 901px) {
+  .vd-chart .va-axis-unit { top: calc(var(--vd-plate-pad) + 20 * var(--u)); transform: translateY(-50%); }
+}
 .vd-chart .va-legend { grid-column: 1 / -1; margin: 0; color: var(--paper-label); }
 /* on paper, each swatch is ringed in the paper's ink so the pale tones still read */
 .vd-chart .va-legend-swatch { box-shadow: 0 0 0 1px var(--paper-label), 0 0 calc(6 * var(--u)) var(--sw); }
@@ -494,7 +502,7 @@
   .vd { --vd-dock-end: calc(30 * var(--u) + max(56px, 58 * var(--u))); }
   .vd::before { height: calc(var(--vd-dock-end) + 22px); }
   .vd-state .va-mode-pill { min-width: 0; }
-  .vd-chart { --chart-h: max(274px, calc(600 * var(--u) + 14px)); padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(30 * var(--u)); }
+  .vd-chart { --chart-h: max(274px, calc(600 * var(--u) + 14px)); /* the range select sits under the plate here */ padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(30 * var(--u)); }
   .vd-chart .va-chart-plate { margin: 0; }
   .vd-chart-foot { grid-template-columns: minmax(0, 1fr); padding: calc(26 * var(--u)) calc(16 * var(--u)) 0; gap: calc(20 * var(--u)); }
   .vd-chart-range .va-range { width: 100%; }

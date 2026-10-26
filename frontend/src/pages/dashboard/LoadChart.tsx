@@ -93,6 +93,9 @@ const Y_AXIS_W = 40;
 /** Past the plot's right end: the label's 10 px offset, its width ("OVERLOAD" in
  * spaced caps, 78 px wide; "200" alone on a phone, 24 px) and the plate padding. */
 const RIGHT = { wide: 10 + 78 + PLATE_PAD, narrow: 6 + 24 + PLATE_PAD };
+/** Over the plot: on the wide layout the range select sits on the plate's top right
+ * (36 px tall, 12 px in), so the plot starts 12 px under it; on a phone it sits under the plate. */
+const TOP = { wide: PLATE_PAD + 36 + PLATE_PAD, narrow: 26 };
 
 const config = {
   grid: { label: "Grid", color: "var(--vd-grid)" },
@@ -452,7 +455,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
           <ChartContainer config={config} className="va-chart aspect-auto h-full w-full" initialDimension={{ width: 900, height: 340 }}>
             <ComposedChart
               data={(daily ? days : rows) as (Row | DayRow)[]}
-              margin={{ top: 26, right: narrow ? RIGHT.narrow : RIGHT.wide, bottom: 4, left: PLATE_PAD }}
+              margin={{ top: narrow ? TOP.narrow : TOP.wide, right: narrow ? RIGHT.narrow : RIGHT.wide, bottom: 4, left: PLATE_PAD }}
               accessibilityLayer={false}
               onMouseMove={(s) => {
                 setLive(true);
@@ -591,6 +594,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
           </ChartContainer>
         </div>
         </div>
+        {!narrow && <div className="vd-plate-range">{rangeControl}</div>}
       </div>
 
       <div className="vd-chart-foot">
@@ -600,7 +604,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
           <p className="va-chart-desc">{desc}</p>
           <p className="sr-only">{trackSummary}</p>
         </div>
-        <div className="vd-chart-range">{rangeControl}</div>
+        {narrow && <div className="vd-chart-range">{rangeControl}</div>}
         <ul className="va-legend" aria-label="Legend">
           {daily ? (
             <>

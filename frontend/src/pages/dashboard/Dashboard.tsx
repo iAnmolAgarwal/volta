@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CloudCheck, CloudOff } from "lucide-react";
+import { Check, CloudCheck, CloudOff, Download } from "lucide-react";
 import { ModeBadge } from "@/components/app/ModeBadge";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Pill } from "@/components/app/Pill";
 import { cssVars } from "@/components/landing/cssVars";
 import { dayMonth, hhmm, type Run } from "@/lib/api";
+import { downloadCsv, runCsv, runCsvName } from "@/lib/csv";
 import { FocusCard } from "./FocusCard";
 import { LoadChart } from "./LoadChart";
 import { activeEntry, logEntries, overloadRuns, WINDOW, windowFor, windowStats } from "./model";
@@ -112,6 +113,20 @@ export function Dashboard({ run }: { run: Run }) {
   const stored = storageChip(run);
   const span = `${dayMonth(run.summary.start)} – ${dayMonth(run.summary.end)}`;
 
+  /* "Download CSV": the run's hours as a file, built here from the run in hand (no request) */
+  const [downloaded, setDownloaded] = useState(false);
+  useEffect(() => {
+    if (!downloaded) return;
+    const t = window.setTimeout(() => setDownloaded(false), 1800);
+    return () => window.clearTimeout(t);
+  }, [downloaded]);
+  const download = () => {
+    const name = runCsvName(unsaved ? null : meta.id);
+    downloadCsv(name, runCsv(run.hours));
+    setDownloaded(true);
+    setAnnounce(`Downloaded ${name}, ${n.toLocaleString()} hours`);
+  };
+
   return (
     <div className="va-page vd" data-scrolled={scrolled || undefined}>
       <p className="sr-only" aria-live="polite">{announce}</p>
@@ -120,8 +135,20 @@ export function Dashboard({ run }: { run: Run }) {
           eyebrow={
             <>
               {unsaved ? "Forecast" : `Run ${meta.id.slice(-6)}`} · {SOURCE[meta.source] ?? meta.source} · <span className="va-num">{run.summary.n_hours.toLocaleString()} h</span> · {span}
-              <span className={stored.saved ? "vd-saved" : "vd-saved is-not"} title={stored.title}>
-                <Pill size="sm" icon={stored.saved ? CloudCheck : CloudOff}>{stored.label}</Pill>
+              <span className="vd-chips">
+                <span className={stored.saved ? "vd-saved" : "vd-saved is-not"} title={stored.title}>
+                  <Pill size="sm" icon={stored.saved ? CloudCheck : CloudOff}>{stored.label}</Pill>
+                </span>
+                <Pill
+                  size="sm"
+                  icon={downloaded ? Check : Download}
+                  onClick={download}
+                  className={downloaded ? "vd-csv is-done" : "vd-csv"}
+                  title={`Download all ${n.toLocaleString()} hours as ${runCsvName(unsaved ? null : meta.id)}`}
+                  aria-label={`Download CSV of all ${n.toLocaleString()} hours`}
+                >
+                  Download CSV
+                </Pill>
               </span>
             </>
           }

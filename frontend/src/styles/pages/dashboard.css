@@ -69,9 +69,24 @@
 /* "Saved" or "Not saved: <reason>": a quiet chip beside the eyebrow */
 .vd-hero .va-eyebrow { white-space: nowrap; }
 /* negative block margins keep the eyebrow's line as tall as its caps, so the headline holds its rail */
-.vd-saved { display: inline-flex; vertical-align: middle; margin: calc(-8 * var(--u)) 0 calc(-8 * var(--u)) calc(12 * var(--u)); }
-.vd-saved .va-pill { height: calc(24 * var(--u)); padding: 0 calc(10 * var(--u)); color: var(--ink-faint); letter-spacing: var(--track-dock); }
+.vd-chips { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); vertical-align: middle; margin: calc(-8 * var(--u)) 0 calc(-8 * var(--u)) calc(12 * var(--u)); }
+.vd-saved { display: inline-flex; }
+/* on the wide layout the pair stands on the lede's rail (x 520), level with the
+   eyebrow, and the lede steps down under it, so the chips never cross a guide */
+@media (min-width: 901px) {
+  .vd-hero .va-eyebrow { position: relative; }
+  .vd-chips { position: absolute; top: 50%; left: calc(474 * var(--u)); margin: 0; transform: translateY(-50%); }
+  .vd-hero > .va-head .va-lede { margin-top: calc(40 * var(--u)); }
+}
+.vd-chips .va-pill { height: calc(24 * var(--u)); padding: 0 calc(10 * var(--u)); color: var(--ink-faint); letter-spacing: var(--track-dock); }
 .vd-saved.is-not .va-pill { color: var(--ink-soft); }
+/* "Download CSV": the same chip, made a dock item (it lifts and brightens on hover, as the dock's do) */
+.vd-chips .vd-csv { color: var(--ink-soft); }
+.vd-chips .vd-csv:hover { color: var(--ink); }
+.vd-chips .vd-csv:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: calc(2 * var(--u)); }
+.vd-csv.is-done,
+.vd-csv.is-done:hover { color: var(--volt); border-color: var(--volt-soft); }
+.vd-csv.is-done .va-pill-glyph { opacity: 1; }
 
 /* ── side stats: Sylva's .stat, on its diagonal ──────────────────────────── */
 .vd-stats { position: absolute; inset: 0; pointer-events: none; }
@@ -367,8 +382,9 @@
   .vd-hero > .va-head .va-lede { max-width: calc(560 * var(--u)); }
   .vd-state { padding-right: 0; }
   .vd-hero .va-eyebrow { white-space: normal; }
-  .vd-saved { display: flex; margin: calc(14 * var(--u)) 0 0; }
-  .vd-saved .va-pill { height: max(28px, calc(40 * var(--u))); padding: 0 max(12px, calc(18 * var(--u))); }
+  .vd-chips { display: flex; flex-wrap: wrap; gap: max(8px, calc(12 * var(--u))); margin: calc(14 * var(--u)) 0 calc(10 * var(--u)); }
+  /* one height for the pair: the download is a tap target, so the Saved chip matches it */
+  .vd-chips .va-pill { height: var(--tap-min); padding: 0 max(14px, calc(20 * var(--u))); }
 
   /* Sylva's phone stats: one row under the pill, as the landing's three */
   .vd-stats { position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(14 * var(--u)); pointer-events: auto; }

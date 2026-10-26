@@ -129,7 +129,8 @@ What the hour fields mean:
 - **`prediction_kw`** comes from the QuickML endpoint, rounded to 0.01 kW. The controller decides on that rounded value, so a saved hour's prediction always matches its `mode`, `overload` flag and `reason`.
 - **`mode`**: `Renewable Storage Mode` when demand > 160 kW **or** the hour is 18–22. Otherwise `Main Grid Mode`.
 - **`overload`** is true at ≥ 200 kW, whatever the mode.
-- **`soc_pct`** is the battery's state of charge at the end of the hour. The battery holds 500 kWh and starts at 80%, with a 10% floor. It discharges up to 150 kW in storage mode and charges at 100 kW in grid mode.
+- **`soc_pct`** is the battery's state of charge at the end of the hour. The battery model and its parameters are in [battery.md](battery.md).
+- **`pv_kw`** is the solar output that hour (`0.25 × solar_irradiance_wm2`). It charges the battery in either mode.
 - **`battery_kw`** is greater than 0 while discharging and less than 0 while charging. **`grid_kw`** is what the main grid supplies.
 - **`switch_events`** lists each mode change between consecutive hours. The first hour of a run is never an event.
 - **`overload_alerts`** has one entry per overload hour.
@@ -170,7 +171,7 @@ The window is up to 24 hours long. An out-of-range value is a `400`.
 | Table | Columns |
 |---|---|
 | `runs` | `ROWID` (the run id), `CREATEDTIME`, `source_type`, `file_name`, `rows_in`, `n_rows`, `peak_kw`, `peak_at`, `overload_count`, `storage_hours`, `switch_count`, `start_at`, `end_at`, `csv_key`, `cleaning_json` |
-| `run_hours` | `run_id` → `runs.ROWID` (cascade delete), `idx`, `ts`, `temp_c`, `humidity_pct`, `solar_wm2`, `prediction_kw`, `grid_mode`, `is_overload`, `soc_pct`, `battery_kw`, `grid_kw`, `reason` |
+| `run_hours` | `run_id` → `runs.ROWID` (cascade delete), `idx`, `ts`, `temp_c`, `humidity_pct`, `solar_wm2`, `prediction_kw`, `grid_mode`, `is_overload`, `soc_pct`, `pv_kw`, `battery_kw`, `grid_kw`, `reason` |
 
 **Stratus:** uploaded CSVs go to the protected bucket `microgrid-uploads` (`UPLOAD_BUCKET` overrides the name). Keys look like `uploads/2026/10/26/153012-1a2b3c4d-name.csv`.
 

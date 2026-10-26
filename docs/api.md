@@ -161,7 +161,7 @@ The window is up to 24 hours long. An out-of-range value is a `400`.
 
 ## GET /api/runs
 
-Runs from Stratus and runs from the Data Store are merged, newest first, each listed once. Every run has a `storage` object. Runs saved before 2026-10-27 have Data Store ROWIDs as their ids and `storage.stratus: false`.
+Runs from Stratus and runs from the Data Store are merged, newest first, each listed once. Each Stratus run also has `series`, its demand in at most 48 equal buckets, for the History card's mini curve: `{"step_hours": 21, "mean_kw": [...], "max_kw": [...]}`. The older Data Store runs have no `series`. Every run has a `storage` object. Runs saved before 2026-10-27 have Data Store ROWIDs as their ids and `storage.stratus: false`.
 
 ```json
 {"runs": [

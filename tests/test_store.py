@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import pytest
 from zcatalyst_sdk.exceptions import CatalystAPIError
 
-from backend.store import (CLEANING_MAX_CHARS, DAILY_SAVE_LIMIT, HOUR_FIELDS, HOURS_TABLE, INDEX_KEY, RUN_ID, RUNS_INDEXED,
+from backend.store import (CLEANING_MAX_CHARS, DAILY_SAVE_LIMIT, SERIES_POINTS, demand_series, HOUR_FIELDS, HOURS_TABLE, INDEX_KEY, RUN_ID, RUNS_INDEXED,
                            RUNS_TABLE, SELECT_PAGE, CatalystRunStore, DailyLimitError, StoreError, created_iso,
                            hour_from_row, run_from_row, run_to_row, upload_key)
 
@@ -207,6 +207,40 @@ def test_list_runs_merges_stratus_and_legacy_data_store_runs_once_each():
     assert [r["id"] for r in runs] == [new["id"], legacy]  # the new run's Data Store row is not listed twice
     assert runs[0]["storage"]["stratus"] and runs[1]["storage"] == {"stratus": False, "datastore": True, "reason": None}
     assert "cleaning" not in runs[0] and "datastore_id" not in runs[0]
+
+
+def test_demand_series_buckets_the_run_into_at_most_48_points():
+    hours = make_hours(1000)  # prediction_kw = 150.25 + i
+    series = demand_series(hours)
+    assert series["step_hours"] == 21 and len(series["mean_kw"]) == len(series["max_kw"]) == 48 <= SERIES_POINTS
+    assert series["max_kw"][0] == 170.2 and series["mean_kw"][0] == 160.2  # hours 0-20
+    assert series["max_kw"][-1] == 1149.2  # the last, shorter bucket (hours 987-999)
+    assert demand_series(make_hours(24))["step_hours"] == 1 and len(demand_series(make_hours(24))["max_kw"]) == 24
+    assert demand_series([]) == {"step_hours": 0, "mean_kw": [], "max_kw": []}
+
+
+def test_listed_stratus_runs_carry_their_series_and_legacy_runs_none():
+    app = FakeApp()
+    legacy = seed_legacy_run(app, RECORD, make_hours(2))
+    store = CatalystRunStore(app)
+    new = store.save(RECORD, make_hours(30), now=NOW)
+    runs = {r["id"]: r for r in store.list_runs()}
+    assert runs[new["id"]]["series"]["max_kw"][:2] == [150.2, 151.2]  # bankers' rounding of 150.25
+    assert "series" not in runs[legacy]
+
+
+def test_index_entries_from_before_the_series_get_one_on_the_first_listing():
+    app = FakeApp()
+    store = CatalystRunStore(app)
+    new = store.save(RECORD, make_hours(30), now=NOW)
+    old = index(app)
+    del old["runs"][0]["series"]
+    app.objects[("microgrid-uploads", INDEX_KEY)] = (json.dumps(old).encode(), None)
+    assert store.list_runs()[0]["series"]["max_kw"][0] == 150.2
+    assert "series" in index(app)["runs"][0]  # written back, so later listings read no runs
+    reads = len(app.queries)
+    store.list_runs()
+    assert len(app.queries) == reads + 1  # just the Data Store listing
 
 
 def test_list_runs_falls_back_to_the_index_when_the_data_store_fails():

@@ -57,6 +57,20 @@ class DailyLimitError(StoreError):
     """DAILY_SAVE_LIMIT runs are already saved today (UTC); the forecast is still returned."""
 
 
+SERIES_POINTS = 48  # the History card's mini curve
+
+
+def demand_series(hours: list[dict], points: int = SERIES_POINTS) -> dict:
+    """The run's demand in at most `points` equal buckets: each bucket's mean and max kW."""
+    kw = [h["prediction_kw"] for h in hours]
+    if not kw:
+        return {"step_hours": 0, "mean_kw": [], "max_kw": []}
+    step = -(-len(kw) // points)  # ceiling division
+    buckets = [kw[i:i + step] for i in range(0, len(kw), step)]
+    return {"step_hours": step, "mean_kw": [round(sum(b) / len(b), 1) for b in buckets],
+            "max_kw": [round(max(b), 1) for b in buckets]}
+
+
 def new_run_id(now: datetime) -> str:
     return f"r{now:%Y%m%d%H%M%S}-{uuid.uuid4().hex[:6]}"
 
@@ -213,7 +227,8 @@ class CatalystRunStore:
                 except Exception:  # noqa: BLE001 - the Stratus error is the one to report
                     pass
             raise
-        runs = [{**summary, "storage": storage, "datastore_id": datastore_id}, *index.get("runs", [])][:RUNS_INDEXED]
+        entry = {**summary, "storage": storage, "series": demand_series(hours), "datastore_id": datastore_id}
+        runs = [entry, *index.get("runs", [])][:RUNS_INDEXED]
         self._put_json("updating the run index", INDEX_KEY, {"day": day, "saved_today": saved_today + 1, "runs": runs})
         return {"id": run_id, "created": created, "storage": storage}
 
@@ -222,7 +237,7 @@ class CatalystRunStore:
 
     def list_runs(self, limit: int = 20) -> list[dict]:
         """The Stratus index merged with the Data Store's runs rows, newest first, each run once."""
-        index = self._get_json("reading the run index", INDEX_KEY) or {}
+        index = self._backfill_series(self._get_json("reading the run index", INDEX_KEY) or {})
         indexed = index.get("runs", [])
         linked = {r.get("datastore_id") for r in indexed if r.get("datastore_id")}
         runs = [{k: v for k, v in r.items() if k != "datastore_id"} for r in indexed]
@@ -236,6 +251,20 @@ class CatalystRunStore:
         legacy = [run_from_row(r) | {"storage": {"stratus": False, "datastore": True, "reason": None}}
                   for r in rows if str(r["ROWID"]) not in linked]
         return sorted(runs + legacy, key=lambda r: _when(r.get("created")), reverse=True)[:limit]
+
+    def _backfill_series(self, index: dict) -> dict:
+        """Once: give index entries saved before the series existed their series (1 read each, 1 write)."""
+        missing = [r for r in index.get("runs", []) if "series" not in r and RUN_ID.fullmatch(str(r.get("id")))]
+        if not missing:
+            return index
+        try:
+            for entry in missing:
+                found = self._get_json("reading the run", run_key(entry["id"]))
+                entry["series"] = demand_series(found["hours"]) if found else demand_series([])
+            self._put_json("updating the run index", INDEX_KEY, index)
+        except StoreError:
+            pass  # the list still works; the next listing tries again
+        return index
 
     def get_run(self, run_id: str) -> tuple[dict, list[dict]] | None:
         """(run, hours in order), or None when there is no such run."""

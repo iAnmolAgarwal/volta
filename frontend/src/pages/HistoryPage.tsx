@@ -91,7 +91,7 @@ export default function HistoryPage() {
             </>
           }
           title="Saved runs"
-          lede="Every forecast the controller kept, newest first. Open one to replay its decisions, hour by hour, on the dashboard."
+          lede="Every saved forecast, newest first. Open one to replay its controller decisions."
         />
         {ready && resume && (
           <div className="vh-resume va-reveal" style={cssVars({ "--d": "380ms" })}>

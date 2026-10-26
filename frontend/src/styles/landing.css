@@ -634,45 +634,6 @@
 .vl-tip-label { display: flex; align-items: center; justify-content: space-between; gap: calc(10 * var(--u)); }
 .vl-tip .vl-flag { height: calc(18 * var(--u)); padding: 0 calc(8 * var(--u)); color: var(--ink); font-size: calc(9.5 * var(--u)); }
 
-/* ── headline review switcher (temporary) ─────────────────────────────────
-   A review control, not part of the composition: on the headline's rail
-   (left 46) above it, at the dock captions' size and faintness. It comes
-   right after the dock in the tab order. */
-.vl-review {
-  position: absolute;
-  z-index: var(--z-ui);
-  left: calc(46 * var(--u));
-  top: calc(140 * var(--u));
-  display: flex;
-  align-items: center;
-  gap: calc(4 * var(--u));
-}
-.vl-review-label {
-  margin-right: calc(6 * var(--u));
-  font-size: var(--t-dock);
-  font-weight: var(--w-medium);
-  letter-spacing: var(--track-dock);
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-.vl-review-chip {
-  width: max(24px, calc(24 * var(--u)));
-  height: max(24px, calc(24 * var(--u)));
-  padding: 0;
-  border-radius: calc(8 * var(--u));
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--ink-faint);
-  font: inherit;
-  font-size: var(--t-dock);
-  font-weight: var(--w-medium);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  transition: color 0.18s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
-}
-.vl-review-chip:hover { color: var(--ink); border-color: var(--glass-edge); }
-.vl-review-chip[aria-pressed="true"] { color: var(--ink); border-color: var(--glass-edge); background: var(--glass); }
-
 /* ── keyboard focus ──────────────────────────────────────────────────────── */
 .vl a:focus-visible,
 .vl button:focus-visible {
@@ -901,16 +862,4 @@
   .vl-knob-float { left: calc(644 * var(--u)); top: calc(1218 * var(--u)); transform-origin: calc(-264 * var(--u)) calc(-43 * var(--u)); }
 
   .vl-ghost { font-size: calc(184 * var(--u)); letter-spacing: calc(14 * var(--u)); bottom: calc(660 * var(--u)); left: calc(-10 * var(--u)); }
-  /* on the pill's row, right-aligned, each chip a full 44px target */
-  .vl-review { left: auto; right: calc(34 * var(--u)); top: calc(430 * var(--u) + var(--drop-2) - var(--tap-min) / 2); gap: max(4px, calc(6 * var(--u))); }
-  .vl-review-label { display: none; }
-  .vl-review-chip {
-    width: var(--tap-min);
-    height: var(--tap-min);
-    border-radius: max(12px, calc(13 * var(--u)));
-    border-color: var(--glass-edge);
-    background: var(--glass);
-    font-size: max(12px, calc(15 * var(--u)));
-  }
-  .vl-review-chip[aria-pressed="true"] { background: var(--glass-hover); border-color: var(--glass-rim); }
 }

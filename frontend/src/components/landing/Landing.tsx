@@ -2,12 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { loadForecast, SNAPSHOT, type Forecast, type Hour } from "@/lib/forecast";
 import { GridScene, type GridSceneHandle } from "@/scene";
 import { Dock } from "./Dock";
-import { Headline, HeadlineSwitcher } from "./Headline";
-import { readHeadlineParam } from "./headlines";
+import { Headline } from "./Headline";
 import { LaunchPill, PlayButton } from "./HeroButtons";
 import { ModeCard, PeakCard, PeakKnob } from "./Cards";
 import { SideStats } from "./SideStats";
-import { FINE_HOVER, NARROW, REDUCED_MOTION, useMedia } from "./useMedia";
+import { FINE_HOVER, REDUCED_MOTION, useMedia } from "./useMedia";
 import { useAfterPaint } from "./useAfterPaint";
 import { cssVars } from "./cssVars";
 import { PAGE_TITLE, WORDMARK } from "@/lib/brand";
@@ -34,7 +33,6 @@ export function Landing() {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [played, setPlayed] = useState(false);
-  const [headline, setHeadline] = useState(readHeadlineParam);
   const [announce, setAnnounce] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
   // pointer parallax on/off (fine hover and full motion); a flag of its own, so
@@ -42,7 +40,6 @@ export function Landing() {
   const fineHover = useMedia(FINE_HOVER);
   const reducedMotion = useMedia(REDUCED_MOTION);
   const par = fineHover && !reducedMotion;
-  const narrow = useMedia(NARROW);
   // the scene (three.js, its own chunk) mounts once the hero has painted and the page is idle
   const sceneOn = useAfterPaint();
   const run = useRef(0);
@@ -189,12 +186,10 @@ export function Landing() {
   }, []);
 
   const caption = playing ? (loading ? "Fetching forecast" : `Playing ${hh(hour.hour)}`) : (announce ?? "Run sample forecast");
-  const switcher = <HeadlineSwitcher option={headline} onChange={setHeadline} />;
   const cards = { forecast, hour, index, loading, played, flash };
 
   // DOM order follows the screen, so the tab order does too: the dock, the
-  // review chips (desktop: under the dock, on the headline's rail), the pill,
-  // the play disc, card 1's knob, then card 2's.
+  // pill, the play disc, card 1's knob, then card 2's.
   return (
     <main
       ref={rootRef}
@@ -207,7 +202,6 @@ export function Landing() {
       <Dock />
 
       <div className="vl-stage">
-        {!narrow && switcher}
         <div className="vl-guides fade" style={cssVars({ "--d": "900ms" })} aria-hidden="true">
           <i /><i /><i />
         </div>
@@ -216,13 +210,12 @@ export function Landing() {
         {/* card 1 sits behind the canvas; its knob floats above it */}
         <PeakCard {...cards} />
 
-        <Headline option={headline} />
+        <Headline />
         <p className="vl-lede mask par" style={cssVars({ "--d": "480ms", "--pd": 14, "--pr": 1 })}>
           We forecast every hour of demand, then route it through the grid, the battery or the sun before the peak arrives.
         </p>
 
         <LaunchPill />
-        {narrow && switcher}
         <PlayButton onPlay={() => void play()} playing={playing} announcing={announce != null} caption={caption} />
         <p className="sr-only" role="status">{announce}</p>
 

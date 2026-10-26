@@ -1,12 +1,3 @@
-/* The three headline options from the developer's direction (spec, "Headline"). */
+/* The headline the developer picked on 2026-10-27, of the three options in the spec. */
 
-export const HEADLINES: [string, string][] = [
-  ["Step into", "the living grid"],
-  ["Power that", "thinks ahead"],
-  ["Every hour,", "balanced"],
-];
-
-export function readHeadlineParam(): number {
-  const h = Number(new URLSearchParams(window.location.search).get("h"));
-  return h >= 1 && h <= HEADLINES.length ? h - 1 : 0;
-}
+export const HEADLINE: [string, string] = ["Power that", "thinks ahead"];

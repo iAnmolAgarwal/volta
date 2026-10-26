@@ -62,3 +62,33 @@ def fake_predictions(rows: list[dict]) -> list[float]:
 
     feats = build_features(pd.DataFrame(rows))[QUICKML_FEATURES].to_dict(orient="records")
     return [fake_model(r) for r in feats]
+
+
+class FakeRunStore:
+    """Stands in for backend.store.CatalystRunStore: keeps runs in memory, can be told to fail."""
+
+    def __init__(self, fail_save: Exception | None = None, fail_csv: Exception | None = None):
+        self.runs, self.csvs, self.fail_save, self.fail_csv = {}, {}, fail_save, fail_csv
+        self._next = 1000
+
+    def put_csv(self, key: str, data: bytes) -> None:
+        if self.fail_csv:
+            raise self.fail_csv
+        self.csvs[key] = data
+
+    def save(self, record: dict, hours: list[dict]) -> dict:
+        if self.fail_save:
+            raise self.fail_save
+        self._next += 1
+        run_id = str(self._next)
+        created = f"2026-10-26T12:00:{self._next % 60:02d}+05:30"
+        self.runs[run_id] = ({**record, "id": run_id, "created": created}, [dict(h) for h in hours])
+        return {"id": run_id, "created": created}
+
+    def list_runs(self, limit: int = 20) -> list[dict]:
+        newest = sorted(self.runs.values(), key=lambda r: int(r[0]["id"]), reverse=True)[:limit]
+        return [{k: v for k, v in run.items() if k != "cleaning"} for run, _ in newest]
+
+    def get_run(self, run_id):
+        found = self.runs.get(str(run_id))
+        return (dict(found[0]), [dict(h) for h in found[1]]) if found else None

@@ -31,7 +31,7 @@ export interface ModeTrackProps {
   /** Tile height and its gap under the plot, in px (the axis ticks sit under it). */
   height: number;
   gap: number;
-  /** "MODE" in the y-axis gutter, level with the strip (wide layout). */
+  /** "MODE" in the y-axis gutter, level with the strip, in the ticks' style. */
   label?: boolean;
   onHover: (index: number | null) => void;
   onPick: (index: number) => void;
@@ -58,7 +58,7 @@ export function ModeTrack({ units, xFirst, xLast, focusX, height, gap, label, on
   return (
     <g className="vd-track" aria-hidden="true">
       {label && (
-        <text x={plot.x - 6} y={y + height / 2} dy="0.36em" textAnchor="end" className="vd-track-label">MODE</text>
+        <text x={plot.x - 4} y={y + height / 2} dy="0.36em" textAnchor="end" className="vd-track-label">MODE</text>
       )}
       {units.map((u) => {
         const x0 = px(Math.max(u.x - 0.5, xFirst));

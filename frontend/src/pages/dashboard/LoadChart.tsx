@@ -586,7 +586,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
               {focusRow && focusX != null && (
                 <ReferenceDot x={focusX} y={focusRow.demand} r={4.5} fill={focusRow.overload ? "var(--flow-overload)" : "var(--vd-grid)"} stroke="var(--bg-deep)" strokeWidth={2} className="va-focus-dot" />
               )}
-              <ModeTrack units={units} xFirst={xFirst} xLast={xLast} focusX={focusX} height={track.h} gap={track.gap} label={!narrow} onHover={onFocusHour} onPick={onPick} />
+              <ModeTrack units={units} xFirst={xFirst} xLast={xLast} focusX={focusX} height={track.h} gap={track.gap} label onHover={onFocusHour} onPick={onPick} />
             </ComposedChart>
           </ChartContainer>
         </div>

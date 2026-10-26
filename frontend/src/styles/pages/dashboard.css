@@ -324,13 +324,14 @@
 .vd-track-hit { fill: transparent; cursor: pointer; touch-action: pan-y; }
 .vd-track:has(.vd-track-hit:hover) .vd-track-tile:not(.is-focus) rect { fill-opacity: 0.5; }
 .vd-track:has(.vd-track-hit:hover) .vd-track-tile.is-storage:not(.is-focus) rect { fill-opacity: 0.86; }
-/* right-aligned with the y ticks, so it reads as the strip's row label; a
-   tighter tracking than the dock's keeps the word inside the 40 px gutter */
+/* the strip's row label, in the ticks' own style (faint ink, Lexend, the 12 px
+   floor), right-aligned in the y-axis gutter and 12 px clear of the plate's edge */
 .vd-track-label {
   fill: var(--ink-faint);
-  font-size: var(--a-caps);
-  font-weight: var(--w-medium);
-  letter-spacing: calc(0.5 * var(--u));
+  font-family: var(--font);
+  font-size: var(--t-min);
+  font-weight: var(--w-light);
+  letter-spacing: 0;
 }
 
 /* its legend: a caption in spaced caps, then each mode as a key (a tile on a

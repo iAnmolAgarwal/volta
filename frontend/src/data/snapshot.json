@@ -1,0 +1,394 @@
+{
+ "captured": "2026-10-26",
+ "source": "live /api/predict on the first 24 rows of sample_test_input.csv",
+ "battery": [
+  {
+   "battery_kw": 57.75,
+   "demand_kw": 244.00801503048478,
+   "grid_kw": 144.00801503048478,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 42.25,
+   "soc_end": 0.7278125,
+   "soc_start": 0.8,
+   "timestamp": "2015-06-16 15:00:00"
+  },
+  {
+   "battery_kw": 72.0,
+   "demand_kw": 234.45976905733428,
+   "grid_kw": 134.45976905733428,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 28.0,
+   "soc_end": 0.6378125,
+   "soc_start": 0.7278125,
+   "timestamp": "2015-06-16 16:00:00"
+  },
+  {
+   "battery_kw": 87.0,
+   "demand_kw": 232.73936437748733,
+   "grid_kw": 132.73936437748733,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 13.0,
+   "soc_end": 0.5290625,
+   "soc_start": 0.6378125,
+   "timestamp": "2015-06-16 17:00:00"
+  },
+  {
+   "battery_kw": 96.0,
+   "demand_kw": 295.68818863030174,
+   "grid_kw": 195.68818863030174,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 4.0,
+   "soc_end": 0.4090625,
+   "soc_start": 0.5290625,
+   "timestamp": "2015-06-16 18:00:00"
+  },
+  {
+   "battery_kw": 99.5,
+   "demand_kw": 267.8176328167813,
+   "grid_kw": 167.81763281678133,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 0.5,
+   "soc_end": 0.2846875,
+   "soc_start": 0.4090625,
+   "timestamp": "2015-06-16 19:00:00"
+  },
+  {
+   "battery_kw": 100.0,
+   "demand_kw": 249.15124204044204,
+   "grid_kw": 149.15124204044204,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 0.0,
+   "soc_end": 0.1596875,
+   "soc_start": 0.2846875,
+   "timestamp": "2015-06-16 20:00:00"
+  },
+  {
+   "battery_kw": 47.75,
+   "demand_kw": 241.32340074713844,
+   "grid_kw": 193.57340074713844,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 0.0,
+   "soc_end": 0.1,
+   "soc_start": 0.1596875,
+   "timestamp": "2015-06-16 21:00:00"
+  },
+  {
+   "battery_kw": 0.0,
+   "demand_kw": 219.0441601431206,
+   "grid_kw": 219.0441601431206,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 0.0,
+   "soc_end": 0.1,
+   "soc_start": 0.1,
+   "timestamp": "2015-06-16 22:00:00"
+  },
+  {
+   "battery_kw": -75.0,
+   "demand_kw": 143.2404724295914,
+   "grid_kw": 218.2404724295914,
+   "mode": "Main Grid Mode",
+   "pv_kw": 0.0,
+   "soc_end": 0.19375,
+   "soc_start": 0.1,
+   "timestamp": "2015-06-16 23:00:00"
+  },
+  {
+   "battery_kw": -75.0,
+   "demand_kw": 94.67541213845915,
+   "grid_kw": 169.67541213845914,
+   "mode": "Main Grid Mode",
+   "pv_kw": 0.0,
+   "soc_end": 0.2875,
+   "soc_start": 0.19375,
+   "timestamp": "2015-06-17 00:00:00"
+  },
+  {
+   "battery_kw": -75.0,
+   "demand_kw": 102.33121296377803,
+   "grid_kw": 177.33121296377803,
+   "mode": "Main Grid Mode",
+   "pv_kw": 0.0,
+   "soc_end": 0.38125,
+   "soc_start": 0.2875,
+   "timestamp": "2015-06-17 01:00:00"
+  },
+  {
+   "battery_kw": -75.0,
+   "demand_kw": 89.68623856690303,
+   "grid_kw": 164.68623856690303,
+   "mode": "Main Grid Mode",
+   "pv_kw": 0.0,
+   "soc_end": 0.475,
+   "soc_start": 0.38125,
+   "timestamp": "2015-06-17 02:00:00"
+  },
+  {
+   "battery_kw": -76.0,
+   "demand_kw": 89.68623856690303,
+   "grid_kw": 164.68623856690303,
+   "mode": "Main Grid Mode",
+   "pv_kw": 1.0,
+   "soc_end": 0.57,
+   "soc_start": 0.475,
+   "timestamp": "2015-06-17 03:00:00"
+  },
+  {
+   "battery_kw": -82.25,
+   "demand_kw": 94.24531096849742,
+   "grid_kw": 169.24531096849742,
+   "mode": "Main Grid Mode",
+   "pv_kw": 7.25,
+   "soc_end": 0.6728125,
+   "soc_start": 0.57,
+   "timestamp": "2015-06-17 04:00:00"
+  },
+  {
+   "battery_kw": -96.0,
+   "demand_kw": 108.8687507471964,
+   "grid_kw": 183.8687507471964,
+   "mode": "Main Grid Mode",
+   "pv_kw": 21.0,
+   "soc_end": 0.7928125,
+   "soc_start": 0.6728125,
+   "timestamp": "2015-06-17 05:00:00"
+  },
+  {
+   "battery_kw": -110.5,
+   "demand_kw": 149.5469485244455,
+   "grid_kw": 224.5469485244455,
+   "mode": "Main Grid Mode",
+   "pv_kw": 35.5,
+   "soc_end": 0.9309375,
+   "soc_start": 0.7928125,
+   "timestamp": "2015-06-17 06:00:00"
+  },
+  {
+   "battery_kw": 17.450636753125877,
+   "demand_kw": 188.2006367531259,
+   "grid_kw": 120.00000000000003,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 50.75,
+   "soc_end": 0.9091242040585926,
+   "soc_start": 0.9309375,
+   "timestamp": "2015-06-17 07:00:00"
+  },
+  {
+   "battery_kw": 35.5,
+   "demand_kw": 239.81277714853408,
+   "grid_kw": 139.81277714853408,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 64.5,
+   "soc_end": 0.8647492040585927,
+   "soc_start": 0.9091242040585926,
+   "timestamp": "2015-06-17 08:00:00"
+  },
+  {
+   "battery_kw": 24.5,
+   "demand_kw": 240.32889855248814,
+   "grid_kw": 140.32889855248814,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 75.5,
+   "soc_end": 0.8341242040585927,
+   "soc_start": 0.8647492040585927,
+   "timestamp": "2015-06-17 09:00:00"
+  },
+  {
+   "battery_kw": 3.3069704359056686,
+   "demand_kw": 205.5569704359057,
+   "grid_kw": 120.00000000000003,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 82.25,
+   "soc_end": 0.8299904910137106,
+   "soc_start": 0.8341242040585927,
+   "timestamp": "2015-06-17 10:00:00"
+  },
+  {
+   "battery_kw": 6.067678625637768,
+   "demand_kw": 208.56767862563783,
+   "grid_kw": 120.00000000000006,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 82.5,
+   "soc_end": 0.8224058927316633,
+   "soc_start": 0.8299904910137106,
+   "timestamp": "2015-06-17 11:00:00"
+  },
+  {
+   "battery_kw": 20.25,
+   "demand_kw": 235.2339511632654,
+   "grid_kw": 135.2339511632654,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 79.75,
+   "soc_end": 0.7970933927316634,
+   "soc_start": 0.8224058927316633,
+   "timestamp": "2015-06-17 12:00:00"
+  },
+  {
+   "battery_kw": 24.5,
+   "demand_kw": 252.35197772774245,
+   "grid_kw": 152.35197772774245,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 75.5,
+   "soc_end": 0.7664683927316633,
+   "soc_start": 0.7970933927316634,
+   "timestamp": "2015-06-17 13:00:00"
+  },
+  {
+   "battery_kw": 32.0,
+   "demand_kw": 263.5346081467476,
+   "grid_kw": 163.5346081467476,
+   "mode": "Renewable Storage Mode",
+   "pv_kw": 68.0,
+   "soc_end": 0.7264683927316633,
+   "soc_start": 0.7664683927316633,
+   "timestamp": "2015-06-17 14:00:00"
+  }
+ ],
+ "predictions": [
+  244.00801503048478,
+  234.45976905733428,
+  232.73936437748733,
+  295.68818863030174,
+  267.8176328167813,
+  249.15124204044204,
+  241.32340074713844,
+  219.0441601431206,
+  143.2404724295914,
+  94.67541213845915,
+  102.33121296377803,
+  89.68623856690303,
+  89.68623856690303,
+  94.24531096849742,
+  108.8687507471964,
+  149.5469485244455,
+  188.2006367531259,
+  239.81277714853408,
+  240.32889855248814,
+  205.5569704359057,
+  208.56767862563783,
+  235.2339511632654,
+  252.35197772774245,
+  263.5346081467476
+ ],
+ "signals": [
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-16 15:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-16 16:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-16 17:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-16 18:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-16 19:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-16 20:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-16 21:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-16 22:00:00"
+  },
+  {
+   "mode": "Main Grid Mode",
+   "overload": false,
+   "timestamp": "2015-06-16 23:00:00"
+  },
+  {
+   "mode": "Main Grid Mode",
+   "overload": false,
+   "timestamp": "2015-06-17 00:00:00"
+  },
+  {
+   "mode": "Main Grid Mode",
+   "overload": false,
+   "timestamp": "2015-06-17 01:00:00"
+  },
+  {
+   "mode": "Main Grid Mode",
+   "overload": false,
+   "timestamp": "2015-06-17 02:00:00"
+  },
+  {
+   "mode": "Main Grid Mode",
+   "overload": false,
+   "timestamp": "2015-06-17 03:00:00"
+  },
+  {
+   "mode": "Main Grid Mode",
+   "overload": false,
+   "timestamp": "2015-06-17 04:00:00"
+  },
+  {
+   "mode": "Main Grid Mode",
+   "overload": false,
+   "timestamp": "2015-06-17 05:00:00"
+  },
+  {
+   "mode": "Main Grid Mode",
+   "overload": false,
+   "timestamp": "2015-06-17 06:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": false,
+   "timestamp": "2015-06-17 07:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-17 08:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-17 09:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-17 10:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-17 11:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-17 12:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-17 13:00:00"
+  },
+  {
+   "mode": "Renewable Storage Mode",
+   "overload": true,
+   "timestamp": "2015-06-17 14:00:00"
+  }
+ ]
+}

@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-DEFAULT_PROXY_URL = ""  # the AppSail service URL; not a secret
+DEFAULT_PROXY_URL = "https://microgrid-proxy-50047164504.development.catalystappsail.in"  # AppSail (Development); not a secret
 TIMEOUT_S = 120
 ATTEMPTS = 3  # connection errors and 5xx (for example a cold start) are retried
 INPUT_COLUMNS = ["timestamp", "ambient_temp_c", "humidity_pct", "solar_irradiance_wm2"]

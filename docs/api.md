@@ -65,18 +65,18 @@ If no rows survive, the response is a `400` with each reason in `details`:
 
 ### Response
 
-Below is the trimmed live response for the sample CSV, from the run that is saved in the Data Store. This run was made before Stratus was enabled, which is why `run.errors` lists the refused upload.
+Below is the trimmed live response for the sample CSV (`-F source=sample`). This run is saved in the Data Store, and the CSV is in Stratus.
 
 ```json
 {
   "run": {
-    "id": "93853000000022027",
-    "created": "2026-10-26T21:47:47+05:30",
+    "id": "93853000000027001",
+    "created": "2026-10-26T21:57:32+05:30",
     "saved": true,
     "source": "sample",
     "filename": "sample_test_input.csv",
-    "csv_key": null,
-    "errors": ["Stratus upload failed: {'code': 'OPERATION_NOT_ALLOWED', 'message': '... User needs to be in session when accessing Stratus for the first time', 'status_code': 405}"]
+    "csv_key": "uploads/2026/10/26/162732-28bc0896-sample_test_input.csv",
+    "errors": []
   },
   "cleaning": {
     "rows_in": 1000,
@@ -150,16 +150,18 @@ The window is up to 24 hours long. An out-of-range value is a `400`.
 
 ```json
 {"runs": [
-  {"id": "93853000000022027", "created": "2026-10-26T21:47:47+05:30", "source": "sample",
+  {"id": "93853000000027001", "created": "2026-10-26T21:57:32+05:30", "source": "sample",
    "filename": "sample_test_input.csv", "rows_in": 1000, "n_rows": 1000, "peak_kw": 299.82,
    "peak_timestamp": "2015-06-23 18:00:00", "overload_count": 577, "storage_hours": 672,
-   "switch_count": 83, "start": "2015-06-16 15:00:00", "end": "2015-07-28 06:00:00", "csv_key": null}
+   "switch_count": 83, "start": "2015-06-16 15:00:00", "end": "2015-07-28 06:00:00",
+   "csv_key": "uploads/2026/10/26/162732-28bc0896-sample_test_input.csv"},
+  "… up to 20 runs, newest first"
 ]}
 ```
 
 ## GET /api/runs/{id}
 
-`GET /api/runs/93853000000022027?window_start=2015-06-23 12:00` returns the same keys as `/api/forecast`: `run`, `cleaning`, `summary`, `window`, `hours`, `switch_events`, `overload_alerts`. They are rebuilt from the stored hours. An unknown id is a `404`.
+`GET /api/runs/93853000000027001?window_start=2015-06-23 12:00` returns the same keys as `/api/forecast`: `run`, `cleaning`, `summary`, `window`, `hours`, `switch_events`, `overload_alerts`. They are rebuilt from the stored hours. An unknown id is a `404`.
 
 ## Storage
 

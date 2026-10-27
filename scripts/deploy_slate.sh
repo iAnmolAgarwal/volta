@@ -13,8 +13,8 @@ npm run build
 # (gitignored) and the whole archive ships with each deploy. Hashed names never collide.
 ARCHIVE="$ROOT/.slate-assets"
 mkdir -p "$ARCHIVE"
-cp -n dist/assets/* "$ARCHIVE"/
-cp -n "$ARCHIVE"/* dist/assets/
+rsync -a --ignore-existing dist/assets/ "$ARCHIVE"/
+rsync -a --ignore-existing "$ARCHIVE"/ dist/assets/
 mkdir -p dist/.catalyst
 # SPA fallback: deep links (/dashboard, /input, /history) serve index.html; _redirects alone was not honoured
 printf 'framework = "static"\ndeployment_name = "default"\n\n[[redirects]]\nfrom = "/*"\nto = "/index.html"\nstatus = 200\n' > dist/.catalyst/slate-config.toml

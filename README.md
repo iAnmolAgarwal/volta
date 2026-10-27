@@ -240,8 +240,8 @@ Neither script has a Production flag.
   every hour. `runs/index.json` lists the latest 20. Uploaded CSVs go to `uploads/`.
 - **The Data Store gets one metadata row per run, when it can.** Catalyst's free tier allows 5,000 Data Store
   inserts a month across the whole account, and the first design, which wrote a row per hour, used them up in a
-  few runs. Until the quota resets, inserts are refused; the run is still saved, and the app says "Saved · stored
-  in Stratus", with a note that the Data Store's quota resets on the 1st. Older runs are read from the Data Store
+  few runs. Until the quota resets on the 1st, inserts are refused; the run is still saved in Stratus, the app
+  shows "Saved", and the API's `run.storage` says where it went and why. Older runs are read from the Data Store
   as before.
 - **QuickML's free tier is 500 inference calls a month, account-wide,** and grading runs on the same allowance as
   every visitor. So every price QuickML has given is kept in Stratus, and identical inputs never reach it twice:

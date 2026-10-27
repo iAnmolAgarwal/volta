@@ -1,12 +1,12 @@
 import { useEffect, useState, type ComponentType, type ReactNode, type Ref } from "react";
-import { ArrowDownUp, ArrowRight, ArrowRightLeft, ArrowUpRight, BatteryCharging, Binary, CircleCheck, Clock, CopyMinus, Database, Droplets, Gauge, Info, Spline, Sun, TriangleAlert, UtilityPole, X } from "lucide-react";
+import { ArrowDownUp, ArrowRight, ArrowRightLeft, ArrowUpRight, BatteryCharging, Binary, CircleCheck, Clock, CopyMinus, Database, Droplets, Gauge, Spline, Sun, TriangleAlert, UtilityPole, X } from "lucide-react";
 import { GlassCard } from "@/components/app/GlassCard";
 import { LogItem } from "@/components/app/LogItem";
 import { Pill } from "@/components/app/Pill";
 import { Shimmer } from "@/components/app/States";
 import { dayMonth, hhmm, type Run } from "@/lib/api";
 import { STEP_SERVER } from "./steps";
-import { STRATUS_LABEL, stratusNote } from "../storageNote";
+import { STRATUS_LABEL } from "../storageNote";
 import { dashboardHref, storageOf } from "./unsaved";
 
 /* What comes back from a post: the cleaning report on the moss glass, and the
@@ -286,13 +286,6 @@ export function RunSummary({ run, delay, headRef, stashed = true }: { run: Run; 
               <CircleCheck strokeWidth={1.5} aria-hidden />
               <span>{st.stratus === false ? "Run saved" : STRATUS_LABEL}{run.run.csv_key ? ", with its CSV" : ""}</span>
             </li>
-            {/* a run in Stratus alone is not a failure: a quiet note says why the Data Store has no row */}
-            {st.datastore === false && (
-              <li className="is-muted">
-                <Info strokeWidth={1.5} aria-hidden />
-                <span>{stratusNote(st, run.run.created)}</span>
-              </li>
-            )}
             {st.datastore === true && (
               <li className="is-muted"><Database strokeWidth={1.5} aria-hidden /><span>Metadata row in the Data Store</span></li>
             )}

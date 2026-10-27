@@ -116,7 +116,7 @@ export function spanEnds(r: SavedRun): [string, string] {
 
 export interface Store {
   name: "Stratus" | "Data Store";
-  /** The chip's words: "Saved · stored in Stratus", or "Saved · Data Store". */
+  /** The chip's words: "Saved". */
   label: string;
   /** The chip's note, said neutrally: where exactly, and why the Data Store has no row. */
   detail: string;
@@ -126,9 +126,9 @@ export function storeOf(r: SavedRun): Store {
   const st = r.storage;
   const stratus = st?.stratus ?? r.id.startsWith("r");
   if (stratus) {
-    return { name: "Stratus", label: STRATUS_LABEL, detail: stratusNote(st, r.created) };
+    return { name: "Stratus", label: STRATUS_LABEL, detail: stratusNote(st) };
   }
-  return { name: "Data Store", label: "Saved · Data Store", detail: "Saved in the Data Store (runs and run_hours), before runs moved to Stratus on 27 Oct." };
+  return { name: "Data Store", label: "Saved", detail: "Saved in the Data Store (runs and run_hours), before runs moved to Stratus on 27 Oct." };
 }
 
 /* ── the header's side stats ─────────────────────────────────────────────── */

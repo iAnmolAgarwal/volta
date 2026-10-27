@@ -24,6 +24,10 @@ USAGE_KEY = "quickml/usage.json"  # read-only fallback (before the ledger)
 MONTHLY_FREE_CALLS = 500
 DEMO_RESERVE_AT = 380  # from here on, only /api/predict may spend calls (about 120 kept for grading)
 
+# Calls made before the counter existed: the console's free-tier dialog read 52 of 500 for October while
+# the counter read 4 (2026-10-27), so October starts 48 higher. Months without an entry start at 0.
+USAGE_OFFSET = {"2026-10": 48}
+
 _lock = threading.Lock()
 
 
@@ -59,7 +63,9 @@ class QuickMLLedger:
 
     def calls_this_month(self) -> int:
         ledger = self._load()
-        return int(ledger.get("calls", 0)) if ledger.get("month") == self._month() else 0
+        month = self._month()
+        counted = int(ledger.get("calls", 0)) if ledger.get("month") == month else 0
+        return counted + USAGE_OFFSET.get(month, 0)
 
     def cached(self) -> dict:
         """{feature vector tuple: prediction} for everything QuickML has priced."""
@@ -72,11 +78,11 @@ class QuickMLLedger:
         with _lock:
             ledger = self._load()
             month = self._month()
-            total = (int(ledger.get("calls", 0)) if ledger.get("month") == month else 0) + max(0, calls)
+            counted = (int(ledger.get("calls", 0)) if ledger.get("month") == month else 0) + max(0, calls)
             merged = ledger.get("predictions", {})
             merged.update({vector_key(k): float(v) for k, v in predictions.items()})
-            self.store.put_json(LEDGER_KEY, {"month": month, "calls": total, "predictions": merged})
-            return total
+            self.store.put_json(LEDGER_KEY, {"month": month, "calls": counted, "predictions": merged})
+            return counted + USAGE_OFFSET.get(month, 0)
 
     def add_calls(self, n: int) -> int:
         return self.record(n, {})

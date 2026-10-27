@@ -215,7 +215,7 @@ allowance as every visitor ([`backend/quota.py`](../backend/quota.py)):
   the sample and a repeated `test_eval` cost nothing once priced.
 - **A monthly counter**, in the same object, counts the QuickML requests sent this calendar month (UTC).
   `/api/health` shows it as `quickml_calls_month`. Cache and counter are written together, one Stratus update per
-  request that called QuickML. The counter was set to the console's figure, 52, on 2026-10-27.
+  request that called QuickML. October starts from the console's figure, 52 of 500 on 2026-10-27, as an offset in `backend/quota.py` (`USAGE_OFFSET`).
 - **A reserve for grading.** From 380 calls on, `/api/forecast` (uploads, the form, the sample) answers only from the
   cache. When it would need QuickML, it answers `429 {"error": "demo forecast quota reached", "details": [...]}`.
   `/api/predict` is never blocked.

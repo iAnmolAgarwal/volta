@@ -3,9 +3,12 @@ counter and the demo reserve. QuickML and Stratus are fakes; no test reaches the
 
 import io
 import json
+
+import pytest
 from datetime import datetime, timezone
 
 from backend.app import SAMPLE_CSV, create_app
+import backend.quota as quota
 from backend.quota import CACHE_KEY, DEMO_RESERVE_AT, LEDGER_KEY, USAGE_KEY, QuickMLLedger
 from backend.service import Forecaster
 from fakes import FakeRunStore
@@ -13,6 +16,11 @@ from test_backend import FakeClient, sample_rows
 
 OCT = lambda: datetime(2026, 10, 27, 6, 0, tzinfo=timezone.utc)  # noqa: E731
 NOV = lambda: datetime(2026, 11, 1, 0, 5, tzinfo=timezone.utc)  # noqa: E731
+
+
+@pytest.fixture(autouse=True)
+def no_offset(monkeypatch):
+    monkeypatch.setattr(quota, "USAGE_OFFSET", {})
 
 
 def app_with(store, fake):
@@ -111,3 +119,12 @@ def test_the_two_earlier_files_are_read_until_the_ledger_exists():
     assert ledger.calls_this_month() == 52 and ledger.cached() == {(1.0, 0.0): 101.5}
     assert ledger.record(1, {(0.0, 0.0): 90.0}) == 53
     assert json.loads(store.objects[LEDGER_KEY])["predictions"] == {"1.0|0.0": 101.5, "0.0|0.0": 90.0}
+
+
+def test_a_month_s_offset_adds_the_calls_made_before_the_counter(monkeypatch):
+    monkeypatch.setattr(quota, "USAGE_OFFSET", {"2026-10": 48})
+    store = FakeRunStore()
+    store.put_json(USAGE_KEY, {"month": "2026-10", "calls": 4})
+    assert QuickMLLedger(store, clock=OCT).calls_this_month() == 52
+    assert QuickMLLedger(store, clock=OCT).record(1, {}) == 53
+    assert QuickMLLedger(store, clock=NOV).calls_this_month() == 0

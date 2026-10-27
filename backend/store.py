@@ -268,7 +268,8 @@ class CatalystRunStore:
             saved_month = index.get("saved_month", 0) if index.get("month") == month else 0
             self._put_json("updating the run index", INDEX_KEY, {"day": day, "saved_today": saved_today + 1,
                                                                  "month": month, "saved_month": saved_month + 1,
-                                                                 "runs": runs})
+                                                                 "runs": runs,
+                                                                 "hidden_datastore_ids": index.get("hidden_datastore_ids", [])})
         except StoreError as e:  # the run is stored and opens by id; it just won't be listed
             storage["reason"] = "; ".join(filter(None, [storage["reason"], f"not listed in History: {e}"]))
         return {"id": run_id, "created": created, "storage": storage}
@@ -280,7 +281,7 @@ class CatalystRunStore:
         """The Stratus index merged with the Data Store's runs rows, newest first, each run once."""
         index = self._get_json("reading the run index", INDEX_KEY) or {}
         indexed = index.get("runs", [])
-        linked = {r.get("datastore_id") for r in indexed if r.get("datastore_id")}
+        linked = {r.get("datastore_id") for r in indexed if r.get("datastore_id")} | set(index.get("hidden_datastore_ids", []))
         runs = [{k: v for k, v in r.items() if k != "datastore_id"} for r in indexed]
         cols = ", ".join(["ROWID", "CREATEDTIME", *RUN_FIELDS.values()])
         try:
@@ -298,10 +299,28 @@ class CatalystRunStore:
         run_id = str(run_id)
         if RUN_ID.fullmatch(run_id):
             found = self._get_json("reading the run", run_key(run_id))
+            if found is None:
+                self._forget(run_id)  # a run object deleted by hand leaves no dead card in History
+                return None
             return (found["run"], found["hours"]) if found else None
         if not LEGACY_RUN_ID.fullmatch(run_id):
             return None
         return self._get_legacy_run(int(run_id))
+
+    def _forget(self, run_id: str) -> None:
+        """Drop a run whose object is gone from the index (one write, only when it was listed)."""
+        with _INDEX_LOCK:
+            try:
+                index = self._get_json("reading the run index", INDEX_KEY) or {}
+                runs = index.get("runs", [])
+                kept = [r for r in runs if r.get("id") != run_id]
+                if len(kept) != len(runs):
+                    # its Data Store row, if any, stays hidden too, or it would list as a run without hours
+                    gone = [r.get("datastore_id") for r in runs if r.get("id") == run_id and r.get("datastore_id")]
+                    hidden = sorted(set(index.get("hidden_datastore_ids", [])) | set(gone))
+                    self._put_json("updating the run index", INDEX_KEY, {**index, "runs": kept, "hidden_datastore_ids": hidden})
+            except StoreError:
+                pass  # the listing keeps the dead entry until the next read tries again
 
     def _get_legacy_run(self, run_id: int) -> tuple[dict, list[dict]] | None:
         """A run saved before 2026-10-27: its row in runs, its hours in run_hours."""

@@ -329,3 +329,17 @@ def test_the_monthly_save_limit_holds_across_days():
     nov = NOW.replace(month=11, day=1)
     assert RUN_ID.fullmatch(store.save(RECORD, make_hours(1), now=nov)["id"])
     assert (index(app)["month"], index(app)["saved_month"]) == ("2026-11", 1)
+
+
+def test_reading_a_run_whose_object_was_deleted_drops_it_from_the_index():
+    app = FakeApp()
+    store = CatalystRunStore(app)
+    keep = store.save(RECORD, make_hours(2), now=NOW)["id"]
+    gone = store.save(RECORD, make_hours(2), now=NOW.replace(second=5))["id"]
+    del app.objects[("microgrid-uploads", f"runs/{gone}.json")]  # deleted by hand, e.g. in the console
+    assert [r["id"] for r in store.list_runs()] == [gone, keep]
+    assert store.get_run(gone) is None
+    assert [r["id"] for r in store.list_runs()] == [keep]
+    assert index(app)["saved_today"] == 2  # the counters are left as they were
+    store.save(RECORD, make_hours(2), now=NOW.replace(second=9))  # a later save keeps the hidden row hidden
+    assert len(store.list_runs()) == 2 and gone not in [r["id"] for r in store.list_runs()]

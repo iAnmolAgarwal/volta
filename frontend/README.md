@@ -14,7 +14,7 @@ npm run build    # dist/, deployable to Catalyst Slate (framework react-vite)
 
 ## Credits
 
-- The design is based on **[Sylva by MengTo](https://github.com/MengTo/sylva)**, used with the author's permission. Our code is our own: the palette, type scale, layout and motion follow Sylva, and the power-grid scene replaces its moss landscape.
+- Visual design based on **[Sylva](https://github.com/MengTo/sylva)** by MengTo. Our code is our own: the palette, type scale, layout and motion follow Sylva, and the power-grid scene replaces its moss landscape.
 - [Lexend](https://www.lexend.com/), SIL Open Font License 1.1, via `@fontsource-variable/lexend`.
 - [Three.js](https://threejs.org/), MIT.
 - [shadcn/ui](https://ui.shadcn.com/), MIT. The chart structure follows its "Area Chart - Interactive" example.

@@ -152,7 +152,7 @@ def test_client_errors_are_not_retried(use_proxy, no_sleep):
 
 @pytest.mark.parametrize(
     "body, message",
-    [({"predictions": [1.0]}, "expected 3 predictions, got 1 values"), ({"error": "x"}, "no 'predictions' list"),
+    [({"predictions": [1.0]}, "expected 3 predictions for rows 0-2, got 1 values"), ({"error": "x"}, "no 'predictions' list"),
      ({"predictions": [1, "a", 2]}, "non-numeric"), ({"predictions": [1, None, 2]}, "non-numeric"),
      ({"predictions": [1, float("inf"), 2]}, "NaN or infinite")],
 )
@@ -173,8 +173,8 @@ def test_bad_input_fails_before_any_request(no_endpoint_env, monkeypatch):
     monkeypatch.setattr(predict.requests, "post", lambda *a, **k: pytest.fail("should not POST"))
     with pytest.raises(ValueError, match="missing columns: humidity_pct"):
         predict.predict(load_test().drop(columns="humidity_pct"))
-    with pytest.raises(ValueError):
-        predict.predict(load_test().head(2).assign(timestamp=["2015-07-01 00:00:00", "garbage"]))
+    with pytest.raises(ValueError, match="no readable timestamps"):
+        predict.predict(load_test().head(2).assign(timestamp=["garbage", None]))
 
 
 def test_self_test_passes_against_the_fake_proxy(use_proxy, monkeypatch, capsys):
@@ -314,3 +314,64 @@ def test_unsorted_input_with_gaps_matches_the_sorted_answer(capture):
     sorted_preds = predict.predict(df)
     shuffled = df.sample(frac=1, random_state=3)
     np.testing.assert_allclose(predict.predict(shuffled), pd.Series(sorted_preds, index=df.index)[shuffled.index])
+
+
+# --- portability (M15): column names, timestamps, chunking --------------------------
+
+
+def test_column_names_are_matched_ignoring_case_and_spaces(capture):
+    df = frame(["2015-07-01 00:00:00", "2015-07-01 01:00:00"], [25.0, 26.0])
+    df.columns = [" Timestamp", "AMBIENT_TEMP_C ", "Humidity_Pct", " solar_irradiance_wm2 "]
+    predict.predict(df)
+    assert [r["ambient_temp_c"] for r in capture[0]] == [25.0, 26.0]
+
+
+def test_a_missing_timestamp_is_inferred_from_its_neighbours_and_kept_in_the_output(capture, tmp_path, monkeypatch):
+    df = frame(["2015-07-01 17:00:00", None, "2015-07-01 19:00:00"], [30.0, 31.0, 32.0])
+    predict.predict(df)
+    assert [r["timestamp"] for r in capture[0]] == ["2015-07-01 17:00:00", "2015-07-01 18:00:00", "2015-07-01 19:00:00"]
+    src, out = tmp_path / "in.csv", tmp_path / "out.csv"
+    df.to_csv(src, index=False)
+    assert predict.main(["--input", str(src), "--output", str(out)]) == 0
+    written = pd.read_csv(out, keep_default_na=False)
+    assert written["timestamp"].tolist() == ["2015-07-01 17:00:00", "", "2015-07-01 19:00:00"]  # the original values
+
+
+def test_day_first_timestamps_are_read_only_when_not_iso(capture):
+    df = frame(["16/06/2015 18:00", "05-06-2015 07:00", "2015-06-05 07:00:00"], [30.0, 25.0, 25.0])
+    predict.predict(df)
+    assert [r["timestamp"] for r in capture[0]] == ["2015-06-16 18:00:00", "2015-06-05 07:00:00", "2015-06-05 07:00:00"]
+
+
+def test_utc_offsets_are_dropped_keeping_the_clock_time(capture):
+    predict.predict(frame(["2015-06-16T18:00:00+05:30", "2015-06-16T19:00:00Z"], [30.0, 30.0]))
+    assert [r["timestamp"] for r in capture[0]] == ["2015-06-16 18:00:00", "2015-06-16 19:00:00"]
+
+
+def test_2500_rows_go_in_chunks_of_1000_and_come_back_in_order(monkeypatch):
+    monkeypatch.setenv("PREDICT_PROXY_URL", "https://proxy.example")
+    sizes = []
+
+    def fake_post(url, json=None, timeout=None):
+        sizes.append(len(json["rows"]))
+        return FakeResponse(200, {"predictions": [float(r["ambient_temp_c"]) for r in json["rows"]]})
+
+    monkeypatch.setattr(predict.requests, "post", fake_post)
+    stamps = pd.date_range("2015-06-01", periods=2500, freq="h").strftime("%Y-%m-%d %H:%M:%S")
+    temps = np.arange(2500, dtype=float) / 100
+    preds = predict.predict(frame(list(stamps), list(temps)))
+    assert sizes == [1000, 1000, 500]
+    np.testing.assert_allclose(preds, temps)
+
+
+def test_a_single_row_works(capture):
+    predict.predict(frame(["2015-07-01 12:00:00"], [33.0]))
+    assert len(capture) == 1 and len(capture[0]) == 1
+
+
+def test_a_shuffled_frame_is_answered_in_its_own_order(capture):
+    df = frame(["2015-07-01 02:00:00", "2015-07-01 00:00:00", "2015-07-01 01:00:00"], [22.0, 20.0, np.nan])
+    predict.predict(df)
+    sent = capture[0]
+    assert [r["timestamp"] for r in sent] == ["2015-07-01 02:00:00", "2015-07-01 00:00:00", "2015-07-01 01:00:00"]
+    assert sent[2]["ambient_temp_c"] == 21.0  # interpolated in time, sent in input order

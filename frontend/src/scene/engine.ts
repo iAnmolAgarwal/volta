@@ -175,6 +175,8 @@ export class GridEngine {
       throw err;
     }
     this.renderer.setClearColor(0x000000, 0);
+    // listen from the start: a context lost during the long async build must also fall back to the poster
+    this.canvas.addEventListener("webglcontextlost", this.onLost);
 
     // every screen starts at the top level, up to 2x (phones too: developer-notes R3.1);
     // the monitor steps down 2 -> 1.5 -> 1 if the frame rate stays low
@@ -295,7 +297,6 @@ export class GridEngine {
     document.addEventListener("visibilitychange", this.onVisibility);
     this.mqReduced.addEventListener("change", this.onReducedChange);
     this.mqNarrow.addEventListener("change", this.onNarrowChange);
-    this.canvas.addEventListener("webglcontextlost", this.onLost);
 
     // dev only: lets the poster be regenerated, and the scene inspected
     if (import.meta.env.DEV) (window as unknown as { __voltaDebug: unknown }).__voltaDebug = { scene: this.scene, engine: this };
@@ -714,7 +715,8 @@ export class GridEngine {
     mats.forEach((m) => m.dispose());
     this.ground?.texture.dispose();
     this.renderer.dispose();
-    this.renderer.forceContextLoss();
+    // free the GPU context now, unless it is already gone (three.js then warns the extension is missing)
+    if (!this.renderer.getContext().isContextLost()) this.renderer.forceContextLoss();
     this.canvas.remove();
     this.probe.remove();
     if (window.__voltaScene) window.__voltaScene.paused = true;

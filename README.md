@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://volta-efjcfenv.onslate.in"><img src="https://img.shields.io/badge/live-Zoho%20Catalyst%20Slate-4d7c0f" alt="Live on Zoho Catalyst Slate"></a>
+  <a href="https://volta.onslate.in"><img src="https://img.shields.io/badge/live-Zoho%20Catalyst%20Slate-4d7c0f" alt="Live on Zoho Catalyst Slate"></a>
   <img src="https://img.shields.io/badge/forecast-Catalyst%20QuickML-2563EB" alt="Forecast by Catalyst QuickML">
   <img src="https://img.shields.io/badge/validation%20RMSE-8.28%20kW-111827" alt="Validation RMSE 8.28 kW">
   <img src="https://img.shields.io/badge/tests-383%20pytest%20%2B%2030%20vitest-4B5563" alt="383 pytest and 30 vitest tests pass">
@@ -17,7 +17,7 @@ Stratus, run metadata in the Data Store.
 
 ## Try it in 30 seconds
 
-Open **[volta-efjcfenv.onslate.in](https://volta-efjcfenv.onslate.in)**, then **Launch dashboard › Use sample
+Open **[volta.onslate.in](https://volta.onslate.in)**, then **Launch dashboard › Use sample
 data**. On the dashboard, look at:
 
 - the **grid-state badge**: Main Grid or Renewable Storage for the hour in focus, with the controller's own reason;
@@ -57,12 +57,12 @@ Hover the chart, or step the 24-hour window, and all four follow the same hour.
 | Requirement ([problem statement §3, §5](docs/PROBLEM_STATEMENT.md)) | Where | Catalyst service |
 |---|---|---|
 | Train and publish a demand regression model | the endpoint `demand-forecast`, called by [`/api/predict`](docs/api.md) | QuickML |
-| Accept telemetry via a live UI form or CSV upload | [`/input`](https://volta-efjcfenv.onslate.in/input) | Slate, AppSail |
+| Accept telemetry via a live UI form or CSV upload | [`/input`](https://volta.onslate.in/input) | Slate, AppSail |
 | Clean, validate and fill missing values | [`backend/cleaning.py`](backend/cleaning.py), with the report on `/input` | AppSail |
 | Store uploaded CSV files | `uploads/…` in the bucket `microgrid-uploads` | Stratus |
 | Hourly predictions for a 24-hour window | [`/api/forecast`](docs/api.md#post-apiforecast), `window` | AppSail, QuickML |
 | Threshold and time-based switching, overload alert | [`backend/controller.py`](backend/controller.py) | AppSail |
-| Dashboard: load curve, grid state, battery SoC, alerts | [`/dashboard`](https://volta-efjcfenv.onslate.in/dashboard) | Slate |
+| Dashboard: load curve, grid state, battery SoC, alerts | [`/dashboard`](https://volta.onslate.in/dashboard) | Slate |
 | System logs | the dashboard's system log; `switch_events` and `overload_alerts` in the API | Slate, AppSail |
 | Persist telemetry and runs | runs in `runs/<id>.json`, one metadata row per run in the table `runs` | Stratus, Data Store |
 | `predict.py` against the published endpoint | [`predict.py`](predict.py) → AppSail → QuickML | AppSail, QuickML |
@@ -284,7 +284,7 @@ scorecards are in [design/review/](design/review/) and [design-notes/](design-no
 ```sh
 .venv/bin/python -m pytest && .venv/bin/python test_eval.py
 cd frontend && npm run lint && npx vitest run && npm run build
-node scripts/e2e.mjs https://volta-efjcfenv.onslate.in scripts/fixtures/e2e-48h.csv   # needs Chrome with --remote-debugging-port=9333
+node scripts/e2e.mjs https://volta.onslate.in scripts/fixtures/e2e-48h.csv   # needs Chrome with --remote-debugging-port=9333
 ```
 
 The API contract is in [docs/api.md](docs/api.md), the model work in [docs/model_report.md](docs/model_report.md),

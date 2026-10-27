@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Build the frontend and deploy it to Catalyst Slate (Development) as a static app.
+# The app's access URL, https://volta.onslate.in, is set in the Slate console; deploys keep it (the CLI
+# printed it after a deploy on 2026-10-27). If a deploy ever prints another URL, rename it back there.
 # Never targets Production (no --production flag). The API base comes from
 # frontend/.env.production; SPA routes fall back to index.html via public/_redirects.
 set -euo pipefail

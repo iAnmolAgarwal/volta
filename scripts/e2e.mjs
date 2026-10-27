@@ -7,7 +7,7 @@
 // post) -> Open on dashboard -> History lists the run -> reopen it. At 1440 and 390 it also
 // loads every route. It fails if any request is an OPTIONS preflight, if the console logs an
 // error, or if the landing falls back to the snapshot.
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
@@ -102,11 +102,12 @@ await go("/history");
 await until(`document.querySelector('a[href*="${runId}"]')`, "the run in History", 20_000);
 check("History lists the run", true, runId);
 await shot("04-history-1440");
-const csvFiles = () => readdirSync(downloads).filter((f) => f.endsWith(".csv"));
-const before = csvFiles().length;
+// the History CSV has the same name as the dashboard's, and Chrome overwrites it: remove ours first
+const csvName = `volta-run-${runId}.csv`;
+rmSync(`${downloads}/${csvName}`, { force: true });
 check("History card CSV", await evaluate(`(() => { const b = document.querySelector('button[aria-label="Download run ${runId.slice(-6)} as CSV"]'); if (!b) return false; b.click(); return true; })()`));
-for (const t0 = Date.now(); Date.now() - t0 < 15_000 && csvFiles().length <= before; ) await wait(250);
-check("  -> a second CSV file", csvFiles().length > before, csvFiles().join(" "));
+const histCsv = await downloaded(csvName);
+check("  -> CSV with header + 48 rows", histCsv?.startsWith("timestamp,") && histCsv.trim().split(/\r?\n/).length === 49, `${histCsv?.trim().split(/\r?\n/).length ?? 0} lines`);
 await evaluate(`document.querySelector('a[href*="${runId}"]').click()`);
 await until(`location.search.includes("${runId}")`, "reopening the run");
 check("History reopens the run", true);

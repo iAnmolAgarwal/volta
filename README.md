@@ -100,7 +100,8 @@ python predict.py --input sample_test_input.csv --output out.csv   # timestamp,t
 python test_eval.py                                                # prints SUCCESS
 ```
 
-`predict.py` needs no credentials: it posts to the AppSail API, which holds the QuickML key. A timeout,
+`predict.py` needs no credentials. It calls the team's published QuickML endpoint, `demand-forecast`, through
+the AppSail API: QuickML's REST API needs Zoho OAuth, and the endpoint key has to stay on the server. A timeout,
 connection error, 5xx or gateway 408 is retried: 3 attempts, 10 s and then 30 s apart, with one stderr line per
 retry. If every attempt fails it raises an error. It never falls back to a made-up curve. The API sends at most
 1,000 distinct hours per QuickML call, so a 1,000-row run costs one call, or none when its rows are already cached.

@@ -199,7 +199,7 @@
   /* phone hit targets: Sylva floors its phone controls at 44px with max() */
   --tap-min: 44px;
 
-  /* round 3 (screen builder): phone legibility, developer-notes R3.3 */
+  /* phone legibility */
   /* the smallest text on a phone; Sylva's own max() floors, applied to type */
   --t-min: 12px;
   /* the headline's clearance under the phone dock (feedback-02 fix 10) */

@@ -195,7 +195,8 @@ The fitted slope (8.54 ± 0.05) and threshold (23.95 °C) match the cooling term
 
 ## QuickML's own evaluation
 
-Seen in the Catalyst console (QuickML, pipeline "demand-linear", model "demand-linear model", V1) on 2026-10-26 : **RMSE 8.7065 kW, R² 0.9706**. This is QuickML's own hold-out on the uploaded training CSV, not
+Read from the Catalyst console (QuickML, pipeline "demand-linear", model "demand-linear model", V1) on 2026-10-26:
+**RMSE 8.7065 kW, R² 0.9706**. This is QuickML's own hold-out on the uploaded training CSV, not
 the forward split above, so it is close to, but not the same as, the 8.279 validation RMSE.
 
 ## Live endpoint check (2026-10-26, Development)
@@ -218,4 +219,4 @@ Proxy `https://microgrid-proxy-50047164504.development.catalystappsail.in`, vers
 - Against the reference formula (`python scripts/compare_formula.py /tmp/p.csv`): RMS difference
   0.121 kW, max 0.229 kW, mean -0.070 kW over 1,000 rows.
 - Latency of a 1,000-row request from this machine: 0.77 s with rows not yet cached (one QuickML call),
-  0.33 s when served from the proxy cache. A second run measured 0.98 s.
+  0.33 s when served from the proxy cache; a second machine measured 0.98 s.

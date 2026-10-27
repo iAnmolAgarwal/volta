@@ -178,7 +178,7 @@ export class GridEngine {
     // listen from the start: a context lost during the long async build must also fall back to the poster
     this.canvas.addEventListener("webglcontextlost", this.onLost);
 
-    // every screen starts at the top level, up to 2x (phones too: developer-notes R3.1);
+    // every screen starts at the top level, up to 2x (phones too, for crisp buildings);
     // the monitor steps down 2 -> 1.5 -> 1 if the frame rate stays low
     this.level = this.maxLevel = QUALITY.length - 1;
     this.ready = this.build();

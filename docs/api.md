@@ -126,7 +126,7 @@ Below is the trimmed live response for the sample CSV (`-F source=sample`). This
 
 What the hour fields mean:
 
-- **`prediction_kw`** comes from the QuickML endpoint, rounded to 0.01 kW. The controller decides on that rounded value, so a saved hour's prediction always matches its `mode`, `overload` flag and `reason`.
+- **`prediction_kw`** comes from the QuickML endpoint, unrounded. The controller decides on that raw value, as `/api/predict` does, so a saved hour's prediction always matches its `mode`, `overload` flag and `reason`. Round it only for display; the reason prints enough decimals near a threshold (`160.004 kW > 160`).
 - **`mode`**: `Renewable Storage Mode` when demand > 160 kW **or** the hour is 18–22. Otherwise `Main Grid Mode`.
 - **`overload`** is true at ≥ 200 kW, whatever the mode.
 - **`soc_pct`** is the battery's state of charge at the end of the hour. The battery model and its parameters are in [battery.md](battery.md).

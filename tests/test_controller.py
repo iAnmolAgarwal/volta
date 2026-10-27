@@ -63,6 +63,8 @@ def test_bad_timestamp_raises(bad):
         ("2015-07-01 12:00:00", 160.0, "160.00 kW ≤ 160 and hour 12 is outside 18–22"),
         ("2015-07-01 12:00:00", 160.04, "160.04 kW > 160"),  # two decimals where one would print "160.0 > 160"
         ("2015-07-01 12:00:00", 199.99, "199.99 kW > 160"),
+        ("2015-07-01 12:00:00", 160.004, "160.004 kW > 160"),  # decided raw: just over, and the reason says so
+        ("2015-07-01 12:00:00", 199.996, "199.996 kW > 160"),  # just under the overload line
         ("2015-07-01 12:00:00", 200.0, "200.00 kW > 160; 200.00 kW ≥ 200 raises a critical overload alert"),
         ("2015-07-01 23:00:00", 90.0, "90.0 kW ≤ 160 and hour 23 is outside 18–22"),
     ],

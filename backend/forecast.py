@@ -1,7 +1,8 @@
 """The work behind /api/forecast and /api/runs: clean -> predict -> controller -> battery -> save.
 
-Predictions are rounded to 0.01 kW before the controller sees them, so every
-stored prediction fully explains its stored mode, overload flag and reason.
+The controller decides on the raw QuickML prediction, exactly as /api/predict does, and the raw value is
+what's stored and returned, so every hour's prediction explains its mode, overload flag and reason.
+Rounding is for display only (the reason prints enough decimals near a threshold).
 """
 
 import logging
@@ -41,7 +42,7 @@ class ForecastService:
         cleaned, report = clean(frame)
         raw = self.forecaster.predict_features(build_features(cleaned)[QUICKML_FEATURES], request,
                                                ledger=self.ledger(request), guard=True)
-        preds = np.round(raw, 2)
+        preds = np.asarray(raw, dtype=float)  # decided raw, as /api/predict decides
         decisions, steps = self.forecaster.schedule(cleaned["timestamp"], preds, cleaned["solar_irradiance_wm2"])
         hours = build_hours(cleaned, preds, decisions, steps)
         body = view(hours, window_start)  # a bad window_start fails here, before anything is saved

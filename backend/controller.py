@@ -46,9 +46,15 @@ def decide(ts, demand_kw) -> dict:
 
 
 def _kw(demand: float) -> str:
-    """Demand for a sentence: one decimal, or two when one would print a threshold (160.04 -> 160.04)."""
-    text = f"{demand:.1f}"
-    return f"{demand:.2f}" if float(text) in (STORAGE_ABOVE_KW, OVERLOAD_AT_KW) else text
+    """Demand for a sentence: one decimal, or as many (up to 3) as it takes not to print a threshold
+    for a value that isn't one (160.04 -> "160.04", 160.004 -> "160.004"); a threshold itself -> "160.00"."""
+    if demand in (STORAGE_ABOVE_KW, OVERLOAD_AT_KW):
+        return f"{demand:.2f}"
+    for places in (1, 2, 3):
+        text = f"{demand:.{places}f}"
+        if float(text) not in (STORAGE_ABOVE_KW, OVERLOAD_AT_KW):
+            return text
+    return f"{demand:.3f}"
 
 
 def explain(ts, demand_kw) -> str:

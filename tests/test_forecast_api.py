@@ -65,7 +65,6 @@ def test_every_hour_follows_the_controller(api):
     body = upload(api).get_json()
     for h in body["hours"]:
         assert {"mode": h["mode"], "overload": h["overload"]} == decide(h["timestamp"], h["prediction_kw"])
-        assert h["prediction_kw"] == round(h["prediction_kw"], 2)
     events = body["switch_events"]
     assert len(events) == sum(a["mode"] != b["mode"] for a, b in zip(body["hours"], body["hours"][1:]))
     assert len(body["overload_alerts"]) == sum(h["overload"] for h in body["hours"])
@@ -268,3 +267,20 @@ def test_predict_battery_uses_solar_and_fills_missing_solar(api):
     battery = api.post("/api/predict", data=json.dumps({"rows": rows}), content_type="application/json").get_json()["battery"]
     assert battery[0]["pv_kw"] == pytest.approx(0.25 * rows[0]["solar_irradiance_wm2"])
     assert battery[1]["pv_kw"] == pytest.approx(0.25 * 8.0)  # the training median, as the features use
+
+
+@pytest.mark.parametrize("raw, mode, overload", [(160.004, "Renewable Storage Mode", False), (199.996, "Renewable Storage Mode", False),
+                                                 (159.996, "Main Grid Mode", False), (200.004, "Renewable Storage Mode", True)])
+def test_forecast_and_predict_decide_on_the_same_raw_value(store, raw, mode, overload):
+    class Fixed:
+        calls = []
+
+        def predict(self, features):
+            return [raw] * len(features)
+
+    api = create_app(Forecaster(client_factory=lambda req: Fixed()), store_factory=lambda req: store).test_client()
+    rows = [{"timestamp": "2015-07-01 12:00:00", "ambient_temp_c": 25.0, "humidity_pct": 50.0, "solar_irradiance_wm2": 0.0}]
+    hour = post_rows(api, {"rows": rows}).get_json()["hours"][0]
+    signal = api.post("/api/predict", data=json.dumps({"rows": rows}), content_type="text/plain").get_json()["signals"][0]
+    assert (hour["mode"], hour["overload"]) == (signal["mode"], signal["overload"]) == (mode, overload)
+    assert hour["prediction_kw"] == raw  # stored unrounded

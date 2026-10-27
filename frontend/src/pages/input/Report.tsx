@@ -6,6 +6,7 @@ import { Pill } from "@/components/app/Pill";
 import { Shimmer } from "@/components/app/States";
 import { dayMonth, hhmm, type Run } from "@/lib/api";
 import { STEP_SERVER } from "./steps";
+import { STRATUS_LABEL, stratusNote } from "../storageNote";
 import { dashboardHref, storageOf } from "./unsaved";
 
 /* What comes back from a post: the cleaning report on the moss glass, and the
@@ -283,12 +284,13 @@ export function RunSummary({ run, delay, headRef, stashed = true }: { run: Run; 
           <>
             <li className="is-ok">
               <CircleCheck strokeWidth={1.5} aria-hidden />
-              <span>{st.stratus === false ? "Run saved" : "Run saved in Stratus"}{run.run.csv_key ? ", with its CSV" : ""}</span>
+              <span>{st.stratus === false ? "Run saved" : STRATUS_LABEL}{run.run.csv_key ? ", with its CSV" : ""}</span>
             </li>
+            {/* a run in Stratus alone is not a failure: a quiet note says why the Data Store has no row */}
             {st.datastore === false && (
               <li className="is-muted">
                 <Info strokeWidth={1.5} aria-hidden />
-                <span>Data Store row skipped{st.reason ? `: ${reasonText(st.reason)}` : ""}</span>
+                <span>{stratusNote(st, run.run.created)}</span>
               </li>
             )}
             {st.datastore === true && (

@@ -1,10 +1,13 @@
 """Guarding the QuickML free tier: 500 inference calls a month, account-wide, shared by every visitor and by
 the graded predict.py run.
 
-Two things live in the Stratus bucket, so they survive AppSail restarts and redeploys:
-    quickml/predictions.json  every feature vector QuickML has priced, and its prediction. Identical inputs
-                              never reach QuickML twice: the landing's 24 rows, the sample, repeated test_evals.
-    quickml/usage.json        QuickML requests sent this calendar month (UTC), and the month they belong to.
+One object in the Stratus bucket, quickml/ledger.json, survives AppSail restarts and redeploys:
+    predictions   every feature vector QuickML has priced, and its prediction. Identical inputs never reach
+                  QuickML twice: the landing's 24 rows, the sample, repeated test_evals.
+    month, calls  QuickML requests sent this calendar month (UTC).
+Both are written together, once per request that called QuickML, so the ledger costs at most one Stratus
+write per QuickML call (Stratus' free tier allows 1,000 object updates a month). The earlier two files,
+quickml/predictions.json and quickml/usage.json, are still read when the ledger doesn't exist yet.
 
 At DEMO_RESERVE_AT calls the demo path (/api/forecast: uploads, the form, the sample) answers only from the
 cache, so the rest of the month is kept for /api/predict, which predict.py uses and which is never blocked.
@@ -15,8 +18,9 @@ which only makes the guard trigger a little later.
 import threading
 from datetime import datetime, timezone
 
-CACHE_KEY = "quickml/predictions.json"
-USAGE_KEY = "quickml/usage.json"
+LEDGER_KEY = "quickml/ledger.json"
+CACHE_KEY = "quickml/predictions.json"  # read-only fallback (before the ledger)
+USAGE_KEY = "quickml/usage.json"  # read-only fallback (before the ledger)
 MONTHLY_FREE_CALLS = 500
 DEMO_RESERVE_AT = 380  # from here on, only /api/predict may spend calls (about 120 kept for grading)
 
@@ -45,29 +49,37 @@ class QuickMLLedger:
     def _month(self) -> str:
         return f"{self.clock():%Y-%m}"
 
-    def calls_this_month(self) -> int:
+    def _load(self) -> dict:
+        ledger = self.store.get_json(LEDGER_KEY)
+        if ledger is not None:
+            return ledger
         usage = self.store.get_json(USAGE_KEY) or {}
-        return int(usage.get("calls", 0)) if usage.get("month") == self._month() else 0
+        cache = self.store.get_json(CACHE_KEY) or {}
+        return {"month": usage.get("month"), "calls": usage.get("calls", 0), "predictions": cache.get("predictions", {})}
 
-    def add_calls(self, n: int) -> int:
-        if n <= 0:
-            return self.calls_this_month()
-        with _lock:
-            calls = self.calls_this_month() + n
-            self.store.put_json(USAGE_KEY, {"month": self._month(), "calls": calls})
-            return calls
+    def calls_this_month(self) -> int:
+        ledger = self._load()
+        return int(ledger.get("calls", 0)) if ledger.get("month") == self._month() else 0
 
     def cached(self) -> dict:
         """{feature vector tuple: prediction} for everything QuickML has priced."""
-        stored = self.store.get_json(CACHE_KEY) or {}
-        return {key_vector(k): float(v) for k, v in stored.get("predictions", {}).items()}
+        return {key_vector(k): float(v) for k, v in self._load().get("predictions", {}).items()}
+
+    def record(self, calls: int, predictions: dict) -> int:
+        """Add QuickML requests to this month's count and their predictions to the cache, in one write."""
+        if calls <= 0 and not predictions:
+            return self.calls_this_month()
+        with _lock:
+            ledger = self._load()
+            month = self._month()
+            total = (int(ledger.get("calls", 0)) if ledger.get("month") == month else 0) + max(0, calls)
+            merged = ledger.get("predictions", {})
+            merged.update({vector_key(k): float(v) for k, v in predictions.items()})
+            self.store.put_json(LEDGER_KEY, {"month": month, "calls": total, "predictions": merged})
+            return total
+
+    def add_calls(self, n: int) -> int:
+        return self.record(n, {})
 
     def remember(self, predictions: dict) -> None:
-        """Add {feature vector tuple: prediction} to the persistent cache."""
-        if not predictions:
-            return
-        with _lock:
-            stored = self.store.get_json(CACHE_KEY) or {}
-            merged = stored.get("predictions", {})
-            merged.update({vector_key(k): float(v) for k, v in predictions.items()})
-            self.store.put_json(CACHE_KEY, {"predictions": merged})
+        self.record(0, predictions)

@@ -143,9 +143,9 @@ def _calls(ledger) -> int:
         return 0
 
 
-def _record(write, value) -> None:
+def _record(write) -> None:
     try:
-        write(value)
+        write()
     except Exception:  # noqa: BLE001 - bookkeeping must not cost the prediction
         log.warning("could not update the QuickML ledger", exc_info=True)
 
@@ -192,19 +192,18 @@ class Forecaster:
                 raise QuotaReserved(f"{len(todo)} hour(s) aren't in the prediction cache, and this month's remaining "
                                     "QuickML calls are kept for grading")
             client = self.client_factory(request)  # raises ConfigError until configured
+            new = {}
             try:
                 fresh = client.predict(pd.DataFrame(todo, columns=feats.columns))
+                new = dict(zip(todo, (float(p) for p in fresh)))
             finally:
                 if ledger is not None:
-                    # the SDK transport counts the requests it really sent (a read-timeout retry included);
-                    # otherwise one request per batch
+                    # the SDK transport counts the requests it really sent; otherwise one request per batch.
+                    # Count and new predictions go to Stratus in one write, failed attempts included.
                     sent = getattr(getattr(client, "transport", None), "attempts", None)
-                    batch = getattr(client, "batch_size", 1000)
-                    _record(ledger.add_calls, sent if sent is not None else math.ceil(len(todo) / batch))
-            new = dict(zip(todo, (float(p) for p in fresh)))
+                    calls = sent if sent is not None else math.ceil(len(todo) / getattr(client, "batch_size", 1000))
+                    _record(lambda: ledger.record(calls, new))
             self.cache.put_many(new)
-            if ledger is not None:
-                _record(ledger.remember, new)
             known.update(new)
         return np.array([known[k] for k in keys], dtype=float)
 

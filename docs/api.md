@@ -182,7 +182,7 @@ Runs from Stratus and runs from the Data Store are merged, newest first, each li
 
 Runs are stored in a hybrid way, because of the Catalyst free tier.
 
-**Why.** The free tier is account-wide and per calendar month, shared by Development and Production. It allows 5,000 Data Store inserts, 2,000 Stratus uploads and 10,000 Stratus downloads. Runs used to be saved as one `runs` row plus one `run_hours` row per hour. Inserts appear to be counted per row, so each 1,000-hour run cost about 1,001 of them, and a handful of runs used up the month's allowance on 2026-10-27. Inserts then failed with `FREE_USAGE_LIMIT_REACHED` until the next month.
+**Why.** The free tier is account-wide and per calendar month, shared by Development and Production. It allows 5,000 Data Store inserts, 1,000 Stratus object uploads, 1,000 object updates and 10,000 downloads (as the console's free-tier dialog shows). Runs used to be saved as one `runs` row plus one `run_hours` row per hour. Inserts appear to be counted per row, so each 1,000-hour run cost about 1,001 of them, and a handful of runs used up the month's allowance on 2026-10-27. Inserts then failed with `FREE_USAGE_LIMIT_REACHED` until the next month.
 
 **Now:**
 
@@ -196,7 +196,13 @@ Runs are stored in a hybrid way, because of the Catalyst free tier.
 - Stratus is the run store. The Data Store row is kept so that run metadata is queryable with ZCQL. When an insert is refused, for example by the free-tier quota, the run is still saved and `storage.datastore` is false.
 - Hourly rows are no longer written to `run_hours`. The table is read only for the runs saved before 2026-10-27.
 - Run ids are made by the API: `r` + the UTC time to the second + 6 random hex digits. They sort by time, and don't depend on Data Store ROWIDs.
-- **Daily save limit: 40 runs per UTC day.** That is at most 120 of the 2,000 monthly uploads, so no visitor or bot can use them all up in a day. Past it, forecasts still work, unsaved.
+- **Save limits: 40 runs per UTC day, and 250 per calendar month.** Past either, forecasts still work, unsaved.
+  The maths, against the free tier's 1,000 uploads and 1,000 updates a month:
+  - a saved run costs at most 2 uploads (the run object and its CSV) and 1 update (the index);
+  - 250 runs a month: at most **500 uploads** and **250 updates**;
+  - the QuickML ledger adds at most one update per QuickML request, so at most 500 more;
+  - worst case for a full month: 500 uploads and 750 updates, both under 1,000;
+  - until Nov 1, from the console's 31 uploads and 15 updates on 2026-10-27, 40 a day for five days stays under 400 more uploads.
 - **Limitations.** The index is read, changed and written back with no lock, so two runs saved in the same second can drop one from the 20-run list. Both runs are still stored and can be opened by id.
 
 ## QuickML quota
@@ -205,10 +211,11 @@ QuickML's free tier is 500 inference calls a month, account-wide, and the graded
 allowance as every visitor ([`backend/quota.py`](../backend/quota.py)):
 
 - **A persistent prediction cache.** Every feature vector QuickML has priced, and its prediction, is kept in Stratus
-  at `quickml/predictions.json`. Identical inputs never reach QuickML twice, across restarts too: the landing's 24
-  rows, the sample and a repeated `test_eval` cost nothing once priced.
-- **A monthly counter.** `quickml/usage.json` counts the QuickML requests sent this calendar month (UTC), read-timeout
-  retries included. `/api/health` shows it as `quickml_calls_month`.
+  in `quickml/ledger.json`. Identical inputs never reach QuickML twice, across restarts too: the landing's 24 rows,
+  the sample and a repeated `test_eval` cost nothing once priced.
+- **A monthly counter**, in the same object, counts the QuickML requests sent this calendar month (UTC).
+  `/api/health` shows it as `quickml_calls_month`. Cache and counter are written together, one Stratus update per
+  request that called QuickML. The counter was set to the console's figure, 52, on 2026-10-27.
 - **A reserve for grading.** From 380 calls on, `/api/forecast` (uploads, the form, the sample) answers only from the
   cache. When it would need QuickML, it answers `429 {"error": "demo forecast quota reached", "details": [...]}`.
   `/api/predict` is never blocked.
@@ -231,7 +238,7 @@ allowance as every visitor ([`backend/quota.py`](../backend/quota.py)):
 - Uploaded CSVs are at keys like `uploads/2026/10/26/153012-1a2b3c4d-name.csv`.
 
 **Free-tier cost per run:**
-- 2 Stratus uploads, plus 1 more for a CSV;
+- 1 Stratus upload (the run), plus 1 more for a CSV, and 1 update (the index);
 - 1 Stratus download;
 - 1 Data Store insert, when the quota allows;
 - at most 1 QuickML call (rows already cached cost nothing), out of 500 a month.

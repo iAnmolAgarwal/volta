@@ -29,7 +29,10 @@ SELECT_PAGE = 300  # ZCQL row limit per query
 CLEANING_MAX_CHARS = 10_000  # limit of the Data Store text column runs.cleaning_json
 INDEX_KEY = "runs/index.json"
 RUNS_INDEXED = 20
-DAILY_SAVE_LIMIT = 40  # saved runs per UTC day, so no visitor can spend the month's 2,000 Stratus uploads
+DAILY_SAVE_LIMIT = 40  # saved runs per UTC day
+MONTHLY_SAVE_LIMIT = 250  # saved runs per calendar month (UTC). Stratus' free tier allows 1,000 uploads and
+# 1,000 updates a month; a saved run costs 2 uploads (run object, CSV) and 1 update (the index), so 250 runs
+# use at most 500 uploads and 250 updates, leaving room for the QuickML ledger (one update per QuickML call)
 RUN_ID = re.compile(r"r\d{14}-[0-9a-f]{6}")  # Stratus runs: r + UTC yyyymmddHHMMSS + random, time-sortable
 LEGACY_RUN_ID = re.compile(r"\d{1,20}")  # Data Store ROWIDs of the runs saved before 2026-10-27
 
@@ -213,6 +216,9 @@ class CatalystRunStore:
         saved_today = index.get("saved_today", 0) if index.get("day") == f"{now:%Y-%m-%d}" else 0
         if saved_today >= DAILY_SAVE_LIMIT:
             raise DailyLimitError(f"daily save limit reached ({DAILY_SAVE_LIMIT} runs a day, UTC)")
+        saved_month = index.get("saved_month", 0) if index.get("month") == f"{now:%Y-%m}" else 0
+        if saved_month >= MONTHLY_SAVE_LIMIT:
+            raise DailyLimitError(f"monthly save limit reached ({MONTHLY_SAVE_LIMIT} runs a month, UTC)")
         return saved_today
 
     def get_json(self, key: str):
@@ -258,7 +264,11 @@ class CatalystRunStore:
         entry = {**summary, "storage": storage, "series": demand_series(hours), "datastore_id": datastore_id}
         runs = [entry, *index.get("runs", [])][:RUNS_INDEXED]
         try:
-            self._put_json("updating the run index", INDEX_KEY, {"day": day, "saved_today": saved_today + 1, "runs": runs})
+            month = f"{now:%Y-%m}"
+            saved_month = index.get("saved_month", 0) if index.get("month") == month else 0
+            self._put_json("updating the run index", INDEX_KEY, {"day": day, "saved_today": saved_today + 1,
+                                                                 "month": month, "saved_month": saved_month + 1,
+                                                                 "runs": runs})
         except StoreError as e:  # the run is stored and opens by id; it just won't be listed
             storage["reason"] = "; ".join(filter(None, [storage["reason"], f"not listed in History: {e}"]))
         return {"id": run_id, "created": created, "storage": storage}

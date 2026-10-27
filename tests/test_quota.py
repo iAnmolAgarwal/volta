@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 
 from backend.app import SAMPLE_CSV, create_app
-from backend.quota import CACHE_KEY, DEMO_RESERVE_AT, USAGE_KEY, QuickMLLedger
+from backend.quota import CACHE_KEY, DEMO_RESERVE_AT, LEDGER_KEY, USAGE_KEY, QuickMLLedger
 from backend.service import Forecaster
 from fakes import FakeRunStore
 from test_backend import FakeClient, sample_rows
@@ -31,7 +31,7 @@ def upload(api, data=SAMPLE_CSV.read_bytes()):
 def test_identical_inputs_never_reach_quickml_twice_even_after_a_restart():
     store, fake = FakeRunStore(), FakeClient()
     assert predict(app_with(store, fake), sample_rows(24)).status_code == 200
-    assert len(fake.calls) == 1 and CACHE_KEY in store.objects
+    assert len(fake.calls) == 1 and LEDGER_KEY in store.objects
     again = FakeClient()  # a new process: empty memory, same Stratus bucket
     body = predict(app_with(store, again), sample_rows(24)).get_json()
     assert again.calls == [] and len(body["predictions"]) == 24
@@ -43,7 +43,7 @@ def test_every_quickml_call_is_counted_for_the_month():
     predict(api, sample_rows(24))
     predict(api, sample_rows(30))  # 6 new hours: one more call
     assert len(fake.calls) == 2
-    assert json.loads(store.objects[USAGE_KEY])["calls"] == 2
+    assert json.loads(store.objects[LEDGER_KEY])["calls"] == 2
     assert api.get("/api/health").get_json()["quickml_calls_month"] == 2
 
 
@@ -86,3 +86,28 @@ def test_a_broken_ledger_never_costs_the_prediction():
     fake = FakeClient()
     resp = predict(app_with(Broken(), fake), sample_rows(5))
     assert resp.status_code == 200 and len(fake.calls) == 1
+
+
+def test_one_stratus_write_per_quickml_request():
+    class Counting(FakeRunStore):
+        puts = 0
+
+        def put_json(self, key, value):
+            Counting.puts += 1
+            super().put_json(key, value)
+
+    store, fake = Counting(), FakeClient()
+    api = app_with(store, fake)
+    predict(api, sample_rows(24))
+    predict(api, sample_rows(24))  # cached: no QuickML call, no write
+    assert len(fake.calls) == 1 and Counting.puts == 1
+
+
+def test_the_two_earlier_files_are_read_until_the_ledger_exists():
+    store = FakeRunStore()
+    store.put_json(USAGE_KEY, {"month": "2026-10", "calls": 52})
+    store.put_json(CACHE_KEY, {"predictions": {"1.0|0.0": 101.5}})
+    ledger = QuickMLLedger(store, clock=OCT)
+    assert ledger.calls_this_month() == 52 and ledger.cached() == {(1.0, 0.0): 101.5}
+    assert ledger.record(1, {(0.0, 0.0): 90.0}) == 53
+    assert json.loads(store.objects[LEDGER_KEY])["predictions"] == {"1.0|0.0": 101.5, "0.0|0.0": 90.0}

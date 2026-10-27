@@ -245,7 +245,8 @@ Neither script has a Production flag.
   a landing visit, the sample and a repeated `test_eval` cost nothing. A counter tracks the month's calls
   (`quickml_calls_month` in `/api/health`). Past 380, uploads and the form answer only from that cache, and
   otherwise say the demo's quota is used up. `/api/predict`, which `predict.py` uses, is never blocked.
-- **At most 40 saved runs a day.** It keeps the free tier's 2,000 monthly Stratus uploads safe from a busy day.
+- **At most 40 saved runs a day, and 250 a month.** Stratus' free tier allows 1,000 uploads and 1,000 updates a
+  month, and a saved run costs 2 uploads and 1 update, so even a full month stays under both.
   Past it, forecasts still work, unsaved.
 - **Slate caches every page for a year,** and won't take other headers. So each deploy ships every earlier build's
   files as well, and a page whose files are missing reloads itself once.

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import pytest
 from zcatalyst_sdk.exceptions import CatalystAPIError
 
-from backend.store import (CLEANING_MAX_CHARS, DAILY_SAVE_LIMIT, SERIES_POINTS, demand_series, HOUR_FIELDS, HOURS_TABLE, INDEX_KEY, RUN_ID, RUNS_INDEXED,
+from backend.store import (CLEANING_MAX_CHARS, DAILY_SAVE_LIMIT, MONTHLY_SAVE_LIMIT, SERIES_POINTS, demand_series, HOUR_FIELDS, HOURS_TABLE, INDEX_KEY, RUN_ID, RUNS_INDEXED,
                            RUNS_TABLE, SELECT_PAGE, CatalystRunStore, DailyLimitError, StoreError, created_iso,
                            hour_from_row, run_from_row, run_to_row, upload_key)
 
@@ -317,3 +317,15 @@ def test_oversized_cleaning_report_drops_the_row_list_but_keeps_the_count():
     row = run_to_row({**RECORD, "cleaning": {"rejected_count": 900, "rejected": rejected}})
     assert len(row["cleaning_json"]) <= CLEANING_MAX_CHARS
     assert '"rejected_count": 900' in row["cleaning_json"] and '"rejected": []' in row["cleaning_json"]
+
+
+def test_the_monthly_save_limit_holds_across_days():
+    app = FakeApp()
+    store = CatalystRunStore(app)
+    app.objects[("microgrid-uploads", INDEX_KEY)] = (json.dumps({"day": "2026-10-26", "saved_today": 3, "month": "2026-10",
+                                                                 "saved_month": MONTHLY_SAVE_LIMIT, "runs": []}).encode(), None)
+    with pytest.raises(DailyLimitError, match="monthly save limit"):
+        store.save(RECORD, make_hours(1), now=NOW)
+    nov = NOW.replace(month=11, day=1)
+    assert RUN_ID.fullmatch(store.save(RECORD, make_hours(1), now=nov)["id"])
+    assert (index(app)["month"], index(app)["saved_month"]) == ("2026-11", 1)

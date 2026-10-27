@@ -284,3 +284,9 @@ def test_forecast_and_predict_decide_on_the_same_raw_value(store, raw, mode, ove
     signal = api.post("/api/predict", data=json.dumps({"rows": rows}), content_type="text/plain").get_json()["signals"][0]
     assert (hour["mode"], hour["overload"]) == (signal["mode"], signal["overload"]) == (mode, overload)
     assert hour["prediction_kw"] == raw  # stored unrounded
+
+
+def test_predict_reports_soc_as_a_fraction_and_as_a_percentage(api):
+    battery = api.post("/api/predict", data=json.dumps({"rows": sample_rows(3)}), content_type="text/plain").get_json()["battery"]
+    for b in battery:
+        assert 0 <= b["soc_end"] <= 1 and b["soc_pct"] == round(b["soc_end"] * 100, 2)

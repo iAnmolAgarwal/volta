@@ -178,6 +178,19 @@ Runs from Stratus and runs from the Data Store are merged, newest first, each li
 
 `GET /api/runs/r20261027013000-1a2b3c?window_start=2015-06-23 12:00` returns the same keys as `/api/forecast`: `run`, `cleaning`, `summary`, `window`, `hours`, `switch_events`, `overload_alerts`. They are rebuilt from the stored hours. Ids starting with `r` are read from Stratus. All-digit ids are the older Data Store runs, read from `runs` and `run_hours`. An unknown or malformed id is a `404`.
 
+## POST /api/predict
+
+`predict.py`'s contract: `{"rows": [{timestamp, ambient_temp_c, humidity_pct, solar_irradiance_wm2}, ...]}` answers,
+in input order:
+
+- `predictions`: one kW value per row, from QuickML, unrounded;
+- `signals`: per row, `{timestamp, mode, overload}`, decided on the raw prediction exactly as `/api/forecast` decides;
+- `battery`: per row, `{timestamp, mode, demand_kw, pv_kw, battery_kw, grid_kw, soc_start, soc_end, soc_pct}`.
+
+**Units:** `soc_start` and `soc_end` are fractions from 0 to 1, kept for compatibility. `soc_pct` is the same end
+state as a percentage, matching `soc_pct` in runs. It saves nothing, and it is never blocked by the
+[QuickML quota](#quickml-quota) reserve.
+
 ## Persistence
 
 Runs are stored in a hybrid way, because of the Catalyst free tier.

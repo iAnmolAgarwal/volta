@@ -229,5 +229,7 @@ class Forecaster:
         return {
             "predictions": preds.tolist(),
             "signals": [{"timestamp": t, **d} for t, d in zip(originals, decisions)],
-            "battery": [{"timestamp": t, **asdict(s)} for t, s in zip(originals, steps)],
+            # soc_start/soc_end are 0-1 fractions (kept for compatibility); soc_pct is the same end state in %,
+            # as runs report it
+            "battery": [{"timestamp": t, **asdict(s), "soc_pct": round(s.soc_end * 100, 2)} for t, s in zip(originals, steps)],
         }

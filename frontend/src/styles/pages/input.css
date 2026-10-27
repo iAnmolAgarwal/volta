@@ -416,6 +416,10 @@
 /* beside the quick cards the busy and error cards take the column's full width */
 .vi-result--quick .vi-result-grid > .vi-busy,
 .vi-result--quick .vi-result-grid > .vi-error { grid-column: 1 / -1; }
+/* a refused post: the server's own reason ("Missing required column(s): timestamp")
+   is the card's line, in full ink; the status code trails it, kept on one line */
+.vi-error .va-state-body { color: var(--ink); font-weight: var(--w-regular); }
+.vi-error .va-state-code { white-space: nowrap; }
 
 /* busy: the steps advance; the current one wears the volt dot */
 .vi-steps { display: flex; flex-wrap: wrap; gap: calc(8 * var(--u)) calc(22 * var(--u)); margin: 0; padding: 0; list-style: none; font-size: var(--a-small); color: var(--ink-faint); }

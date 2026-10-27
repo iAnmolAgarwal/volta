@@ -74,8 +74,9 @@ const iso = (ms: number) => {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 };
 
-/** "15:00 · 16 Jun" for a readable timestamp, or null. */
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "15:00 · 16 Jun" for a readable timestamp, or null. */
 export function shortStamp(raw: string): string | null {
   const t = readTimestamp(raw);
   return t ? `${pad(t.h)}:${pad(t.mi)} · ${t.d} ${MONTHS[t.m - 1]}` : null;

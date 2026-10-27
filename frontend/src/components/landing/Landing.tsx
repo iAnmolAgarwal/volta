@@ -181,6 +181,7 @@ export function Landing() {
     }, STEP_MS);
   }, []);
   useEffect(() => () => {
+    run.current++; // a play() still awaiting its forecast sees a newer run and stops
     clearInterval(timer.current);
     after.current.forEach(clearTimeout);
   }, []);

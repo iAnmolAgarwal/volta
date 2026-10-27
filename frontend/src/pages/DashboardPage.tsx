@@ -12,7 +12,7 @@ import "@/styles/pages/dashboard.css";
 
 /* /dashboard, /dashboard?run=<id> and /dashboard?unsaved=1.
  *
- * - ?run=<id>, else the viewer's last run: read from the Data Store.
+ * - ?run=<id>, else the viewer's last run: read through GET /api/runs/{id} (Stratus, or the Data Store for older runs).
  * - ?unsaved=1: a complete forecast the store did not keep (its quota spent,
  *   say), handed over in sessionStorage (dashboard/unsaved.ts). Shown as is.
  * - Neither: an empty state; "Use sample data" forecasts the sample once and
@@ -80,7 +80,7 @@ export default function DashboardPage() {
         navigate(UNSAVED_URL, { replace: true });
       } else {
         setLastRunId(run.run.id);
-        navigate(`/dashboard?run=${run.run.id}`, { replace: true });
+        navigate(`/dashboard?run=${encodeURIComponent(run.run.id)}`, { replace: true });
       }
     } catch (error) {
       setStarting({ error });

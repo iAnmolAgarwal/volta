@@ -6,8 +6,9 @@
  * force-parses them), there are no custom headers, and CSV uploads stay
  * multipart FormData (the browser sets that boundary header itself).
  *
- * Every failure is thrown as an ApiError with a `kind`, the HTTP status and the
- * backend's `{error, details}`, so a screen can say exactly what went wrong.
+ * Every HTTP or network failure is thrown as an ApiError with a `kind`, the HTTP
+ * status and the backend's `{error, details}`, so a screen can say exactly what
+ * went wrong. A caller's own abort surfaces as the browser's AbortError.
  */
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";

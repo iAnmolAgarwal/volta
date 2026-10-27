@@ -2,7 +2,6 @@ import { Suspense, useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
 import { Dock, type DockId } from "@/components/landing/Dock";
 import { WORDMARK } from "@/lib/brand";
-import { getLastRunId } from "@/lib/api";
 import { Shimmer } from "./States";
 import "@/styles/landing.css"; // the dock's own rules (already in the entry bundle; listed so the dependency is explicit)
 import "@/styles/app.css";
@@ -18,11 +17,10 @@ const ACTIVE: Record<string, DockId> = {
   "/history": "history",
 };
 
-// Controller opens the run in context: the dashboard's own ?run= / ?unsaved=1, else the viewer's last run
+// Controller opens the run in context: the dashboard's own ?run= / ?unsaved=1, else plain /dashboard,
+// which opens the viewer's last run itself (read when clicked, so a run made on this page counts)
 function controllerHref(pathname: string, search: string): string {
-  if (pathname === "/dashboard" && /[?&](run|unsaved)=/.test(search)) return `/dashboard${search}`;
-  const last = getLastRunId();
-  return last ? `/dashboard?run=${encodeURIComponent(last)}` : "/dashboard";
+  return pathname === "/dashboard" && /[?&](run|unsaved)=/.test(search) ? `/dashboard${search}` : "/dashboard";
 }
 
 export default function AppLayout() {

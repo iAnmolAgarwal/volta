@@ -12,6 +12,8 @@ export const BURST_MS = 360;
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+let pending = 0; // the one delayed navigation in flight; a newer click replaces it
+
 export function useRouteLink() {
   const navigate = useNavigate();
   return useCallback(
@@ -20,7 +22,8 @@ export function useRouteLink() {
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
         const wait = delayMs > 0 && e.detail > 0 && !reduced() ? delayMs : 0;
-        if (wait) window.setTimeout(() => navigate(to), wait);
+        window.clearTimeout(pending);
+        if (wait) pending = window.setTimeout(() => navigate(to), wait);
         else navigate(to);
       },
     [navigate],

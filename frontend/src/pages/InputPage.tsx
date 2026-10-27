@@ -107,6 +107,7 @@ export default function InputPage() {
       setOp({ state: "busy", what, fileName: extra.fileName, title, startedAt: Date.now(), ...route, token, cancel: () => ctrl.abort() });
       go(ctrl.signal, advance)
         .then((run) => {
+          if (ctrl.signal.aborted) return setOp({ state: "idle" }); // cancelled while the body was still arriving
           // a saved run is remembered by id; one that wasn't saved travels in sessionStorage
           const st = storageOf(run);
           if (st.saved && st.id) setLastRunId(st.id);
@@ -143,6 +144,8 @@ export default function InputPage() {
   const sendFile = (file: File) => {
     // the file is read and its size checked inside the post, so the busy card's first step is that read
     send("csv", file.name, `Forecasting ${file.name}`, stepsFor("csv", { fileName: file.name }), async (signal, advance) => {
+      // 2,000 rows of four columns is well under 1 MB; refuse a huge file before reading it into memory
+      if (file.size > 4 * 1024 * 1024) throw new Error(`${file.name} is ${(file.size / 1048576).toFixed(0)} MB. A forecast takes at most ${MAX_ROWS.toLocaleString()} rows; split the file and try again.`);
       let n: number;
       try {
         n = csvRowCount(await file.text());

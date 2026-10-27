@@ -27,9 +27,7 @@ A page's root is `<div className="va-page">`, a centred 1600-unit column with Sy
 | `Pill` | `children`, `icon?`, `tone?: "default" \| "volt" \| "overload"`, `size?: "sm" \| "md"`, `pressed?`, `current?`, `onClick?` (button), `to?` (route link), `disabled?` | `.dock-item`: spaced caps, a glass chip, paper when pressed or current |
 | `ModeBadge` | `mode`, `reason?`, `overload?`, `eyebrow?`, `size?: "md" \| "lg"`, `live?` (aria-live) | the dock bar with its mark tile. Storage is a battery icon in `--mode-storage`; Main Grid is a pole icon in `--mode-grid`. Overload is card 2's flag |
 | `RingGauge` | `socPct`, `batteryKw` (> 0 discharging, < 0 charging), `pvKw`, `capacityKwh?` (800), `label?` | the `.stat .mark` dotted ring, grown, with a lime arc, the 10% reserve tick, and two side stats under it (battery state, solar) |
-| `AlertBanner` | `alerts` (`OverloadAlert[]`), `onSelect?(index)`, `activeIndex?`, `onDismiss?`, `dismissible?`, `scope?`, `delay?` | a full-width dock-glass pill in `--overload`, entering like the cards. Its chips are `Pill`s. It renders nothing with no alerts. Re-key it (`key={windowStart}`) to undo a dismiss |
 | `LogItem` | `label` (caps), `title`, `kind?: "switch" \| "overload" \| "info"`, `meta?`, `icon?`, `active?`, `onClick?` \| `to?` | the Field Note (small label, then a headline); `active` wears the paper |
-| `MainChart` | `hours` (`RunHour[]`), `start?` (run index the range starts at), `range?` \| `defaultRange?` (`"24h" \| "72h" \| "7d" \| "all"`), `onRangeChange?`, `focusIndex?`, `onFocusHour?(index \| null)`, `label?`, `title?`, `description?`, `delay?` | the shadcn Area Chart - Interactive structure, in Screen 1's look: the moss plate with its scan and draw-in, a stacked grid + battery discharge + solar, the demand line with overload dots, 160/200 reference lines, the 18–22 band, a glass tooltip (hour, kW, mode, `reason`), the range as a small dock, and a legend |
 | `DropZone` | `onFile(file)`, `onReject?(file, why)`, `accept?` (CSV), `title?`, `hint?`, `fileName?`, `busy?`, `busyText?`, `disabled?` | a dashed `--r-portal` plate with a dotted ring mark; lime when a file is dragged over it. Click anywhere to browse |
 | `Field` | `label`, `hint?`, `error?`, `suffix?`, plus every `<input>` prop | the dock's glass, 46 tall, `--r-dock`. The label is in spaced caps; an error is in `--overload` with an icon and `aria-invalid` |
 | `Shimmer` | `variant?: "overlay" \| "card" \| "chart" \| "text"`, `lines?`, `label?` | the landing's `.vl-shimmer` sheen |
@@ -38,7 +36,8 @@ A page's root is `<div className="va-page">`, a centred 1600-unit column with Sy
 
 ## Rules
 
-- **The focused hour.** `MainChart` reports hover through `onFocusHour` (null on leave) and draws `focusIndex`. The page keeps `hovered ?? stepperHour` and passes it to `ModeBadge` (with that hour's `reason`), `RingGauge`, the `LogItem` `active` flags, and `AlertBanner` `activeIndex`.
+- **The focused hour.** The page keeps one focused hour (the chart's hover or tap, else the stepper's hour) and passes it to `ModeBadge` (with that hour's `reason`), `RingGauge` and the `LogItem` `active` flags.
+- **Removed 2026-10-27:** the shared `MainChart` and `AlertBanner`. The Dashboard needed a charging series and grouped overload stretches that they couldn't take, so it has its own `pages/dashboard/LoadChart.tsx` and `OverloadBanner.tsx`, built from the same styles (`.va-chart*` in app.css).
 - **Entrances.** A `delay` prop staggers the mask wipe, in Sylva's ~100 ms steps after the header (380, 460, 560 …). Reduced motion turns every entrance and animation off.
 - **Colour is never the only signal.** Mode and overload always come with an icon and a word; keep it that way in your pages.
 - **CORS.** JSON POSTs (`forecastRows`, `predict`) go out as `text/plain;charset=UTF-8`. They will 400 until the backend force-parses JSON (planned with the Slate deploy). CSV and sample uploads (multipart) and every GET already work.

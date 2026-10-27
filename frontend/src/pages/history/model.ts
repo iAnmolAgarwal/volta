@@ -60,7 +60,7 @@ const instant = (iso: string) => {
   return Number.isFinite(t) ? t : 0;
 };
 
-/** "27 Oct, 03:10" in the viewer's time zone. */
+/** "27 Oct · 03:10" in the viewer's time zone. */
 export function createdShort(iso: string): string {
   const t = instant(iso);
   return t ? CREATED.format(t).replace(",", " ·") : iso;

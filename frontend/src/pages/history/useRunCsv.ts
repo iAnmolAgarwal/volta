@@ -57,6 +57,7 @@ export function useRunCsv(id: string) {
     setStatus({ state: "busy" });
     try {
       const run = await getRun(id, { signal: ctrl.signal });
+      if (ctrl.signal.aborted) return; // the body can finish after an abort (left the page, or cancelled)
       hours.current = run.hours;
       handOver(run.hours);
     } catch (e) {

@@ -90,7 +90,9 @@ export function Dashboard({ run }: { run: Run }) {
   );
 
   const step = (dir: -1 | 1) => {
-    const next = Math.max(0, Math.min(windowStart + dir * WINDOW, n - WINDOW));
+    // stay on the run's 24-hour grid: stepping back from the last (clamped) window must land on an
+    // aligned one, or the windows drift off the grid and "Window N of M" skips a number
+    const next = dir < 0 ? windowFor(windowStart - 1, n) : windowFor(windowStart + WINDOW, n);
     // keep the same hour of the window, so stepping compares like with like
     const offset = selected - windowStart;
     setWindowStart(next);

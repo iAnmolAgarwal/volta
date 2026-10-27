@@ -1,7 +1,7 @@
-import { useEffect, useId, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref, type TouchEvent } from "react";
 import { clsx } from "clsx";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts";
-import { BatteryCharging, TriangleAlert, UtilityPole } from "lucide-react";
+import { BatteryCharging, BatteryMedium, TriangleAlert, UtilityPole } from "lucide-react";
 import { GlassCard } from "@/components/app/GlassCard";
 import { NARROW, useMedia } from "@/components/landing/useMedia";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
@@ -96,6 +96,11 @@ const RIGHT = { wide: 10 + 78 + PLATE_PAD, narrow: 6 + 24 + PLATE_PAD };
 /** Over the plot: on the wide layout the range select sits on the plate's top right
  * (36 px tall, 12 px in), so the plot starts 12 px under it; on a phone it sits under the plate. */
 const TOP = { wide: PLATE_PAD + 36 + PLATE_PAD, narrow: 26 };
+/** On a phone or a touch screen the tooltip gives way to the readout: a glass chip in its
+ * own row over the plot's top-left (under the range row on the wide layout), so the line
+ * never runs under it; its first-paint height before it is measured, and the gap under it. */
+const READOUT = { estimate: 52, gap: 8 };
+const COARSE = "(pointer: coarse)";
 
 const config = {
   grid: { label: "Grid", color: "var(--vd-grid)" },
@@ -223,6 +228,31 @@ function HourTip({ active, payload, compact }: { active?: boolean; payload?: { p
   );
 }
 
+/** The focused hour, read inside the plate on a phone: the time, the predicted load and
+ * the overload flag, then the mode and the battery's charge. The tooltip's vocabulary
+ * (va-tip), sized to a chip. It is the page's one focused hour, so it follows a tap, a
+ * drag, the stepper and the keyboard alike; the slider's aria-valuetext already speaks it. */
+function HourReadout({ hour, style, boxRef }: { hour: RunHour; style: CSSProperties; boxRef: Ref<HTMLDivElement> }) {
+  const storage = isStorage(hour.mode);
+  const ModeIcon = storage ? BatteryCharging : UtilityPole;
+  return (
+    <div className="va-tip vd-readout" style={style} ref={boxRef} aria-hidden="true">
+      <div className="vd-readout-line">
+        <span className="va-tip-time"><b>{hhmm(hour.timestamp)}</b> {dayMonth(hour.timestamp)}</span>
+        <span className="vd-readout-kw"><span className="va-num">{hour.prediction_kw.toFixed(1)}</span> kW</span>
+        {hour.overload && <span className="va-flag"><i aria-hidden="true" />Overload</span>}
+      </div>
+      <div className="vd-readout-line">
+        <span className={clsx("va-tip-mode", storage ? "is-storage" : "is-grid")}>
+          <ModeIcon strokeWidth={1.5} aria-hidden />
+          {shortMode(hour.mode)}
+        </span>
+        <span className="vd-readout-soc"><BatteryMedium strokeWidth={1.5} aria-hidden /><span className="va-num">{Math.round(hour.soc_pct)}%</span> charge</span>
+      </div>
+    </div>
+  );
+}
+
 function DayTip({ active, payload, compact }: { active?: boolean; payload?: { payload?: DayRow }[]; compact?: boolean }) {
   const r = payload?.[0]?.payload;
   if (!active || !r) return null;
@@ -292,6 +322,20 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
   const span = RANGES.find((r) => r.id === range)?.hours ?? 24;
   const daily = DAILY.includes(range);
   const narrow = useMedia(NARROW);
+  // a phone, or any touch screen: the readout in the plate stands in for the tooltip
+  const coarse = useMedia(COARSE);
+  const readout = narrow || coarse;
+  const readoutRef = useRef<HTMLDivElement>(null);
+  const [readoutH, setReadoutH] = useState(READOUT.estimate);
+  useLayoutEffect(() => {
+    const el = readoutRef.current;
+    if (!readout || !el) return;
+    const ro = new ResizeObserver(() => setReadoutH(Math.ceil(el.getBoundingClientRect().height)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [readout]);
+  const readoutTop = narrow ? PLATE_PAD : TOP.wide;
+  const plotTop = readout ? readoutTop + readoutH + READOUT.gap : narrow ? TOP.narrow : TOP.wide;
   // the tooltip shows only while a pointer is on the plate; a scroll under a still
   // pointer hides it (and drops the hover), so it never lingers at a stale hour
   const [live, setLive] = useState(false);
@@ -385,11 +429,6 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
     if (daily) return days[Number(k)]?.peakIndex;
     return rows[Number(k)]?.i;
   };
-  const pick = (s: { activeTooltipIndex?: unknown } | null | undefined) => {
-    setLive(true);
-    const i = hourAt(s?.activeTooltipIndex);
-    if (i != null) onPick(i);
-  };
 
   /* The keyboard: the plot is one slider over the page's focused hour (Recharts'
    * own keyboard layer is off, so there is never a second cursor). Arrows step an
@@ -418,6 +457,12 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
     if (width <= 0 || clientX < left - 1 || clientX > left + width + 1) return undefined;
     const x = Math.round(xFirst + ((clientX - left) / width) * (xLast - xFirst));
     return daily ? days.find((d) => d.d === x)?.peakIndex : rows.find((r) => r.i === x)?.i;
+  };
+
+  const onTouch = (e: TouchEvent<HTMLDivElement>) => {
+    const t = e.touches[0];
+    const i = t ? hourAtX(t.clientX, e.currentTarget.querySelector(".recharts-surface")) : undefined;
+    if (i != null) onPick(i);
   };
 
   const rangeControl = (
@@ -449,13 +494,17 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
             const i = hourAtX(e.clientX, e.currentTarget.querySelector(".recharts-surface"));
             if (i != null) onPick(i);
           }}
+          // a touch, and a sideways drag, pin the hour under the finger, read the same way
+          // (the plate takes horizontal pans, touch-action: pan-y; a vertical one still scrolls)
+          onTouchStart={onTouch}
+          onTouchMove={onTouch}
         >
         <div className="va-plate-media" key={range}>
           <span className="va-axis-unit" aria-hidden="true">kW</span>
           <ChartContainer config={config} className="va-chart aspect-auto h-full w-full" initialDimension={{ width: 900, height: 340 }}>
             <ComposedChart
               data={(daily ? days : rows) as (Row | DayRow)[]}
-              margin={{ top: narrow ? TOP.narrow : TOP.wide, right: narrow ? RIGHT.narrow : RIGHT.wide, bottom: 4, left: PLATE_PAD }}
+              margin={{ top: plotTop, right: narrow ? RIGHT.narrow : RIGHT.wide, bottom: 4, left: PLATE_PAD }}
               accessibilityLayer={false}
               onMouseMove={(s) => {
                 setLive(true);
@@ -466,8 +515,6 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                 setLive(false);
                 onFocusHour(null);
               }}
-              onTouchStart={pick}
-              onTouchMove={pick}
             >
               <defs>
                 {SERIES.map((s) => (
@@ -504,7 +551,7 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
               <ReferenceLine y={STORAGE_ABOVE_KW} stroke="var(--chart-ref-line)" strokeDasharray="2 4" label={narrow ? STORAGE_LABEL.Narrow : STORAGE_LABEL.Wide} />
               <ReferenceLine y={OVERLOAD_AT_KW} stroke="var(--overload-soft)" strokeDasharray="2 4" label={narrow ? OVERLOAD_LABEL.Narrow : OVERLOAD_LABEL.Wide} />
               <ChartTooltip
-                active={live ? undefined : false}
+                active={live && !readout ? undefined : false}
                 cursor={false}
                 content={daily ? <DayTip compact={narrow} /> : <HourTip compact={narrow} />}
                 wrapperStyle={{ outline: "none" }}
@@ -593,8 +640,13 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
             </ComposedChart>
           </ChartContainer>
         </div>
+        {/* a touch's events stay with the node it began on; Recharts redraws its marks as the
+            hour moves, which would strand a drag on a detached node, so in readout mode a
+            still, clear layer over the plot takes the touches (and the clicks, read by x) */}
+        {readout && <div className="vd-plot-touch" aria-hidden="true" />}
         </div>
         {!narrow && <div className="vd-plate-range">{rangeControl}</div>}
+        {readout && focusHour && <HourReadout hour={focusHour} boxRef={readoutRef} style={{ top: readoutTop, left: PLATE_PAD + Y_AXIS_W }} />}
       </div>
 
       <div className="vd-chart-foot">

@@ -20,6 +20,8 @@
   /* every label on the chart plate keeps this far from the plate's edges
      (the round-2 judge's 12 px; the same floor as --t-min and the tick size) */
   --vd-plate-pad: var(--t-min);
+  /* the y axis's column on the plate (LoadChart's Y_AXIS_W): the readout starts past it */
+  --vd-y-axis: calc(var(--t-min) * 10 / 3);
   /* where the fixed dock ends: Sylva's 38 top + its 46 height */
   --vd-dock-end: calc((38 + 46) * var(--u));
 }
@@ -262,7 +264,8 @@
 .vd-chart { --chart-h: calc(429 * var(--u)); display: flex; flex-direction: column; padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(26 * var(--u)); }
 .vd-chart .va-chart-plate { margin: 0; flex: none; }
 /* the plot is one slider over the focused hour (arrow keys); its ring is drawn round the plate */
-.vd-plot { position: absolute; inset: 0; border-radius: inherit; }
+.vd-plot { position: absolute; inset: 0; border-radius: inherit; touch-action: pan-y; }
+.vd-plot-touch { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
 .vd-plot:focus-visible { outline: none; }
 /* a tap can focus Recharts' own wrapper/svg layers, which then draw the browser outline; the plate's ring is the only focus mark */
 .vd-plot :focus, .vd-plot :focus-visible { outline: none; }
@@ -508,6 +511,9 @@
   .vd-chart .va-chart-plate { margin: 0; }
   .vd-chart-foot { grid-template-columns: minmax(0, 1fr); padding: calc(26 * var(--u)) calc(16 * var(--u)) 0; gap: calc(20 * var(--u)); }
   .vd-chart-range .va-range { width: 100%; }
+  /* the readout's row over the plot (its chip, about 3.75 lines of the 12 px floor, less the
+     26 the plot's top margin had): the plate grows by it, so the plot keeps its height */
+  .vd-chart:has(.vd-readout) { --chart-h: calc(max(274px, calc(600 * var(--u) + 14px)) + 3.75 * var(--t-min)); }
   .vd-tip.is-compact { width: auto; min-width: calc(330 * var(--u)); gap: max(4px, calc(8 * var(--u))); }
   .vd-legend-band { width: max(12px, calc(22 * var(--u))); height: max(10px, calc(16 * var(--u))); }
   .vd-legend-dot { width: max(8px, calc(14 * var(--u))); height: max(8px, calc(14 * var(--u))); }
@@ -535,4 +541,30 @@
   .vd-skel-stepper { grid-column: 1; width: 100%; height: max(150px, calc(230 * var(--u))); border-radius: max(16px, calc(26 * var(--u))); }
   .vd-skel-alert .va-shimmer-line:first-child { height: calc(150 * var(--u)); border-radius: calc(40 * var(--u)); }
   .vd-skel-focus { min-height: calc(900 * var(--u)); }
+}
+
+/* the phone's readout (LoadChart's HourReadout): the tooltip's glass, sized to a chip in
+   its own row over the plot's top-left, so the line never runs under it; taps pass through */
+.vd-readout {
+  position: absolute;
+  z-index: 2;
+  width: auto;
+  max-width: calc(100% - 2 * var(--vd-plate-pad) - var(--vd-y-axis));
+  gap: max(4px, calc(6 * var(--u)));
+  padding: max(7px, calc(10 * var(--u))) max(10px, calc(14 * var(--u)));
+  border-radius: max(12px, calc(18 * var(--u)));
+  font-size: var(--t-min);
+  line-height: 1.25;
+  pointer-events: none;
+}
+.vd-readout-line { display: flex; flex-wrap: wrap; align-items: center; gap: max(4px, calc(6 * var(--u))) max(10px, calc(14 * var(--u))); white-space: nowrap; }
+.vd-readout-kw { color: var(--ink); font-weight: var(--w-medium); font-variant-numeric: tabular-nums; }
+.vd-readout-soc { display: inline-flex; align-items: center; gap: max(4px, calc(6 * var(--u))); color: var(--ink-soft); }
+.vd-readout-soc .va-num { color: var(--ink); font-weight: var(--w-medium); }
+.vd-readout .va-tip-mode svg,
+.vd-readout-soc svg { width: max(14px, calc(18 * var(--u))); height: max(14px, calc(18 * var(--u))); flex: none; }
+.vd-readout .va-flag { margin-left: auto; }
+/* on a touch screen over 900 the plate is wide enough: the readout's two lines run as one row */
+@media (min-width: 901px) {
+  .vd-readout { grid-auto-flow: column; align-items: center; column-gap: calc(18 * var(--u)); }
 }

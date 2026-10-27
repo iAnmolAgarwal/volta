@@ -30,7 +30,7 @@ class Window:
 
 
 def build_hours(clean: pd.DataFrame, preds, decisions: list[dict], steps: list[BatteryStep]) -> list[dict]:
-    """One dict per hour. `preds` are the rounded predictions the decisions were made on."""
+    """One dict per hour. `preds` are the raw predictions the decisions were made on."""
     hours = []
     for i, (row, pred, d, s) in enumerate(zip(clean.itertuples(index=False), preds, decisions, steps)):
         ts = pd.Timestamp(row.timestamp)

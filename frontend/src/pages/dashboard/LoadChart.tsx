@@ -20,12 +20,16 @@ import { chargeSource, supplyOf } from "./supply";
  * discharge (--flow-battery, pale green, a thin solid edge) and the solar
  * serving the load (--flow-solar, Sylva's warm light, a dotted edge) sum to the predicted
  * demand every hour, so the white demand line rides on the stack's top; the
- * battery's charging is drawn below the axis. 7 days and All are daily: an
+ * battery's charging is drawn below the axis. The demand line is the chart's
+ * one bold mark (thick, full ink, a soft glow); the stack recedes behind it in
+ * light washes with hairline edges, and the charging below 0 is lighter still. 7 days and All are daily: an
  * envelope from each day's lowest to highest hour, the daily mean as the line,
  * and a red marker on each day with overload hours, sized by how many.
  *
- * The 160 and 200 kW lines are labelled past the plot's right end, in spaced
- * caps; a faint band marks each 18–22 evening window (hourly ranges).
+ * The 160 and 200 kW lines are drawn as clear dashes and labelled past the
+ * plot's right end, in spaced caps, inside the plate's padding; a faint band
+ * marks each 18–22 evening window (hourly ranges). The lowest y tick is dropped
+ * when it would sit on the plot's bottom edge, beside the mode track's label.
  * Under the plot runs the mode track (ModeTrack.tsx): Main Grid against
  * Renewable Storage on the chart's own x scale, per hour or per day, with the
  * overload hours dotted; the axis ticks sit under it.
@@ -77,22 +81,27 @@ interface DayRow {
 }
 
 /* the three supply flows, each on its own flow token (dashboard.css: --vd-grid,
- * --vd-battery, --vd-solar), told apart by fill weight and edge: the grid a
- * solid lime edge over a deep gradient, the battery a thin solid edge over a
- * lighter fill, the solar a dotted edge over the faintest wash */
+ * --vd-battery, --vd-solar), told apart by fill weight and edge, and all kept
+ * behind the demand line: the grid a hairline lime edge over the deepest wash,
+ * the battery a hairline solid edge over a lighter one, the solar a dotted
+ * edge over the faintest */
 const SERIES = [
-  { key: "grid" as const, color: "var(--vd-grid)", name: "Grid to load", top: 0.42, bottom: 0.05, width: 1.5, dash: undefined, edge: 1 },
-  { key: "battery" as const, color: "var(--vd-battery)", name: "Battery discharge", top: 0.42, bottom: 0.14, width: 1.1, dash: undefined, edge: 0.8 },
-  { key: "pv" as const, color: "var(--vd-solar)", name: "Solar to load", top: 0.26, bottom: 0.06, width: 1.4, dash: "1.5 2.5", edge: 1 },
+  { key: "grid" as const, color: "var(--vd-grid)", name: "Grid to load", top: 0.22, bottom: 0.03, width: 1, dash: undefined, edge: 0.7 },
+  { key: "battery" as const, color: "var(--vd-battery)", name: "Battery discharge", top: 0.2, bottom: 0.07, width: 0.9, dash: undefined, edge: 0.65 },
+  { key: "pv" as const, color: "var(--vd-solar)", name: "Solar to load", top: 0.14, bottom: 0.03, width: 1, dash: "1.5 2.5", edge: 0.75 },
 ];
+/** The predicted demand: the chart's one bold line (its glow is in dashboard.css, .vd-demand). */
+const DEMAND = { width: 2.75, dot: 4.5, overloadDot: 3.4 };
+/** The 160 and 200 kW lines: dashes long enough to read as a rule, not as the grid. */
+const REF_DASH = "6 5";
 
 /* the plot's margins: every label on the plate keeps 12 px from the plate's edges
  * (the y ticks on the left, the 160 / 200 labels on the right) */
 const PLATE_PAD = 12;
 const Y_AXIS_W = 40;
 /** Past the plot's right end: the label's 10 px offset, its width ("OVERLOAD" in
- * spaced caps, 78 px wide; "200" alone on a phone, 24 px) and the plate padding. */
-const RIGHT = { wide: 10 + 78 + PLATE_PAD, narrow: 6 + 24 + PLATE_PAD };
+ * spaced caps, 78 px wide; "200" alone on a phone, semibold, 26 px) and the plate padding. */
+const RIGHT = { wide: 10 + 78 + PLATE_PAD, narrow: 6 + 26 + PLATE_PAD };
 /** Over the plot: on the wide layout the range select sits on the plate's top right
  * (36 px tall, 12 px in), so the plot starts 12 px under it; on a phone it sits under the plate. */
 const TOP = { wide: PLATE_PAD + 36 + PLATE_PAD, narrow: 26 };
@@ -397,7 +406,9 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
   const yMin = low < 0 ? -Math.ceil(-low / 50) * 50 : 0;
   const yStep = yMax - yMin > 320 ? 100 : 50;
   const yTicks: number[] = [];
-  for (let v = Math.ceil(yMin / yStep) * yStep; v <= yMax - yStep * 0.5; v += yStep) yTicks.push(v);
+  // the top tick keeps half a step under the kW unit; the bottom one leaves the plot's bottom
+  // edge to the mode track's "MODE", level with it underneath, by at least 0.4 of a step
+  for (let v = Math.ceil((yMin + yStep * 0.4) / yStep) * yStep; v <= yMax - yStep * 0.5; v += yStep) yTicks.push(v);
 
   const focusRow = focusIndex != null ? rows.find((r) => r.i === focusIndex) : undefined;
   const focusX = focusRow ? (daily ? dayOf.get(focusRow.i) : focusRow.i) : undefined;
@@ -524,8 +535,8 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                   </linearGradient>
                 ))}
                 <linearGradient id={`charging${uid}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" style={{ stopColor: "var(--vd-battery)", stopOpacity: 0.34 }} />
-                  <stop offset="100%" style={{ stopColor: "var(--vd-battery)", stopOpacity: 0.04 }} />
+                  <stop offset="0%" style={{ stopColor: "var(--vd-battery)", stopOpacity: 0.16 }} />
+                  <stop offset="100%" style={{ stopColor: "var(--vd-battery)", stopOpacity: 0.02 }} />
                 </linearGradient>
                 <linearGradient id={`band${uid}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" style={{ stopColor: "var(--vd-grid)", stopOpacity: 0.34 }} />
@@ -548,8 +559,8 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                 />
               ))}
               {yMin < 0 && <ReferenceLine y={0} stroke="var(--glass-edge)" />}
-              <ReferenceLine y={STORAGE_ABOVE_KW} stroke="var(--chart-ref-line)" strokeDasharray="2 4" label={narrow ? STORAGE_LABEL.Narrow : STORAGE_LABEL.Wide} />
-              <ReferenceLine y={OVERLOAD_AT_KW} stroke="var(--overload-soft)" strokeDasharray="2 4" label={narrow ? OVERLOAD_LABEL.Narrow : OVERLOAD_LABEL.Wide} />
+              <ReferenceLine y={STORAGE_ABOVE_KW} stroke="var(--vd-ref-storage)" strokeWidth={1.25} strokeDasharray={REF_DASH} label={narrow ? STORAGE_LABEL.Narrow : STORAGE_LABEL.Wide} />
+              <ReferenceLine y={OVERLOAD_AT_KW} stroke="var(--vd-ref-overload)" strokeWidth={1.25} strokeDasharray={REF_DASH} label={narrow ? OVERLOAD_LABEL.Narrow : OVERLOAD_LABEL.Wide} />
               <ChartTooltip
                 active={live && !readout ? undefined : false}
                 cursor={false}
@@ -564,12 +575,13 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                     dataKey="mean"
                     type="monotone"
                     stroke="var(--ink)"
-                    strokeOpacity={0.82}
-                    strokeWidth={1.3}
+                    strokeWidth={DEMAND.width}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     isAnimationActive={false}
-                    activeDot={{ r: 3.5, fill: "var(--ink)", stroke: "var(--bg-deep)", strokeWidth: 1.5 }}
+                    activeDot={{ r: DEMAND.dot, fill: "var(--ink)", stroke: "var(--bg-deep)", strokeWidth: 1.5 }}
                     dot={false}
-                    className="va-demand"
+                    className="va-demand vd-demand"
                   />
                   <Line
                     dataKey="max"
@@ -609,8 +621,8 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                     stackId="charge"
                     type="monotone"
                     stroke="var(--vd-battery)"
-                    strokeOpacity={0.9}
-                    strokeWidth={1.1}
+                    strokeOpacity={0.45}
+                    strokeWidth={0.9}
                     strokeDasharray="3 3"
                     fill={`url(#charging${uid})`}
                     isAnimationActive={false}
@@ -621,14 +633,15 @@ export function LoadChart({ hours, start, focusIndex, onFocusHour, onPick, delay
                     dataKey="demand"
                     type="monotone"
                     stroke="var(--ink)"
-                    strokeOpacity={0.8}
-                    strokeWidth={1.2}
+                    strokeWidth={DEMAND.width}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     isAnimationActive={false}
-                    activeDot={{ r: 3.5, fill: "var(--ink)", stroke: "var(--bg-deep)", strokeWidth: 1.5 }}
+                    activeDot={{ r: DEMAND.dot, fill: "var(--ink)", stroke: "var(--bg-deep)", strokeWidth: 1.5 }}
                     dot={(p: DotProps) =>
-                      p.payload?.overload && n <= 72 ? <circle key={`o${p.index}`} cx={p.cx} cy={p.cy} r={2.4} className="va-overload-dot" /> : <g key={`o${p.index}`} />
+                      p.payload?.overload && n <= 72 ? <circle key={`o${p.index}`} cx={p.cx} cy={p.cy} r={DEMAND.overloadDot} className="va-overload-dot" /> : <g key={`o${p.index}`} />
                     }
-                    className="va-demand"
+                    className="va-demand vd-demand"
                   />
                 </>
               )}

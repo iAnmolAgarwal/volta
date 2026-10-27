@@ -88,8 +88,9 @@ export function RunCard({ run, last, delay }: { run: SavedRun; last: boolean; de
           {meta}
         </p>
         <span className="vh-run-actions">
-          <span className="vh-saved">
-            <Pill size="sm" icon={store.name === "Stratus" ? CloudCheck : Database}>Saved · {store.name}</Pill>
+          <span className="vh-saved" title={store.detail}>
+            <Pill size="sm" icon={store.name === "Stratus" ? CloudCheck : Database}>{store.label}</Pill>
+            <span className="sr-only">. {store.detail}</span>
           </span>
           <button
             type="button"

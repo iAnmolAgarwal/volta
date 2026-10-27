@@ -4,7 +4,7 @@ import { Database, History, RotateCw, Sparkles, Upload } from "lucide-react";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Pill } from "@/components/app/Pill";
 import { EmptyState, ErrorState, Shimmer } from "@/components/app/States";
-import { forecastSample, getLastRunId, getRun, isApiError, setLastRunId, type Run } from "@/lib/api";
+import { forecastSample, getLastRunId, getRun, isApiError, listRuns, setLastRunId, type Run, type RunListItem } from "@/lib/api";
 import { WORDMARK } from "@/lib/brand";
 import { Dashboard } from "./dashboard/Dashboard";
 import { isUnsaved, keepUnsaved, readUnsaved, UNSAVED_URL } from "./dashboard/unsaved";
@@ -15,12 +15,22 @@ import "@/styles/pages/dashboard.css";
  * - ?run=<id>, else the viewer's last run: read through GET /api/runs/{id} (Stratus, or the Data Store for older runs).
  * - ?unsaved=1: a complete forecast the store did not keep (its quota spent,
  *   say), handed over in sessionStorage (dashboard/unsaved.ts). Shown as is.
- * - Neither: an empty state; "Use sample data" forecasts the sample once and
- *   opens it here, saved or not.
- * A bad id is an ErrorState. While a run loads, a skeleton in the dashboard's
- * own layout holds its place. */
+ * - Neither (a first visit): GET /api/runs, then open the newest saved run
+ *   (a replace to ?run=<id>). Only when the store holds no runs at all, an
+ *   empty state; "Use sample data" forecasts the sample once and opens it
+ *   here, saved or not. A failed listing is an ErrorState with Retry.
+ * A bad id is an ErrorState. While the runs are listed or a run loads, a
+ * skeleton in the dashboard's own layout holds its place. */
 
 type Load = { state: "loading"; for: string } | { state: "error"; for: string; error: unknown } | { state: "ready"; for: string; run: Run };
+type Listing = { state: "loading" } | { state: "error"; error: unknown } | { state: "empty" };
+
+/** The most recently created run, whatever order the list arrives in. */
+function newestOf(runs: RunListItem[]): RunListItem | null {
+  let best: RunListItem | null = null;
+  for (const r of runs) if (!best || Date.parse(r.created) > Date.parse(best.created)) best = r;
+  return best;
+}
 
 export default function DashboardPage() {
   const [params] = useSearchParams();
@@ -29,6 +39,9 @@ export default function DashboardPage() {
   const runId = unsaved ? null : (params.get("run") ?? getLastRunId());
   const [load, setLoad] = useState<Load | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [listAttempt, setListAttempt] = useState(0);
+  const firstVisit = !unsaved && !runId;
   const [starting, setStarting] = useState<{ error?: unknown } | null>(null);
   const [made, setMade] = useState(0); // forecasts made here, so a repeat at the same URL is re-read
   // a forecast just made here: shown as is, without reading it straight back
@@ -60,6 +73,27 @@ export default function DashboardPage() {
     return () => ctrl.abort();
   }, [runId, attempt]);
 
+  // a first visit opens the newest saved run; the empty state is for an empty store only
+  useEffect(() => {
+    if (!firstVisit) return;
+    const ctrl = new AbortController();
+    setListing({ state: "loading" });
+    listRuns({ signal: ctrl.signal })
+      .then((runs) => {
+        const newest = newestOf(runs);
+        if (newest) navigate(`/dashboard?run=${encodeURIComponent(newest.id)}`, { replace: true });
+        else setListing({ state: "empty" });
+      })
+      .catch((error) => {
+        if (ctrl.signal.aborted) return;
+        setListing({ state: "error", error });
+      });
+    return () => {
+      ctrl.abort();
+      setListing(null); // a later first visit starts from the skeleton, not a stale result
+    };
+  }, [firstVisit, listAttempt, navigate]);
+
   // the unsaved hand-off: this visit's copy first, else the tab's sessionStorage
   const unsavedRun = useMemo(() => {
     if (!unsaved) return null;
@@ -88,6 +122,26 @@ export default function DashboardPage() {
   }, [navigate]);
 
   if (unsavedRun) return <Dashboard key={`unsaved:${unsavedRun.run.created}`} run={unsavedRun} />;
+
+  if (firstVisit && listing?.state === "error") {
+    return (
+      <div className="va-page vd">
+        <PageHeader eyebrow="Controller" title="Controller" lede="The dashboard opens the latest saved run, and the list of runs could not be read." />
+        <ErrorState
+          error={listing.error}
+          title="The saved runs could not be listed"
+          action={
+            <>
+              <Pill icon={RotateCw} tone="volt" onClick={() => setListAttempt((a) => a + 1)}>Retry</Pill>
+              <Pill icon={Upload} to="/input">New forecast</Pill>
+            </>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (firstVisit && listing?.state !== "empty") return <DashboardSkeleton listing />;
 
   if (!runId) {
     return (
@@ -132,7 +186,7 @@ export default function DashboardPage() {
               ? "1,000 hours of June and July weather go through the model and the controller. It takes about ten seconds."
               : unsaved
                 ? "An unsaved forecast lives only in the tab that made it. Start a new one from the sample, or upload telemetry."
-                : "The dashboard opens your latest run. Start one from the 1,000-hour sample in about ten seconds."}
+                : "No runs are saved yet. The dashboard opens the newest one; start it from the 1,000-hour sample in about ten seconds."}
           </EmptyState>
         )}
       </div>
@@ -164,11 +218,15 @@ export default function DashboardPage() {
 }
 
 /** The loading state: the landing's sheen, laid out as the dashboard will be. */
-function DashboardSkeleton() {
+function DashboardSkeleton({ listing = false }: { listing?: boolean }) {
   return (
     <div className="va-page vd" aria-busy="true">
       <div className="vd-hero">
-        <PageHeader eyebrow="Loading the run" title="Controller" lede="Reading the saved run and its hours from the Data Store." />
+        <PageHeader
+          eyebrow={listing ? "Finding the latest run" : "Loading the run"}
+          title="Controller"
+          lede={listing ? "Listing the saved runs to open the newest one." : "Reading the saved run and its hours from the Data Store."}
+        />
         <div className="vd-state"><Shimmer variant="text" lines={2} label="Loading the grid state" className="vd-skel-badge" /></div>
         <div className="vd-skel-stepper"><Shimmer variant="overlay" label="Loading the window" /></div>
       </div>

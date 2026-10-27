@@ -7,6 +7,7 @@
  * live in Stratus, all-digit ids are the older Data Store runs. */
 
 import { dayMonth, hhmm, type RunListItem, type RunSource } from "@/lib/api";
+import { STRATUS_LABEL, stratusNote } from "../storageNote";
 
 export interface RunStorage {
   stratus?: boolean;
@@ -115,7 +116,9 @@ export function spanEnds(r: SavedRun): [string, string] {
 
 export interface Store {
   name: "Stratus" | "Data Store";
-  /** The chip's title: where exactly, and why the Data Store row was skipped. */
+  /** The chip's words: "Saved · stored in Stratus", or "Saved · Data Store". */
+  label: string;
+  /** The chip's note, said neutrally: where exactly, and why the Data Store has no row. */
   detail: string;
 }
 
@@ -123,10 +126,9 @@ export function storeOf(r: SavedRun): Store {
   const st = r.storage;
   const stratus = st?.stratus ?? r.id.startsWith("r");
   if (stratus) {
-    const skipped = st?.datastore === false && st.reason ? ` The Data Store row was skipped: ${st.reason}.` : st?.datastore ? " Its metadata row is also in the Data Store." : "";
-    return { name: "Stratus", detail: `Saved in Stratus as runs/${r.id}.json.${skipped}` };
+    return { name: "Stratus", label: STRATUS_LABEL, detail: stratusNote(st, r.created) };
   }
-  return { name: "Data Store", detail: "Saved in the Data Store (runs and run_hours), before runs moved to Stratus on 27 Oct." };
+  return { name: "Data Store", label: "Saved · Data Store", detail: "Saved in the Data Store (runs and run_hours), before runs moved to Stratus on 27 Oct." };
 }
 
 /* ── the header's side stats ─────────────────────────────────────────────── */

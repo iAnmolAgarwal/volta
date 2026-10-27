@@ -158,6 +158,7 @@ export function Dashboard({ run }: { run: Run }) {
               <span className="vd-chips">
                 <span className={stored.saved ? "vd-saved" : "vd-saved is-not"} title={stored.title}>
                   <Pill size="sm" icon={stored.saved ? CloudCheck : CloudOff}>{stored.label}</Pill>
+                  <span className="sr-only">. {stored.title}</span>
                 </span>
                 <Pill
                   size="sm"

@@ -9,6 +9,7 @@
  * is guarded (the page also keeps the response in memory for this visit). */
 
 import type { Run } from "@/lib/api";
+import { STRATUS_LABEL, stratusNote } from "../storageNote";
 
 export const UNSAVED_URL = "/dashboard?unsaved=1";
 const KEY = "volta:lastForecast";
@@ -37,10 +38,12 @@ export function readUnsaved(): Run | null {
 interface Storage { stratus?: boolean; datastore?: boolean; reason?: string | null }
 const storageOf = (run: Run) => (run.run as Run["run"] & { storage?: Storage }).storage;
 
-/** The header's quiet chip: "Saved", or "Not saved: <reason>", with the detail as its title. */
+/** The header's quiet chip: "Saved · stored in Stratus" (its note as the title, neutral),
+ * "Saved", or "Not saved: <reason>", with the detail as its title. */
 export function storageChip(run: Run): { saved: boolean; label: string; title: string } {
   const st = storageOf(run);
   const reasons = [st?.reason, ...(run.run.errors ?? [])].filter((r): r is string => Boolean(r));
+  if (!isUnsaved(run) && st?.stratus) return { saved: true, label: STRATUS_LABEL, title: stratusNote(st, run.run.created) };
   if (!isUnsaved(run)) {
     const where = [st?.stratus && "Stratus", st?.datastore && "the Data Store"].filter(Boolean).join(" and ");
     return { saved: true, label: "Saved", title: [where ? `Saved to ${where}` : "Saved", ...reasons].join(". ") };

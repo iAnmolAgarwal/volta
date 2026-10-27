@@ -59,6 +59,7 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
     def health():
         # catalyst_context: did the gateway add the X-ZC-* headers the SDK authenticates with?
         return jsonify(
+            gateway_timeout=os.environ.get("CATALYST_MAX_TIMEOUT"),  # AppSail's request limit; not a secret
             status="ok",
             version=app_version,
             quickml_configured=quickml_configured(),

@@ -27,7 +27,8 @@ import requests
 
 DEFAULT_PROXY_URL = "https://microgrid-proxy-50047164504.development.catalystappsail.in"  # AppSail (Development); not a secret
 TIMEOUT_S = 120
-ATTEMPTS = 3  # connection errors and 5xx (for example a cold start) are retried
+ATTEMPTS = 5  # connection errors, timeouts and 5xx (a cold start, a QuickML blip) are retried
+BACKOFF_S = [2, 4, 8, 16]  # waits between attempts: about 30 s of patience before failing loudly
 INPUT_COLUMNS = ["timestamp", "ambient_temp_c", "humidity_pct", "solar_irradiance_wm2"]
 
 # Inline copy of the QuickML columns built by model/features.py (a test keeps them
@@ -103,8 +104,11 @@ def _post(url: str, rows: list[dict]) -> dict:
             if resp.status_code < 500:
                 break  # the request itself is wrong; retrying will not help
         if attempt < ATTEMPTS - 1:
-            time.sleep(2**attempt)
-    raise PredictionError(f"POST {url} failed: {problem}")
+            wait = BACKOFF_S[attempt]
+            print(f"predict.py: attempt {attempt + 1} of {ATTEMPTS} failed ({problem[:160]}); retrying in {wait} s",
+                  file=sys.stderr)
+            time.sleep(wait)
+    raise PredictionError(f"POST {url} failed after {attempt + 1} attempt(s): {problem}")
 
 
 def predict(input_df: pd.DataFrame) -> np.ndarray:

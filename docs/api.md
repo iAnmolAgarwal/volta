@@ -11,7 +11,7 @@ The API is public and needs no login. Every response is JSON except `/api/sample
 | `GET` | `/api/runs/{id}` | Returns one saved run, in the same shape as `/api/forecast` |
 | `GET` | `/api/sample` | Downloads the bundled sample CSV (1,000 hours), for "Try sample data" |
 | `POST` | `/api/predict` | `predict.py`'s contract, unchanged: `{"rows": [...]}` → `{"predictions", "signals", "battery"}` |
-| `GET` | `/api/health` | `{"status", "version", "quickml_configured", "catalyst_context"}`. It never shows a secret |
+| `GET` | `/api/health` | `{"status", "version", "quickml_configured", "catalyst_context", "gateway_timeout"}` (AppSail's `CATALYST_MAX_TIMEOUT`). It never shows a secret |
 
 ## POST /api/forecast
 

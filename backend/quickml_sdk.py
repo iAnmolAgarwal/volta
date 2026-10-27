@@ -11,9 +11,43 @@ through the SDK's own authorized requester to the same path, with the org and
 environment headers added; 1,000 rows cost one QuickML call.
 """
 
+import logging
 import os
+import time
 
 from model.quickml_client import PredictionError
+
+log = logging.getLogger("quickml")
+SDK_ATTEMPT_S = 35.0  # the SDK's own 30 s read timeout, plus connection set-up
+DEFAULT_GATEWAY_S = 60.0  # assumed when AppSail doesn't say (CATALYST_MAX_TIMEOUT)
+GATEWAY_MARGIN_S = 10.0  # features, controller, battery and the response, after QuickML answers
+
+
+def gateway_budget_s(env=None) -> float:
+    """Seconds this request may spend on QuickML before the gateway gives up on it.
+
+    AppSail injects CATALYST_MAX_TIMEOUT; values over 1,000 are read as milliseconds."""
+    raw = (env if env is not None else os.environ).get("CATALYST_MAX_TIMEOUT", "")
+    try:
+        value = float(raw)
+    except ValueError:
+        value = DEFAULT_GATEWAY_S
+    seconds = value / 1000 if value > 1000 else value
+    return max(0.0, (seconds if seconds > 0 else DEFAULT_GATEWAY_S) - GATEWAY_MARGIN_S)
+
+
+def once_more_on_network_error(call, network_errors, budget_s: float, attempt_s: float = SDK_ATTEMPT_S, clock=time.monotonic):
+    """call(); after a timeout or connection error, call it once more if a full attempt still fits the budget.
+
+    Predictions are idempotent, so a repeat is safe. Any other error is raised at once."""
+    start = clock()
+    try:
+        return call()
+    except network_errors as e:
+        if clock() - start + attempt_s > budget_s:
+            raise
+        log.warning("QuickML did not answer (%s); trying once more", type(e).__name__)
+        return call()
 
 PROJECT_HEADER = "X-ZC-ProjectId"  # present only on requests routed by Catalyst
 ENVIRONMENT_HEADER = "X-ZC-Environment"
@@ -45,8 +79,8 @@ class SdkTransport:
         from zcatalyst_sdk._constants import CatalystService, CredentialUser, RequestMethod
         from zcatalyst_sdk.exceptions import CatalystError
 
-        try:
-            resp = self.quick_ml._requester.request(
+        def post():
+            return self.quick_ml._requester.request(
                 method=RequestMethod.POST,
                 path="/endpoints/predict",
                 json={"data": payload["data"]},
@@ -54,6 +88,10 @@ class SdkTransport:
                 catalyst_service=CatalystService.QUICK_ML,
                 headers=dict(self.headers),  # the requester adds its own headers to this dict
             )
+
+        try:
+            # a QuickML blip (read timeout, dropped connection) gets one more try while the gateway allows it
+            resp = once_more_on_network_error(post, (requests.ConnectionError, requests.Timeout), gateway_budget_s())
             return resp.response_json
         except CatalystError as e:
             raise PredictionError(f"QuickML SDK call failed: {str(e).replace(self.key, '***')[:500]}") from None

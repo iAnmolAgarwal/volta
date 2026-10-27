@@ -187,7 +187,8 @@ def test_health_without_credentials(api, monkeypatch):
         monkeypatch.delenv(k, raising=False)
     resp = api.get("/api/health")
     assert resp.status_code == 200
-    assert resp.get_json() == {"status": "ok", "version": "dev", "quickml_configured": False, "catalyst_context": False}
+    assert resp.get_json() == {"status": "ok", "version": "dev", "quickml_configured": False, "catalyst_context": False,
+                               "gateway_timeout": None}
     assert api.get("/api/health", headers={"X-ZC-ProjectId": "1"}).get_json()["catalyst_context"] is True
 
 
@@ -346,3 +347,70 @@ def test_sdk_network_errors_become_prediction_errors(sdk):
     sdk.fail = requests.ReadTimeout("HTTPSConnectionPool(host='api.catalyst.zoho.in', port=443): Read timed out.")
     with pytest.raises(PredictionError, match="QuickML did not answer: ReadTimeout"):
         SdkTransport("endpoint-key-SECRET", IN_CATALYST)({"data": [{"cool_24": 1.0}]})
+
+
+# --- the server's one extra QuickML try (backend/quickml_sdk.py) ------------------
+
+class Clock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+def test_a_network_error_gets_one_more_try_when_the_budget_allows():
+    from backend.quickml_sdk import once_more_on_network_error
+    clock, calls = Clock(), []
+
+    def call():
+        calls.append(1)
+        if len(calls) == 1:
+            clock.t += 30  # a read timeout
+            raise TimeoutError("read timed out")
+        return "ok"
+
+    assert once_more_on_network_error(call, (TimeoutError,), budget_s=110, clock=clock) == "ok"
+    assert len(calls) == 2
+
+
+def test_no_second_try_when_it_would_outlast_the_gateway():
+    from backend.quickml_sdk import once_more_on_network_error
+    clock, calls = Clock(), []
+
+    def call():
+        calls.append(1)
+        clock.t += 30
+        raise TimeoutError("read timed out")
+
+    with pytest.raises(TimeoutError):
+        once_more_on_network_error(call, (TimeoutError,), budget_s=50, clock=clock)
+    assert len(calls) == 1
+
+
+def test_two_network_errors_raise_and_other_errors_are_not_retried():
+    from backend.quickml_sdk import once_more_on_network_error
+    calls = []
+
+    def dead():
+        calls.append(1)
+        raise ConnectionError("refused")
+
+    with pytest.raises(ConnectionError):
+        once_more_on_network_error(dead, (ConnectionError,), budget_s=1000, clock=Clock())
+    assert len(calls) == 2
+    calls.clear()
+
+    def refused():  # a QuickML 4xx comes back as an SDK error, not a network error
+        calls.append(1)
+        raise ValueError("ORGID_HEADER_UNAVAILABLE")
+
+    with pytest.raises(ValueError):
+        once_more_on_network_error(refused, (ConnectionError,), budget_s=1000, clock=Clock())
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("raw, budget", [("", 50.0), ("120", 110.0), ("300000", 290.0), ("junk", 50.0), ("0", 50.0)])
+def test_gateway_budget_reads_seconds_or_milliseconds(raw, budget):
+    from backend.quickml_sdk import gateway_budget_s
+    assert gateway_budget_s({"CATALYST_MAX_TIMEOUT": raw}) == budget

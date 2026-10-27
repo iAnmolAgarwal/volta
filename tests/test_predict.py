@@ -91,11 +91,48 @@ def test_missing_weather_goes_out_as_null(monkeypatch, no_endpoint_env):
                                       "humidity_pct": None, "solar_irradiance_wm2": 12.0}]}
 
 
-def test_server_errors_are_retried_then_raise(use_proxy, no_sleep):
+def test_server_errors_are_retried_then_raise(use_proxy, no_sleep, capsys):
     use_proxy.status = 502
-    with pytest.raises(predict.PredictionError, match="HTTP 502"):
+    with pytest.raises(predict.PredictionError, match="failed after 5 attempt.*HTTP 502"):
         predict.predict(load_test())
-    assert len(use_proxy.batches) == predict.ATTEMPTS
+    assert len(use_proxy.batches) == predict.ATTEMPTS == 5
+    assert capsys.readouterr().err.count("retrying in") == 4  # one stderr line per retry
+
+
+def test_backoff_is_2_4_8_16_seconds(use_proxy, monkeypatch):
+    waits = []
+    monkeypatch.setattr(predict.time, "sleep", waits.append)
+    use_proxy.status = 503
+    with pytest.raises(predict.PredictionError):
+        predict.predict(load_test())
+    assert waits == [2, 4, 8, 16]
+
+
+@pytest.mark.parametrize("failures", [1, 4])
+def test_failures_then_success_returns_the_predictions(monkeypatch, no_sleep, failures):
+    monkeypatch.setenv("PREDICT_PROXY_URL", "https://proxy.example")
+    calls = []
+
+    def flaky(url, json=None, timeout=None):
+        calls.append(1)
+        if len(calls) <= failures:
+            raise predict.requests.ReadTimeout("read timed out")
+        return FakeResponse(200, {"predictions": [100.0] * len(json["rows"])})
+
+    monkeypatch.setattr(predict.requests, "post", flaky)
+    assert predict.predict(load_test()).tolist() == [100.0] * len(load_test())
+    assert len(calls) == failures + 1
+
+
+def test_timeouts_on_every_attempt_raise_loudly(monkeypatch, no_sleep):
+    monkeypatch.setenv("PREDICT_PROXY_URL", "https://proxy.example")
+
+    def dead(url, json=None, timeout=None):
+        raise predict.requests.ConnectionError("connection refused")
+
+    monkeypatch.setattr(predict.requests, "post", dead)
+    with pytest.raises(predict.PredictionError, match="failed after 5 attempt.*ConnectionError"):
+        predict.predict(load_test())
 
 
 def test_client_errors_are_not_retried(use_proxy, no_sleep):

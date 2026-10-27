@@ -19,21 +19,28 @@ from model.quickml_client import PredictionError
 
 log = logging.getLogger("quickml")
 SDK_ATTEMPT_S = 35.0  # the SDK's own 30 s read timeout, plus connection set-up
-DEFAULT_GATEWAY_S = 60.0  # assumed when AppSail doesn't say (CATALYST_MAX_TIMEOUT)
+DEFAULT_GATEWAY_S = 60.0  # assumed when AppSail doesn't say (CATALYST_MAX_TIMEOUT unset or unreadable)
+CLIENT_TIMEOUT_S = 120.0  # predict.py's TIMEOUT_S: with no gateway limit, the caller's patience is the limit
 GATEWAY_MARGIN_S = 10.0  # features, controller, battery and the response, after QuickML answers
 
 
 def gateway_budget_s(env=None) -> float:
     """Seconds this request may spend on QuickML before the gateway gives up on it.
 
-    AppSail injects CATALYST_MAX_TIMEOUT; values over 1,000 are read as milliseconds."""
+    AppSail injects CATALYST_MAX_TIMEOUT: -1 (seen live on 2026-10-27) means no gateway limit, so
+    predict.py's 120 s timeout bounds the request; values over 1,000 are read as milliseconds."""
     raw = (env if env is not None else os.environ).get("CATALYST_MAX_TIMEOUT", "")
     try:
         value = float(raw)
     except ValueError:
         value = DEFAULT_GATEWAY_S
-    seconds = value / 1000 if value > 1000 else value
-    return max(0.0, (seconds if seconds > 0 else DEFAULT_GATEWAY_S) - GATEWAY_MARGIN_S)
+    if value < 0:
+        seconds = CLIENT_TIMEOUT_S
+    elif value == 0:
+        seconds = DEFAULT_GATEWAY_S
+    else:
+        seconds = min(value / 1000 if value > 1000 else value, CLIENT_TIMEOUT_S)
+    return max(0.0, seconds - GATEWAY_MARGIN_S)
 
 
 def once_more_on_network_error(call, network_errors, budget_s: float, attempt_s: float = SDK_ATTEMPT_S, clock=time.monotonic):

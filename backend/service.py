@@ -4,9 +4,11 @@ validate rows -> build_features -> QuickML (cached, deduplicated, concurrent)
 -> controller signals -> battery state of charge, all in input order.
 """
 
+import logging
 import math
 import os
 import threading
+import time
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import asdict
@@ -19,11 +21,14 @@ from backend.controller import decide
 from model.data import INPUT_COLUMNS
 from model.features import FILL_VALUES, QUICKML_FEATURES, build_features
 from backend.quickml_sdk import SdkTransport, in_catalyst
+from backend.quota import DEMO_RESERVE_AT, QuotaReserved
 from model.quickml_client import ConfigError, PredictionError, QuickMLClient, is_configured, settings
 
 MAX_ROWS = 2000
 CACHE_SIZE = 50_000
 KEY_DECIMALS = 6  # feature vectors are cached rounded to 1e-6
+LEDGER_RELOAD_S = 60  # how stale the copy of the persistent cache may get before a miss re-reads it
+log = logging.getLogger("forecast")
 
 
 class RequestError(ValueError):
@@ -130,6 +135,21 @@ class PredictionCache:
                 self._data.popitem(last=False)
 
 
+def _calls(ledger) -> int:
+    try:
+        return ledger.calls_this_month()
+    except Exception:  # noqa: BLE001 - unknown usage never blocks; the guard only acts on a known count
+        log.warning("could not read the QuickML call counter", exc_info=True)
+        return 0
+
+
+def _record(write, value) -> None:
+    try:
+        write(value)
+    except Exception:  # noqa: BLE001 - bookkeeping must not cost the prediction
+        log.warning("could not update the QuickML ledger", exc_info=True)
+
+
 class Forecaster:
     """Turns raw telemetry rows into predictions, grid signals and battery state."""
 
@@ -141,17 +161,50 @@ class Forecaster:
     ):
         self.client_factory, self.battery = client_factory, battery
         self.cache = PredictionCache(cache_size)
+        self._ledger_read = float("-inf")  # when the persistent cache was last merged in (monotonic s)
 
-    def predict_features(self, feats: pd.DataFrame, request=None) -> np.ndarray:
-        """Predictions for feature rows; only vectors not already cached reach QuickML, once each."""
+    def _from_ledger(self, ledger, keys) -> dict:
+        """Merge the persistent cache into memory (at most once a minute) and look the keys up again."""
+        if time.monotonic() - self._ledger_read < LEDGER_RELOAD_S:
+            return {}
+        try:
+            self.cache.put_many(ledger.cached())
+            self._ledger_read = time.monotonic()
+        except Exception:  # noqa: BLE001 - a storage fault must not cost the prediction
+            log.warning("could not read the persistent prediction cache", exc_info=True)
+            return {}
+        return self.cache.get_many(keys)
+
+    def predict_features(self, feats: pd.DataFrame, request=None, ledger=None, guard: bool = False) -> np.ndarray:
+        """Predictions for feature rows; only vectors not already cached reach QuickML, once each.
+
+        With a ledger (backend/quota.py) the cache persists in Stratus and QuickML calls are counted.
+        `guard` is the demo path's reserve: past DEMO_RESERVE_AT calls this month it may not call
+        QuickML at all. /api/predict never sets it."""
         keys = [tuple(round(float(v), KEY_DECIMALS) for v in row) for row in feats.itertuples(index=False)]
-        known = self.cache.get_many(dict.fromkeys(keys))
-        todo = [k for k in dict.fromkeys(keys) if k not in known]
+        unique = list(dict.fromkeys(keys))
+        known = self.cache.get_many(unique)
+        if ledger is not None and len(known) < len(unique):
+            known.update(self._from_ledger(ledger, [k for k in unique if k not in known]))
+        todo = [k for k in unique if k not in known]
         if todo:
+            if guard and ledger is not None and _calls(ledger) >= DEMO_RESERVE_AT:
+                raise QuotaReserved(f"{len(todo)} hour(s) aren't in the prediction cache, and this month's remaining "
+                                    "QuickML calls are kept for grading")
             client = self.client_factory(request)  # raises ConfigError until configured
-            fresh = client.predict(pd.DataFrame(todo, columns=feats.columns))
+            try:
+                fresh = client.predict(pd.DataFrame(todo, columns=feats.columns))
+            finally:
+                if ledger is not None:
+                    # the SDK transport counts the requests it really sent (a read-timeout retry included);
+                    # otherwise one request per batch
+                    sent = getattr(getattr(client, "transport", None), "attempts", None)
+                    batch = getattr(client, "batch_size", 1000)
+                    _record(ledger.add_calls, sent if sent is not None else math.ceil(len(todo) / batch))
             new = dict(zip(todo, (float(p) for p in fresh)))
             self.cache.put_many(new)
+            if ledger is not None:
+                _record(ledger.remember, new)
             known.update(new)
         return np.array([known[k] for k in keys], dtype=float)
 
@@ -166,10 +219,11 @@ class Forecaster:
             raise PredictionError(f"unusable prediction from QuickML: {e}") from None
         return decisions, simulate(((d["mode"], p, s) for d, p, s in zip(decisions, preds, solar)), self.battery)
 
-    def forecast(self, payload, request=None) -> dict:
-        """`request` is the incoming HTTP request; the SDK path authenticates from its headers."""
+    def forecast(self, payload, request=None, ledger=None) -> dict:
+        """`request` is the incoming HTTP request; the SDK path authenticates from its headers.
+        This is /api/predict, predict.py's path: the cache helps it, the demo reserve never blocks it."""
         raw = parse_rows(payload)
-        preds = self.predict_features(build_features(raw)[QUICKML_FEATURES], request)
+        preds = self.predict_features(build_features(raw)[QUICKML_FEATURES], request, ledger=ledger)
         solar = pd.to_numeric(raw["solar_irradiance_wm2"]).fillna(FILL_VALUES["solar_irradiance_wm2"])
         decisions, steps = self.schedule(pd.to_datetime(raw["timestamp"], format="ISO8601"), preds, solar)
         originals = raw["timestamp"].tolist()

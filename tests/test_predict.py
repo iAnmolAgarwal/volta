@@ -93,22 +93,22 @@ def test_missing_weather_goes_out_as_null(monkeypatch, no_endpoint_env):
 
 def test_server_errors_are_retried_then_raise(use_proxy, no_sleep, capsys):
     use_proxy.status = 502
-    with pytest.raises(predict.PredictionError, match="failed after 5 attempt.*HTTP 502"):
+    with pytest.raises(predict.PredictionError, match="failed after 3 attempt.*HTTP 502"):
         predict.predict(load_test())
-    assert len(use_proxy.batches) == predict.ATTEMPTS == 5
-    assert capsys.readouterr().err.count("retrying in") == 4  # one stderr line per retry
+    assert len(use_proxy.batches) == predict.ATTEMPTS == 3
+    assert capsys.readouterr().err.count("retrying in") == 2  # one stderr line per retry
 
 
-def test_backoff_is_2_4_8_16_seconds(use_proxy, monkeypatch):
+def test_backoff_is_10_then_30_seconds(use_proxy, monkeypatch):
     waits = []
     monkeypatch.setattr(predict.time, "sleep", waits.append)
     use_proxy.status = 503
     with pytest.raises(predict.PredictionError):
         predict.predict(load_test())
-    assert waits == [2, 4, 8, 16]
+    assert waits == [10, 30]
 
 
-@pytest.mark.parametrize("failures", [1, 4])
+@pytest.mark.parametrize("failures", [1, 2])
 def test_failures_then_success_returns_the_predictions(monkeypatch, no_sleep, failures):
     monkeypatch.setenv("PREDICT_PROXY_URL", "https://proxy.example")
     calls = []
@@ -131,7 +131,7 @@ def test_timeouts_on_every_attempt_raise_loudly(monkeypatch, no_sleep):
         raise predict.requests.ConnectionError("connection refused")
 
     monkeypatch.setattr(predict.requests, "post", dead)
-    with pytest.raises(predict.PredictionError, match="failed after 5 attempt.*ConnectionError"):
+    with pytest.raises(predict.PredictionError, match="failed after 3 attempt.*ConnectionError"):
         predict.predict(load_test())
 
 

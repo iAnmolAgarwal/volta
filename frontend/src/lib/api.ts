@@ -161,6 +161,7 @@ export type ApiErrorKind =
   | "bad_request" // 400: the input or window is unusable; `details` lists why
   | "not_found" // 404: no such run
   | "too_large" // 413: more than 2,000 rows
+  | "quota" // 429: this month's QuickML calls are kept for grading; cached inputs still forecast
   | "upstream" // 502: QuickML or the Data Store failed; there is no made-up forecast
   | "not_configured" // 503: QuickML or the store is not configured
   | "server" // any other non-2xx
@@ -188,6 +189,7 @@ function kindOf(status: number): ApiErrorKind {
   if (status === 400) return "bad_request";
   if (status === 404) return "not_found";
   if (status === 413) return "too_large";
+  if (status === 429) return "quota";
   if (status === 502) return "upstream";
   if (status === 503) return "not_configured";
   return "server";
@@ -199,6 +201,7 @@ export function errorTitle(e: ApiError): string {
     case "bad_request": return "The input could not be used";
     case "not_found": return "That run no longer exists";
     case "too_large": return `Too many rows (at most ${MAX_ROWS.toLocaleString()})`;
+    case "quota": return "The demo's forecast quota is used up for this month";
     case "upstream": return "The forecast service failed";
     case "not_configured": return "The forecast service is not configured";
     case "network": return "The API could not be reached";

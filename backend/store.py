@@ -215,6 +215,13 @@ class CatalystRunStore:
             raise DailyLimitError(f"daily save limit reached ({DAILY_SAVE_LIMIT} runs a day, UTC)")
         return saved_today
 
+    def get_json(self, key: str):
+        """A JSON object from the bucket, or None when there is none (for the QuickML ledger)."""
+        return self._get_json(f"reading {key}", key)
+
+    def put_json(self, key: str, value) -> None:
+        self._put_json(f"writing {key}", key, value)
+
     def save(self, record: dict, hours: list[dict], now: datetime | None = None) -> dict:
         """Save the run to Stratus (the run object, then the index), and try one Data Store row.
 

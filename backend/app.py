@@ -21,6 +21,7 @@ from werkzeug.exceptions import HTTPException
 
 from backend.cleaning import CleaningError, read_csv, rows_frame
 from backend.forecast import SOURCES, ForecastService, NoStoreError, catalyst_store
+from backend.quota import QuotaReserved
 from backend.quickml_sdk import in_catalyst
 from backend.service import Forecaster, RequestError, quickml_configured
 from backend.store import StoreError
@@ -55,11 +56,21 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
         # send JSON as text/plain (a "simple" request, no preflight). Parse it whatever the type.
         return request.get_json(force=True, silent=True)
 
+    def quickml_calls_month():
+        ledger = runs.ledger(request)
+        if ledger is None:
+            return None
+        try:
+            return ledger.calls_this_month()
+        except Exception:  # noqa: BLE001 - health must answer even when Stratus doesn't
+            return None
+
     @app.get("/api/health")
     def health():
         # catalyst_context: did the gateway add the X-ZC-* headers the SDK authenticates with?
         return jsonify(
             gateway_timeout=os.environ.get("CATALYST_MAX_TIMEOUT"),  # AppSail's request limit; not a secret
+            quickml_calls_month=quickml_calls_month(),
             status="ok",
             version=app_version,
             quickml_configured=quickml_configured(),
@@ -72,7 +83,7 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
         if payload is None:
             return error(400, 'body must be JSON: {"rows": [...]}')
         try:
-            return jsonify(fc.forecast(payload, request))
+            return jsonify(fc.forecast(payload, request, ledger=runs.ledger(request)))
         except RequestError as e:
             return error(e.status, str(e), e.details)
         except ConfigError as e:
@@ -107,6 +118,9 @@ def create_app(forecaster: Forecaster | None = None, store_factory=catalyst_stor
             return error(400, str(e))
         except ConfigError as e:
             return error(503, str(e))
+        except QuotaReserved as e:
+            return error(429, "demo forecast quota reached",
+                         [str(e), "Cached forecasts (the sample, earlier uploads) still work; the counter resets on the 1st."])
         except PredictionError as e:
             return error(502, str(e))
 

@@ -27,8 +27,8 @@ import requests
 
 DEFAULT_PROXY_URL = "https://microgrid-proxy-50047164504.development.catalystappsail.in"  # AppSail (Development); not a secret
 TIMEOUT_S = 120
-ATTEMPTS = 5  # connection errors, timeouts and 5xx (a cold start, a QuickML blip) are retried
-BACKOFF_S = [2, 4, 8, 16]  # waits between attempts: about 30 s of patience before failing loudly
+ATTEMPTS = 3  # connection errors, timeouts and 5xx are retried; kept at 3 to spare the QuickML free tier
+BACKOFF_S = [10, 30]  # long waits, so a QuickML blip has time to pass before the next attempt
 INPUT_COLUMNS = ["timestamp", "ambient_temp_c", "humidity_pct", "solar_irradiance_wm2"]
 
 # Inline copy of the QuickML columns built by model/features.py (a test keeps them

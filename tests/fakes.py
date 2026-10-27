@@ -69,7 +69,14 @@ class FakeRunStore:
 
     def __init__(self, fail_save: Exception | None = None, fail_csv: Exception | None = None):
         self.runs, self.csvs, self.fail_save, self.fail_csv = {}, {}, fail_save, fail_csv
+        self.objects = {}  # the bucket's JSON objects (the QuickML ledger)
         self._next = 1000
+
+    def get_json(self, key: str):
+        return json.loads(self.objects[key]) if key in self.objects else None
+
+    def put_json(self, key: str, value) -> None:
+        self.objects[key] = json.dumps(value)
 
     def put_csv(self, key: str, data: bytes) -> None:
         if self.fail_csv:

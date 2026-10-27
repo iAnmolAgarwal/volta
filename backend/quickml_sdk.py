@@ -73,6 +73,7 @@ class SdkTransport:
     def __init__(self, endpoint_key: str, request):
         import zcatalyst_sdk
 
+        self.attempts = 0  # QuickML requests actually sent, counted against the monthly free tier
         self.key = endpoint_key
         self.quick_ml = zcatalyst_sdk.initialize(req=request).quick_ml()
         self.headers = {
@@ -87,6 +88,7 @@ class SdkTransport:
         from zcatalyst_sdk.exceptions import CatalystError
 
         def post():
+            self.attempts += 1
             return self.quick_ml._requester.request(
                 method=RequestMethod.POST,
                 path="/endpoints/predict",
@@ -97,8 +99,9 @@ class SdkTransport:
             )
 
         try:
-            # a QuickML blip (read timeout, dropped connection) gets one more try while the gateway allows it
-            resp = once_more_on_network_error(post, (requests.ConnectionError, requests.Timeout), gateway_budget_s())
+            # a QuickML read timeout gets one more try while the budget allows it; nothing else is repeated,
+            # since every request counts against the free tier's 500 calls a month
+            resp = once_more_on_network_error(post, (requests.ReadTimeout,), gateway_budget_s())
             return resp.response_json
         except CatalystError as e:
             raise PredictionError(f"QuickML SDK call failed: {str(e).replace(self.key, '***')[:500]}") from None

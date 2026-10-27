@@ -11,6 +11,7 @@ import numpy as np
 
 from backend.cleaning import clean
 from backend.quickml_sdk import in_catalyst
+from backend.quota import QuickMLLedger
 from backend.service import Forecaster
 from backend.store import CatalystRunStore, StoreError, upload_key
 from backend.timeline import build_hours, view
@@ -38,7 +39,8 @@ class ForecastService:
     def forecast(self, frame, *, source: str, filename: str | None = None, csv_bytes: bytes | None = None,
                  window_start=None, request=None) -> dict:
         cleaned, report = clean(frame)
-        raw = self.forecaster.predict_features(build_features(cleaned)[QUICKML_FEATURES], request)
+        raw = self.forecaster.predict_features(build_features(cleaned)[QUICKML_FEATURES], request,
+                                               ledger=self.ledger(request), guard=True)
         preds = np.round(raw, 2)
         decisions, steps = self.forecaster.schedule(cleaned["timestamp"], preds, cleaned["solar_irradiance_wm2"])
         hours = build_hours(cleaned, preds, decisions, steps)
@@ -86,6 +88,13 @@ class ForecastService:
         else:
             run["storage"]["reason"] = run["errors"][-1]
         return run
+
+    def ledger(self, request):
+        """The QuickML ledger on this request's store, or None (outside Catalyst, or the store won't open)."""
+        try:
+            return QuickMLLedger(self.store_factory(request))
+        except Exception:  # noqa: BLE001 - no ledger means no persistent cache and no counting, never a failure
+            return None
 
     def list_runs(self, request=None) -> list[dict]:
         return self.store_factory(request).list_runs(RUNS_LISTED)

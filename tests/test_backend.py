@@ -188,7 +188,7 @@ def test_health_without_credentials(api, monkeypatch):
     resp = api.get("/api/health")
     assert resp.status_code == 200
     assert resp.get_json() == {"status": "ok", "version": "dev", "quickml_configured": False, "catalyst_context": False,
-                               "gateway_timeout": None}
+                               "gateway_timeout": None, "quickml_calls_month": None}
     assert api.get("/api/health", headers={"X-ZC-ProjectId": "1"}).get_json()["catalyst_context"] is True
 
 

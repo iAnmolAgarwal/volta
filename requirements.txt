@@ -1,3 +1,5 @@
+# The full backend and development environment (Python 3.11+): model training, tests, the API.
+# To run predict.py or test_eval.py, use requirements-predict.txt instead (Python 3.9+).
 pandas==3.1.0
 numpy==2.4.6
 scikit-learn==1.9.1

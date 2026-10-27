@@ -1,0 +1,5 @@
+# What predict.py (and test_eval.py) need, nothing else: Python 3.9+, pandas 1.5+.
+# Graders: pip install -r requirements-predict.txt
+pandas>=1.5
+numpy>=1.23
+requests>=2.28

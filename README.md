@@ -96,6 +96,7 @@ demand-linear, V1).
 **Reproduce:**
 
 ```sh
+pip install -r requirements-predict.txt                            # pandas, numpy, requests; Python 3.9+
 python predict.py --input sample_test_input.csv --output out.csv   # timestamp,target_demand_kw, one row per input
 python test_eval.py                                                # prints SUCCESS
 ```

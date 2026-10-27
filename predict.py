@@ -29,6 +29,7 @@ DEFAULT_PROXY_URL = "https://microgrid-proxy-50047164504.development.catalystapp
 TIMEOUT_S = 120
 ATTEMPTS = 3  # connection errors, timeouts and 5xx are retried; kept at 3 to spare the QuickML free tier
 BACKOFF_S = [10, 30]  # long waits, so a QuickML blip has time to pass before the next attempt
+RETRY_4XX = {408, 429}  # the Catalyst gateway answers 408 after about 30 s while QuickML is slow: retried
 INPUT_COLUMNS = ["timestamp", "ambient_temp_c", "humidity_pct", "solar_irradiance_wm2"]
 
 # Inline copy of the QuickML columns built by model/features.py (a test keeps them
@@ -101,7 +102,7 @@ def _post(url: str, rows: list[dict]) -> dict:
                 except ValueError:
                     raise PredictionError(f"proxy answered with non-JSON: {resp.text[:300]!r}") from None
             problem = f"HTTP {resp.status_code}: {resp.text[:300]!r}"
-            if resp.status_code < 500:
+            if resp.status_code < 500 and resp.status_code not in RETRY_4XX:
                 break  # the request itself is wrong; retrying will not help
         if attempt < ATTEMPTS - 1:
             wait = BACKOFF_S[attempt]

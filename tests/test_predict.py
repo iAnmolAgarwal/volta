@@ -135,6 +135,14 @@ def test_timeouts_on_every_attempt_raise_loudly(monkeypatch, no_sleep):
         predict.predict(load_test())
 
 
+@pytest.mark.parametrize("status", [408, 429])
+def test_gateway_timeouts_and_429_are_retried(use_proxy, no_sleep, status):
+    use_proxy.status = status
+    with pytest.raises(predict.PredictionError, match=f"failed after 3 attempt.*HTTP {status}"):
+        predict.predict(load_test())
+    assert len(use_proxy.batches) == 3
+
+
 def test_client_errors_are_not_retried(use_proxy, no_sleep):
     use_proxy.status = 400
     with pytest.raises(predict.PredictionError, match="HTTP 400"):

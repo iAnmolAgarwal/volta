@@ -101,10 +101,10 @@ python test_eval.py                                                # prints SUCC
 ```
 
 `predict.py` needs no credentials: it posts to the AppSail API, which holds the QuickML key. A timeout,
-connection error or 5xx is retried: 3 attempts, 10 s and then 30 s apart, with one stderr line per retry. If every
-attempt fails it raises an error. It never falls back to a made-up curve. The API sends at most 1,000 distinct
-hours per QuickML call, so a 1,000-row run costs one call, or none when its rows are already cached. The worst case
-is 6 calls: 3 attempts, each with one server-side retry after a QuickML read timeout.
+connection error, 5xx or gateway 408 is retried: 3 attempts, 10 s and then 30 s apart, with one stderr line per
+retry. If every attempt fails it raises an error. It never falls back to a made-up curve. The API sends at most
+1,000 distinct hours per QuickML call, so a 1,000-row run costs one call, or none when its rows are already cached.
+Worst case: 3 calls, one per attempt.
 
 ## Architecture
 

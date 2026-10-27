@@ -410,7 +410,7 @@ def test_two_network_errors_raise_and_other_errors_are_not_retried():
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize("raw, budget", [("-1", 110.0), ("", 50.0), ("60", 50.0), ("300000", 110.0), ("junk", 50.0), ("0", 50.0)])
+@pytest.mark.parametrize("raw, budget", [("-1", 20.0), ("", 50.0), ("60", 50.0), ("300000", 110.0), ("junk", 50.0), ("0", 50.0)])
 def test_gateway_budget_reads_seconds_or_milliseconds_and_never_outlasts_predict_py(raw, budget):
     from backend.quickml_sdk import gateway_budget_s
     assert gateway_budget_s({"CATALYST_MAX_TIMEOUT": raw}) == budget

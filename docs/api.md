@@ -212,8 +212,10 @@ allowance as every visitor ([`backend/quota.py`](../backend/quota.py)):
 - **A reserve for grading.** From 380 calls on, `/api/forecast` (uploads, the form, the sample) answers only from the
   cache. When it would need QuickML, it answers `429 {"error": "demo forecast quota reached", "details": [...]}`.
   `/api/predict` is never blocked.
-- **Retries.** `predict.py` makes 3 attempts (10 s, then 30 s apart). The server repeats a QuickML request once,
-  and only after a read timeout. Worst case for one graded run: 6 calls. The usual case: 1 call, or 0 when cached.
+- **Retries.** `predict.py` makes 3 attempts (10 s, then 30 s apart), and retries a gateway 408 too. The Catalyst
+  gateway cuts a request at about 30 s even though `CATALYST_MAX_TIMEOUT` reads -1, and the SDK's own QuickML read
+  timeout is 30 s, so the server never makes a second QuickML try: it couldn't finish in time.
+  Worst case for one graded run: 3 calls. The usual case: 1 call, or 0 when cached.
 
 ## Storage
 

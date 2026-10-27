@@ -1,5 +1,4 @@
-/* The wordmark, in one place. The developer has not confirmed it yet
- * (docs/process/design/QUESTIONS.md, question 1), so swapping it is a one-line change here.
+/* The wordmark, in one place, so swapping it is a one-line change here.
  * index.html repeats it in its static <title> for crawlers and the first paint;
  * the page sets document.title from PAGE_TITLE at runtime. */
 

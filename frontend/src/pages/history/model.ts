@@ -2,7 +2,7 @@
  * functions, so the page only lays things out.
  *
  * Every run carries `storage {stratus, datastore, reason}`, which api.ts's
- * RunListItem does not type yet (logged in design-notes/m2/history-requests.md);
+ * RunListItem does not type yet;
  * it is read defensively here, and the id's shape is the fallback: `r…` ids
  * live in Stratus, all-digit ids are the older Data Store runs. */
 

@@ -1,6 +1,6 @@
 # Shared app components (M2 shell)
 
-These are frozen for the screen builders: use them, don't edit them. Every look is in `src/styles/app.css` and every value is a token (`src/styles/tokens.css`). Each component is built from Sylva's vocabulary (`.refs/sylva/index.html`). If you need something new, add it in your page and log it in `docs/process/design/QUESTIONS.md`.
+Shared by the app's pages. Every look is in `src/styles/app.css` and every value is a token (`src/styles/tokens.css`). Each component is built from Sylva's vocabulary (`.refs/sylva/index.html`). If you need something new, add it in your page.
 
 Data comes only through `src/lib/api.ts`, the typed client for `docs/api.md`:
 

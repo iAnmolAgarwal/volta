@@ -10,7 +10,7 @@ import type { OverloadRun } from "./model";
  * a hot day reads as two stretches and never overflows the pill. Built from the
  * shared AlertBanner's own pieces (its .va-alert glass pill in --overload, its
  * icon, eyebrow and close button) and Pill chips, because AlertBanner takes
- * single hours only (design-notes/m2/dashboard-requests.md). A chip focuses its
+ * single hours only. A chip focuses its
  * run's peak hour; the chip of the run the focused hour sits in is pressed.
  * Re-key it (key={windowStart}) to undo a dismiss. */
 

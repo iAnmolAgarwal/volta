@@ -10,7 +10,6 @@ npm run build    # dist/, deployable to Catalyst Slate (framework react-vite)
 
 - **Design tokens:** `src/styles/tokens.css`. Every screen uses them.
 - **shadcn variables:** `src/index.css` maps them to the tokens.
-- **Screen specs, rubrics and review notes:** `../design-notes/`.
 
 ## Credits
 

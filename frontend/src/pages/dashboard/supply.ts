@@ -13,7 +13,7 @@
 
 import { MIN_SOC_PCT, type RunHour } from "@/lib/api";
 
-/** docs/battery.md, "Parameters" (not yet exported by api.ts; see design-notes/m2/dashboard-requests.md). */
+/** docs/battery.md, "Parameters" (not exported by api.ts). */
 export const GRID_CAP_KW = 120;
 export const MAX_DISCHARGE_KW = 100;
 

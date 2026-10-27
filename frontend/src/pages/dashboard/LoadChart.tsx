@@ -34,8 +34,7 @@ import { chargeSource, supplyOf } from "./supply";
  * Renewable Storage on the chart's own x scale, per hour or per day, with the
  * overload hours dotted; the axis ticks sit under it.
  * MainChart stacks the backend's net fields, whose top overshoots the demand
- * in charging hours, hence this page-local chart
- * (design-notes/m2/dashboard-requests.md). */
+ * in charging hours, hence this page-local chart. */
 
 export type ChartRange = "24h" | "72h" | "7d" | "all";
 

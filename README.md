@@ -6,7 +6,7 @@
   <a href="https://volta.onslate.in"><img src="https://img.shields.io/badge/live-Zoho%20Catalyst%20Slate-4d7c0f" alt="Live on Zoho Catalyst Slate"></a>
   <img src="https://img.shields.io/badge/forecast-Catalyst%20QuickML-2563EB" alt="Forecast by Catalyst QuickML">
   <img src="https://img.shields.io/badge/validation%20RMSE-8.28%20kW-111827" alt="Validation RMSE 8.28 kW">
-  <img src="https://img.shields.io/badge/tests-383%20pytest%20%2B%2030%20vitest-4B5563" alt="383 pytest and 30 vitest tests pass">
+  <img src="https://img.shields.io/badge/tests-409%20pytest%20%2B%2035%20vitest-4B5563" alt="409 pytest and 35 vitest tests pass">
   <img src="https://img.shields.io/badge/Lighthouse%20a11y-100-9CA3AF" alt="Lighthouse accessibility 100 on every page">
 </p>
 
@@ -239,8 +239,9 @@ Neither script has a Production flag.
   every hour. `runs/index.json` lists the latest 20. Uploaded CSVs go to `uploads/`.
 - **The Data Store gets one metadata row per run, when it can.** Catalyst's free tier allows 5,000 Data Store
   inserts a month across the whole account, and the first design, which wrote a row per hour, used them up in a
-  few runs. Until the quota resets, inserts are refused, and the app still saves the run and says, truthfully,
-  "Saved in Stratus · Data Store row skipped". Older runs are read from the Data Store as before.
+  few runs. Until the quota resets, inserts are refused; the run is still saved, and the app says "Saved · stored
+  in Stratus", with a note that the Data Store's quota resets on the 1st. Older runs are read from the Data Store
+  as before.
 - **QuickML's free tier is 500 inference calls a month, account-wide,** and grading runs on the same allowance as
   every visitor. So every price QuickML has given is kept in Stratus, and identical inputs never reach it twice:
   a landing visit, the sample and a repeated `test_eval` cost nothing. A counter tracks the month's calls
@@ -256,15 +257,15 @@ The details are in [docs/api.md › Persistence](docs/api.md#persistence).
 
 ## Quality
 
-- **Tests:** 383 pytest (API contract, cleaning, controller boundaries, battery, run store, `predict.py`, feature
-  parity) and 30 vitest (the stacked supply equals demand every hour, CSV export, History curves, the no-preflight
+- **Tests:** 409 pytest (API contract, cleaning, controller boundaries, battery, run store, `predict.py`, feature
+  parity) and 35 vitest (the stacked supply equals demand every hour, CSV export, History curves, the no-preflight
   guard).
 - **End to end, on the live site:** [`scripts/e2e.mjs`](scripts/e2e.mjs) runs 21 checks in a fresh, logged-out
   browser: upload a CSV, open it on the dashboard, download its CSV, find it in History and reopen it, plus layout
   at 390 px, no CORS preflights and no console errors. The last run passed all 21.
 
 <details>
-<summary><b>Lighthouse on the live site, and the design scores</b></summary>
+<summary><b>Lighthouse on the live site</b></summary>
 <br>
 
 | Page | Desktop: perf / a11y / best practices / SEO | Mobile: perf / a11y / best practices / SEO |
@@ -273,10 +274,6 @@ The details are in [docs/api.md › Persistence](docs/api.md#persistence).
 | `/dashboard` | 99 / 100 / 100 / 100 | 94 / 100 / 100 / 100 |
 | `/input` | 100 / 100 / 100 / 100 | 99 / 100 / 100 / 100 |
 | `/history` | 99 / 100 / 100 / 100 | 99 / 100 / 100 / 100 |
-
-Each screen went through a design loop scored by fresh, independent judges against a bar set by scoring the
-reference design itself (6.99). The final scores: Landing 7.54, Dashboard 7.40, Input 7.27, History 7.33. The
-scorecards are in [docs/process/](docs/process/).
 
 </details>
 
@@ -289,8 +286,7 @@ node scripts/e2e.mjs https://volta.onslate.in scripts/fixtures/e2e-48h.csv   # n
 ```
 
 The API contract is in [docs/api.md](docs/api.md), the model work in [docs/model_report.md](docs/model_report.md),
-and the battery model in [docs/battery.md](docs/battery.md). How the screens were designed and judged, and the
-decisions along the way, are in [docs/process/](docs/process/).
+and the battery model in [docs/battery.md](docs/battery.md).
 
 ## Credits
 

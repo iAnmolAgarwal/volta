@@ -1,5 +1,4 @@
-// The VOLTA power-grid scene. Interface: design-notes/screen-01/spec.md,
-// "Interface between the scene and the page".
+// The VOLTA power-grid scene: GridScene renders it, and the page drives it through GridSceneHandle.
 export { GridScene } from "./GridScene";
 export type { GridSceneHandle, GridSceneProps } from "./GridScene";
 export type { GridMode, GridState } from "./engine";

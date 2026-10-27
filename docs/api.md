@@ -11,7 +11,7 @@ The API is public and needs no login. Every response is JSON except `/api/sample
 | `GET` | `/api/runs/{id}` | Returns one saved run, in the same shape as `/api/forecast` |
 | `GET` | `/api/sample` | Downloads the bundled sample CSV (1,000 hours), for "Try sample data" |
 | `POST` | `/api/predict` | `predict.py`'s contract, unchanged: `{"rows": [...]}` → `{"predictions", "signals", "battery"}` |
-| `GET` | `/api/health` | `{"status", "version", "quickml_configured", "catalyst_context", "gateway_timeout"}` (AppSail's `CATALYST_MAX_TIMEOUT`). It never shows a secret |
+| `GET` | `/api/health` | `{"status", "version", "quickml_configured", "catalyst_context", "gateway_timeout", "quickml_calls_month"}`: AppSail's `CATALYST_MAX_TIMEOUT`, and QuickML requests sent this month (see [QuickML quota](#quickml-quota)). It never shows a secret |
 
 ## POST /api/forecast
 
@@ -198,6 +198,22 @@ Runs are stored in a hybrid way, because of the Catalyst free tier.
 - Run ids are made by the API: `r` + the UTC time to the second + 6 random hex digits. They sort by time, and don't depend on Data Store ROWIDs.
 - **Daily save limit: 40 runs per UTC day.** That is at most 120 of the 2,000 monthly uploads, so no visitor or bot can use them all up in a day. Past it, forecasts still work, unsaved.
 - **Limitations.** The index is read, changed and written back with no lock, so two runs saved in the same second can drop one from the 20-run list. Both runs are still stored and can be opened by id.
+
+## QuickML quota
+
+QuickML's free tier is 500 inference calls a month, account-wide, and the graded `predict.py` run uses the same
+allowance as every visitor ([`backend/quota.py`](../backend/quota.py)):
+
+- **A persistent prediction cache.** Every feature vector QuickML has priced, and its prediction, is kept in Stratus
+  at `quickml/predictions.json`. Identical inputs never reach QuickML twice, across restarts too: the landing's 24
+  rows, the sample and a repeated `test_eval` cost nothing once priced.
+- **A monthly counter.** `quickml/usage.json` counts the QuickML requests sent this calendar month (UTC), read-timeout
+  retries included. `/api/health` shows it as `quickml_calls_month`.
+- **A reserve for grading.** From 380 calls on, `/api/forecast` (uploads, the form, the sample) answers only from the
+  cache. When it would need QuickML, it answers `429 {"error": "demo forecast quota reached", "details": [...]}`.
+  `/api/predict` is never blocked.
+- **Retries.** `predict.py` makes 3 attempts (10 s, then 30 s apart). The server repeats a QuickML request once,
+  and only after a read timeout. Worst case for one graded run: 6 calls. The usual case: 1 call, or 0 when cached.
 
 ## Storage
 

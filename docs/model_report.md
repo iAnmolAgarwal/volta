@@ -193,6 +193,11 @@ The noise floor is about 8.52 kW RMSE: the leftover looks like white Gaussian no
 
 The fitted slope (8.54 ± 0.05) and threshold (23.95 °C) match the cooling term in the starter predict.py, 8.5 * max(0, T - 24). The starter curve's cooling term is right; its sine base, which smooths over the hour blocks, is what costs it.
 
+## QuickML's own evaluation
+
+Seen in the Catalyst console (QuickML, pipeline "demand-linear", model "demand-linear model", V1) on 2026-10-26 : **RMSE 8.7065 kW, R² 0.9706**. This is QuickML's own hold-out on the uploaded training CSV, not
+the forward split above, so it is close to, but not the same as, the 8.279 validation RMSE.
+
 ## Live endpoint check (2026-10-26, Development)
 
 Recorded by hand after the QuickML endpoint was published; not produced by `python model/baselines.py`.

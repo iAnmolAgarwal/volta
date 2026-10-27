@@ -90,7 +90,8 @@ of validation hours, and 45% of the test hours, are above 30 °C.
 **Features sent to QuickML:** `blk_dawn`, `blk_morning`, `blk_day`, `blk_evening`, `blk_late` (night is the
 reference) and `cool_24` = max(0, T − 24 °C). One module builds them for the training CSV, `predict.py` and the
 app, and a test keeps the three identical. The published endpoint agrees with the fitted formula to 0.121 kW RMS
-over the 1,000 sample rows.
+over the 1,000 sample rows. QuickML's own evaluation of the deployed model: RMSE 8.71 kW, R² 0.971 (pipeline
+demand-linear, V1).
 
 **Reproduce:**
 
@@ -100,8 +101,10 @@ python test_eval.py                                                # prints SUCC
 ```
 
 `predict.py` needs no credentials: it posts to the AppSail API, which holds the QuickML key. A timeout,
-connection error or 5xx is retried, 5 attempts with 2, 4, 8 and 16 s between them, with one stderr line per retry.
-If every attempt fails it raises an error. It never falls back to a made-up curve.
+connection error or 5xx is retried: 3 attempts, 10 s and then 30 s apart, with one stderr line per retry. If every
+attempt fails it raises an error. It never falls back to a made-up curve. The API sends at most 1,000 distinct
+hours per QuickML call, so a 1,000-row run costs one call, or none when its rows are already cached. The worst case
+is 6 calls: 3 attempts, each with one server-side retry after a QuickML read timeout.
 
 ## Architecture
 
@@ -115,9 +118,9 @@ flowchart LR
   A -->|one row per run| DS[(Data Store)]
 ```
 
-A forecast request is cleaned, turned into the QuickML features, predicted in one QuickML call per 1,000 rows
-(repeated rows come from a cache), put through the controller and the battery model, saved, and returned with the
-whole timeline. The browser builds the dashboard from that response. Nothing is computed twice.
+A forecast request is cleaned, turned into the QuickML features, predicted in one QuickML call per 1,000
+distinct hours (anything priced before comes from a cache), put through the controller and the battery model,
+saved, and returned with the whole timeline. The browser builds the dashboard from that response. Nothing is computed twice.
 
 **Why JSON goes out as `text/plain`.** Slate and AppSail are on different origins, and the Catalyst gateway answers
 CORS preflight requests itself, without CORS headers, so any request that needs a preflight fails. The frontend
@@ -237,6 +240,11 @@ Neither script has a Production flag.
   inserts a month across the whole account, and the first design, which wrote a row per hour, used them up in a
   few runs. Until the quota resets, inserts are refused, and the app still saves the run and says, truthfully,
   "Saved in Stratus · Data Store row skipped". Older runs are read from the Data Store as before.
+- **QuickML's free tier is 500 inference calls a month, account-wide,** and grading runs on the same allowance as
+  every visitor. So every price QuickML has given is kept in Stratus, and identical inputs never reach it twice:
+  a landing visit, the sample and a repeated `test_eval` cost nothing. A counter tracks the month's calls
+  (`quickml_calls_month` in `/api/health`). Past 380, uploads and the form answer only from that cache, and
+  otherwise say the demo's quota is used up. `/api/predict`, which `predict.py` uses, is never blocked.
 - **At most 40 saved runs a day.** It keeps the free tier's 2,000 monthly Stratus uploads safe from a busy day.
   Past it, forecasts still work, unsaved.
 - **Slate caches every page for a year,** and won't take other headers. So each deploy ships every earlier build's

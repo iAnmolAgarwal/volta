@@ -21,7 +21,8 @@ predictions.csv
 # AppSail bundle (scripts/build_appsail.sh)
 dist/
 
-# design-loop screenshots (large; the final review set lives in design/review/)
+# design-loop screenshots (large; the final review set lives in docs/process/design/review/)
+design-notes/*/shots/
 design-notes/*/shots/
 
 # every Slate build's hashed assets, re-shipped with each deploy (scripts/deploy_slate.sh)

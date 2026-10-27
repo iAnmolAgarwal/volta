@@ -276,7 +276,7 @@ The details are in [docs/api.md › Persistence](docs/api.md#persistence).
 
 Each screen went through a design loop scored by fresh, independent judges against a bar set by scoring the
 reference design itself (6.99). The final scores: Landing 7.54, Dashboard 7.40, Input 7.27, History 7.33. The
-scorecards are in [design/review/](design/review/) and [design-notes/](design-notes/).
+scorecards are in [docs/process/](docs/process/).
 
 </details>
 
@@ -289,7 +289,8 @@ node scripts/e2e.mjs https://volta.onslate.in scripts/fixtures/e2e-48h.csv   # n
 ```
 
 The API contract is in [docs/api.md](docs/api.md), the model work in [docs/model_report.md](docs/model_report.md),
-and the battery model in [docs/battery.md](docs/battery.md).
+and the battery model in [docs/battery.md](docs/battery.md). How the screens were designed and judged, and the
+decisions along the way, are in [docs/process/](docs/process/).
 
 ## Credits
 

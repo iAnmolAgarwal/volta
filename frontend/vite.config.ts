@@ -5,7 +5,7 @@ import { defineConfig } from "vite";
 
 // The AppSail API (Development). The browser calls a relative /api, and the dev
 // server forwards it: the Catalyst gateway answers CORS preflights itself, without
-// CORS headers, so the browser cannot POST JSON to AppSail directly (design/QUESTIONS.md).
+// CORS headers, so the browser cannot POST JSON to AppSail directly (docs/process/design/QUESTIONS.md).
 const API = "https://microgrid-proxy-50047164504.development.catalystappsail.in";
 
 export default defineConfig({

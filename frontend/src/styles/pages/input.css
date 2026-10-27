@@ -215,7 +215,7 @@
 .va .va-card--paper .va-pill.vi-ink:focus-visible { outline-color: var(--focus-ring-dark); }
 
 /* ── the result slot ─────────────────────────────────────────────────────── */
-.vi-result { scroll-margin-top: calc(120 * var(--u)); }
+.vi-result { scroll-margin-top: calc((38 + 46 + 56) * var(--u)); } /* below the fixed dock (top 38, 46 tall) with a clear gap */
 .vi-result:empty { display: none; }
 .vi-result-grid { display: grid; grid-template-columns: minmax(0, 1fr) calc(440 * var(--u)); gap: var(--a-gap); align-items: start; }
 
@@ -295,7 +295,7 @@
   .vi-side { position: static; }
   .vi-side-rail { align-self: start; }
   .vi-rows-slot,
-  .vi-result { scroll-margin-top: calc(30 * var(--u) + max(56px, 58 * var(--u)) + 16px); }
+  .vi-result { scroll-margin-top: calc(30 * var(--u) + max(56px, 58 * var(--u)) + 40px); } /* the phone dock, plus a clear gap */
 
   .vi-line { grid-template-columns: minmax(0, 1fr); gap: calc(18 * var(--u)); padding: calc(30 * var(--u)) 0; }
   .vi-line-head { padding-top: 0; gap: calc(16 * var(--u)); }

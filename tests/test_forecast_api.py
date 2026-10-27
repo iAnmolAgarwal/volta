@@ -161,6 +161,28 @@ def test_past_the_daily_save_limit_the_forecast_returns_unsaved(fake):
     assert body["run"]["storage"]["reason"].startswith("daily save limit")
 
 
+def test_past_the_daily_limit_a_csv_is_not_uploaded(fake):
+    class Capped(FakeRunStore):
+        def check_daily_limit(self):
+            raise DailyLimitError("daily save limit reached (40 runs a day, UTC)")
+
+    store = Capped()
+    api = create_app(Forecaster(client_factory=lambda req: fake), store_factory=lambda req: store).test_client()
+    run = upload(api).get_json()["run"]
+    assert run["saved"] is False and run["csv_key"] is None and store.csvs == {}
+    assert run["storage"]["reason"].startswith("daily save limit")
+
+
+def test_case_colliding_columns_are_a_400(api):
+    resp = upload(api, b"Timestamp,timestamp,ambient_temp_c\n2015-06-16 10:00,2015-06-16 10:00,20\n")
+    assert resp.status_code == 400 and "duplicate column" in resp.get_json()["error"]
+
+
+def test_a_timestamp_window_start_with_an_offset_reads_as_clock_time(api):
+    body = upload(api, query="?window_start=2015-06-17T00:00:00Z", source="sample").get_json()
+    assert body["window"]["hours"][0]["timestamp"] == "2015-06-17 00:00:00"
+
+
 def test_a_saved_run_reports_where_it_is_stored(api):
     run = post_rows(api, {"rows": sample_rows(3)}).get_json()["run"]
     assert run["saved"] is True and run["storage"]["stratus"] is True

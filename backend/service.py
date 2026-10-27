@@ -63,6 +63,10 @@ def parse_rows(payload) -> pd.DataFrame:
                 errors.append(f"row {i}: {col} must be a finite number or null, got {v!r:.40}")
     if errors:
         raise RequestError(f"{len(errors)} invalid value(s)", details=errors[:20])
+    try:  # each stamp parses alone, but pandas refuses a column that mixes UTC offsets
+        pd.to_datetime([row["timestamp"] for row in rows], format="ISO8601")
+    except ValueError:
+        raise RequestError("timestamps must all use the same UTC offset (or none)") from None
     return pd.DataFrame([{c: row.get(c) for c in INPUT_COLUMNS} for row in rows])
 
 

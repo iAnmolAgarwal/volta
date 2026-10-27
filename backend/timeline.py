@@ -117,7 +117,9 @@ def window(hours: list[dict], start=None, size: int = WINDOW_HOURS) -> Window:
         except (TypeError, ValueError):
             try:
                 when = pd.Timestamp(str(start))
-            except ValueError:
+                if when.tzinfo is not None:  # hours are local clock time; keep the clock time, drop the offset
+                    when = when.tz_localize(None)
+            except (TypeError, ValueError):
                 raise WindowError(f"window_start must be an hour index or a timestamp, got {str(start)[:40]!r}") from None
             later = [h["index"] for h in hours if pd.Timestamp(h["timestamp"]) >= when]
             if not later:

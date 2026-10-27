@@ -158,7 +158,8 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO)
     port = int(os.environ.get("X_ZOHO_CATALYST_LISTEN_PORT", "9000"))
-    serve(create_app(), host="0.0.0.0", port=port, threads=8)
+    # cap bodies in waitress too: Flask's MAX_CONTENT_LENGTH applies only after waitress has spooled the body
+    serve(create_app(), host="0.0.0.0", port=port, threads=8, max_request_body_size=8 * 1024 * 1024)
 
 
 if __name__ == "__main__":

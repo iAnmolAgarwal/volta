@@ -144,8 +144,8 @@ export default function InputPage() {
   const sendFile = (file: File) => {
     // the file is read and its size checked inside the post, so the busy card's first step is that read
     send("csv", file.name, `Forecasting ${file.name}`, stepsFor("csv", { fileName: file.name }), async (signal, advance) => {
-      // 2,000 rows of four columns is well under 1 MB; refuse a huge file before reading it into memory
-      if (file.size > 4 * 1024 * 1024) throw new Error(`${file.name} is ${(file.size / 1048576).toFixed(0)} MB. A forecast takes at most ${MAX_ROWS.toLocaleString()} rows; split the file and try again.`);
+      // 2,000 rows of four columns is about 100 KB and the API takes at most 2 MB; refuse more before reading it into memory
+      if (file.size > 2 * 1024 * 1024) throw new Error(`${file.name} is ${(file.size / 1048576).toFixed(0)} MB. A forecast takes at most ${MAX_ROWS.toLocaleString()} rows; split the file and try again.`);
       let n: number;
       try {
         n = csvRowCount(await file.text());

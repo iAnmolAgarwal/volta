@@ -229,18 +229,36 @@ def test_listed_stratus_runs_carry_their_series_and_legacy_runs_none():
     assert "series" not in runs[legacy]
 
 
-def test_index_entries_from_before_the_series_get_one_on_the_first_listing():
+def test_a_transient_error_mentioning_404_is_not_taken_for_a_missing_index():
     app = FakeApp()
     store = CatalystRunStore(app)
-    new = store.save(RECORD, make_hours(30), now=NOW)
-    old = index(app)
-    del old["runs"][0]["series"]
-    app.objects[("microgrid-uploads", INDEX_KEY)] = (json.dumps(old).encode(), None)
-    assert store.list_runs()[0]["series"]["max_kw"][0] == 150.2
-    assert "series" in index(app)["runs"][0]  # written back, so later listings read no runs
-    reads = len(app.queries)
-    store.list_runs()
-    assert len(app.queries) == reads + 1  # just the Data Store listing
+    store.save(RECORD, make_hours(2), now=NOW)
+
+    class Flaky(FakeBucket):
+        def get_object(self, key, options=None):
+            raise CatalystAPIError("STRATUS_ERROR", "gateway timeout on port 4040", http_status_code=504)
+
+    app.stratus = lambda: type("S", (), {"bucket": lambda self, name: Flaky(app, name)})()
+    with pytest.raises(StoreError, match="reading the run index failed"):
+        store.save(RECORD, make_hours(2), now=NOW)  # must not overwrite the history with an empty index
+
+
+def test_a_failed_index_write_still_saves_the_run():
+    app = FakeApp()
+    app.fail_put.add(INDEX_KEY)
+    store = CatalystRunStore(app)
+    saved = store.save(RECORD, make_hours(3), now=NOW)
+    assert saved["storage"]["stratus"] and "not listed in History" in saved["storage"]["reason"]
+    assert store.get_run(saved["id"])[1] == make_hours(3)
+
+
+def test_check_daily_limit_raises_before_anything_is_uploaded():
+    app = FakeApp()
+    store = CatalystRunStore(app)
+    store.check_daily_limit(now=NOW)  # fine while under the limit
+    app.objects[("microgrid-uploads", INDEX_KEY)] = (json.dumps({"day": "2026-10-27", "saved_today": DAILY_SAVE_LIMIT, "runs": []}).encode(), None)
+    with pytest.raises(DailyLimitError):
+        store.check_daily_limit(now=NOW)
 
 
 def test_list_runs_falls_back_to_the_index_when_the_data_store_fails():

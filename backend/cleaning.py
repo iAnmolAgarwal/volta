@@ -118,6 +118,9 @@ def parse_timestamps(raw: pd.Series) -> tuple[pd.Series, dict, int]:
 def clean(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """(clean frame with INPUT_COLUMNS, timestamps as datetimes, sorted and unique; the report)."""
     df = df.rename(columns=lambda c: str(c).strip().lower())
+    dupes = sorted({c for c in df.columns[df.columns.duplicated()]})
+    if dupes:
+        raise CleaningError(f"duplicate column(s) once case is ignored: {', '.join(map(str, dupes))[:200]}")
     rows_in = len(df)
     if rows_in == 0:
         raise CleaningError("no rows to forecast")

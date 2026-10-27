@@ -17,6 +17,7 @@ Catalyst (local runs, tests) there is no store and the API says so.
 import json
 import os
 import re
+import threading
 import uuid
 from datetime import datetime, timezone
 
@@ -94,9 +95,10 @@ def _datastore_reason(e: Exception) -> str:
 
 
 def _not_found(e: Exception) -> bool:
+    """A missing object, by its HTTP status only: matching "404" in the message could take a transient
+    error for a miss, and an empty index written over the real one would lose the run history."""
     status = getattr(e, "http_status_code", None) or getattr(e, "status_code", None)
-    text = str(e).lower()
-    return status == 404 or "404" in text or "not found" in text or "no such key" in text or "nosuchkey" in text
+    return status == 404
 
 
 def created_iso(createdtime: str) -> str:
@@ -153,6 +155,9 @@ def _unwrap(result, table: str) -> list[dict]:
     return [r[table] for r in result or [] if table in r]
 
 
+_INDEX_LOCK = threading.Lock()  # one index read-modify-write at a time in this process (waitress runs 8 threads)
+
+
 class CatalystRunStore:
     """Run history on the Catalyst Data Store and Stratus, through zcatalyst_sdk."""
 
@@ -199,14 +204,30 @@ class CatalystRunStore:
         body = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
         self._call(what, self._bucket().put_object, key, body, {"content_type": "application/json", "overwrite": "true"})
 
-    def save(self, record: dict, hours: list[dict], now: datetime | None = None) -> dict:
-        """Save the run to Stratus (the run object, then the index), and try one Data Store row."""
-        now = now or datetime.now(timezone.utc)
-        index = self._get_json("reading the run index", INDEX_KEY) or {}
-        day = f"{now:%Y-%m-%d}"
-        saved_today = index.get("saved_today", 0) if index.get("day") == day else 0
+    def check_daily_limit(self, now: datetime | None = None) -> None:
+        """Raise DailyLimitError when today's saves are used up; called before any upload too."""
+        self._saved_today(self._get_json("reading the run index", INDEX_KEY) or {}, now or datetime.now(timezone.utc))
+
+    @staticmethod
+    def _saved_today(index: dict, now: datetime) -> int:
+        saved_today = index.get("saved_today", 0) if index.get("day") == f"{now:%Y-%m-%d}" else 0
         if saved_today >= DAILY_SAVE_LIMIT:
             raise DailyLimitError(f"daily save limit reached ({DAILY_SAVE_LIMIT} runs a day, UTC)")
+        return saved_today
+
+    def save(self, record: dict, hours: list[dict], now: datetime | None = None) -> dict:
+        """Save the run to Stratus (the run object, then the index), and try one Data Store row.
+
+        Within one process the index update is serialised; across AppSail instances it isn't, so two
+        saves in the same moment on different instances can drop one from the 20-run list (the run
+        itself stays stored and can be opened by id)."""
+        with _INDEX_LOCK:
+            return self._save(record, hours, now or datetime.now(timezone.utc))
+
+    def _save(self, record: dict, hours: list[dict], now: datetime) -> dict:
+        index = self._get_json("reading the run index", INDEX_KEY) or {}
+        day = f"{now:%Y-%m-%d}"
+        saved_today = self._saved_today(index, now)
 
         run_id, created = new_run_id(now), now.isoformat(timespec="seconds")
         summary = {key: record.get(key) for key in RUN_FIELDS} | {"id": run_id, "created": created}
@@ -229,7 +250,10 @@ class CatalystRunStore:
             raise
         entry = {**summary, "storage": storage, "series": demand_series(hours), "datastore_id": datastore_id}
         runs = [entry, *index.get("runs", [])][:RUNS_INDEXED]
-        self._put_json("updating the run index", INDEX_KEY, {"day": day, "saved_today": saved_today + 1, "runs": runs})
+        try:
+            self._put_json("updating the run index", INDEX_KEY, {"day": day, "saved_today": saved_today + 1, "runs": runs})
+        except StoreError as e:  # the run is stored and opens by id; it just won't be listed
+            storage["reason"] = "; ".join(filter(None, [storage["reason"], f"not listed in History: {e}"]))
         return {"id": run_id, "created": created, "storage": storage}
 
     def _query(self, what: str, query: str) -> list:
@@ -237,7 +261,7 @@ class CatalystRunStore:
 
     def list_runs(self, limit: int = 20) -> list[dict]:
         """The Stratus index merged with the Data Store's runs rows, newest first, each run once."""
-        index = self._backfill_series(self._get_json("reading the run index", INDEX_KEY) or {})
+        index = self._get_json("reading the run index", INDEX_KEY) or {}
         indexed = index.get("runs", [])
         linked = {r.get("datastore_id") for r in indexed if r.get("datastore_id")}
         runs = [{k: v for k, v in r.items() if k != "datastore_id"} for r in indexed]
@@ -251,20 +275,6 @@ class CatalystRunStore:
         legacy = [run_from_row(r) | {"storage": {"stratus": False, "datastore": True, "reason": None}}
                   for r in rows if str(r["ROWID"]) not in linked]
         return sorted(runs + legacy, key=lambda r: _when(r.get("created")), reverse=True)[:limit]
-
-    def _backfill_series(self, index: dict) -> dict:
-        """Once: give index entries saved before the series existed their series (1 read each, 1 write)."""
-        missing = [r for r in index.get("runs", []) if "series" not in r and RUN_ID.fullmatch(str(r.get("id")))]
-        if not missing:
-            return index
-        try:
-            for entry in missing:
-                found = self._get_json("reading the run", run_key(entry["id"]))
-                entry["series"] = demand_series(found["hours"]) if found else demand_series([])
-            self._put_json("updating the run index", INDEX_KEY, index)
-        except StoreError:
-            pass  # the list still works; the next listing tries again
-        return index
 
     def get_run(self, run_id: str) -> tuple[dict, list[dict]] | None:
         """(run, hours in order), or None when there is no such run."""

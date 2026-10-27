@@ -146,6 +146,14 @@ def test_json_sent_as_text_plain_is_accepted(api):
     assert resp.status_code == 200 and len(resp.get_json()["predictions"]) == 3
 
 
+def test_mixed_utc_offsets_are_a_400_not_a_500(api):
+    rows = sample_rows(2)
+    rows[0]["timestamp"] += "+05:30"
+    rows[1]["timestamp"] += "Z"
+    resp = post(api, {"rows": rows})
+    assert resp.status_code == 400 and "UTC offset" in resp.get_json()["error"]
+
+
 def test_non_json_body(api):
     resp = api.post("/api/predict", data="rows=1", content_type="text/plain")
     assert resp.status_code == 400 and resp.is_json

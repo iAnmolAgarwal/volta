@@ -72,6 +72,10 @@ class ForecastService:
         if not ok:
             run["storage"]["reason"] = run["errors"][-1]
             return run
+        check = getattr(store, "check_daily_limit", None)
+        if check is not None and not attempt("saving the run", check)[0]:  # no upload once today's saves are used up
+            run["storage"]["reason"] = run["errors"][-1]
+            return run
         if csv_bytes is not None:
             key = upload_key(record["filename"])
             if attempt("Stratus upload", store.put_csv, key, csv_bytes)[0]:

@@ -216,8 +216,8 @@ def test_cli_writes_the_contract_format(proxy_server, tmp_path):
     assert len(lines) == len(raw) + 1
     stamps, values = zip(*(line.split(",") for line in lines[1:]))
     assert list(stamps) == raw["timestamp"].tolist()  # original strings, original order
-    assert all(re.fullmatch(r"\d+\.\d{2}", v) for v in values)
-    np.testing.assert_allclose([float(v) for v in values], expected(pd.read_csv(SAMPLE)), atol=0.005)
+    assert all(re.fullmatch(r"\d+\.\d{4}", v) for v in values)  # 4 decimals: the value the controller decides on
+    np.testing.assert_allclose([float(v) for v in values], expected(pd.read_csv(SAMPLE)), atol=0.00005)
 
 
 def test_cli_fails_loudly_when_the_proxy_is_down(tmp_path):

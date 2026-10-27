@@ -231,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.output:
         out = pd.DataFrame({"timestamp": stamps.to_numpy(), "target_demand_kw": preds})  # original values, input order
-        out.to_csv(args.output, index=False, float_format="%.2f")
+        out.to_csv(args.output, index=False, float_format="%.4f")  # the precision the controller decides on
         print(f"Wrote {len(out)} predictions to {args.output}")
     else:
         print(f"Generated {len(preds)} predictions. First 5 samples:\n{preds[:5]}")
